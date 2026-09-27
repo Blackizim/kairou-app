@@ -1,0 +1,3192 @@
+[
+  {
+    "id": "cazetv",
+    "slug": "cazetv",
+    "title": "Cazé TV HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/cazetv.png",
+    "sourceUrl": "https://v1.rdse.buzz/cazetv",
+    "backupUrl": "https://v2.rdse.site/cazetv"
+  },
+  {
+    "id": "sportv",
+    "slug": "sportv",
+    "title": "SporTV HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sportv.png",
+    "sourceUrl": "https://v1.rdse.buzz/sportv",
+    "backupUrl": "https://v2.rdse.site/sportv"
+  },
+  {
+    "id": "sportv2",
+    "slug": "sportv2",
+    "title": "SporTV 2 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sportv2.png",
+    "sourceUrl": "https://v1.rdse.buzz/sportv2",
+    "backupUrl": "https://v2.rdse.site/sportv2"
+  },
+  {
+    "id": "sportv3",
+    "slug": "sportv3",
+    "title": "SporTV 3 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sportv3.png",
+    "sourceUrl": "https://v1.rdse.buzz/sportv3",
+    "backupUrl": "https://v2.rdse.site/sportv3"
+  },
+  {
+    "id": "premiere",
+    "slug": "premiere",
+    "title": "Premiere HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/premiere.png",
+    "sourceUrl": "https://v1.rdse.buzz/premiere",
+    "backupUrl": "https://v2.rdse.site/premiere"
+  },
+  {
+    "id": "premiere-2",
+    "slug": "premiere-2",
+    "title": "Premiere 2 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/premiere-2.png",
+    "sourceUrl": "https://v1.rdse.buzz/premiere-2",
+    "backupUrl": "https://v2.rdse.site/premiere-2"
+  },
+  {
+    "id": "premiere-3",
+    "slug": "premiere-3",
+    "title": "Premiere 3 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/premiere-3.png",
+    "sourceUrl": "https://v1.rdse.buzz/premiere-3",
+    "backupUrl": "https://v2.rdse.site/premiere-3"
+  },
+  {
+    "id": "espn",
+    "slug": "espn",
+    "title": "ESPN HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/espn.png",
+    "sourceUrl": "https://v1.rdse.buzz/espn",
+    "backupUrl": "https://v2.rdse.site/espn"
+  },
+  {
+    "id": "espn2",
+    "slug": "espn2",
+    "title": "ESPN 2 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/espn2.png",
+    "sourceUrl": "https://v1.rdse.buzz/espn2",
+    "backupUrl": "https://v2.rdse.site/espn2"
+  },
+  {
+    "id": "espn3",
+    "slug": "espn3",
+    "title": "ESPN 3 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/espn3.png",
+    "sourceUrl": "https://v1.rdse.buzz/espn3",
+    "backupUrl": "https://v2.rdse.site/espn3"
+  },
+  {
+    "id": "bandsports",
+    "slug": "bandsports",
+    "title": "BandSports HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/bandsports.png",
+    "sourceUrl": "https://v1.rdse.buzz/bandsports",
+    "backupUrl": "https://v2.rdse.site/bandsports"
+  },
+  {
+    "id": "combate",
+    "slug": "combate",
+    "title": "Combate HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/combate.png",
+    "sourceUrl": "https://v1.rdse.buzz/combate",
+    "backupUrl": "https://v2.rdse.site/combate"
+  },
+  {
+    "id": "globosp",
+    "slug": "globosp",
+    "title": "Globo São Paulo",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globosp.png",
+    "sourceUrl": "https://v1.rdse.buzz/globosp",
+    "backupUrl": "https://v2.rdse.site/globosp"
+  },
+  {
+    "id": "globorj",
+    "slug": "globorj",
+    "title": "Globo Rio de Janeiro",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globorj.png",
+    "sourceUrl": "https://v1.rdse.buzz/globorj",
+    "backupUrl": "https://v2.rdse.site/globorj"
+  },
+  {
+    "id": "sbt",
+    "slug": "sbt",
+    "title": "SBT HD",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/sbt.png",
+    "sourceUrl": "https://v1.rdse.buzz/sbt",
+    "backupUrl": "https://v2.rdse.site/sbt"
+  },
+  {
+    "id": "recordsp",
+    "slug": "recordsp",
+    "title": "Record TV São Paulo",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/recordsp.png",
+    "sourceUrl": "https://v1.rdse.buzz/recordsp",
+    "backupUrl": "https://v2.rdse.site/recordsp"
+  },
+  {
+    "id": "redetv",
+    "slug": "redetv",
+    "title": "RedeTV! HD",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/redetv.png",
+    "sourceUrl": "https://v1.rdse.buzz/redetv",
+    "backupUrl": "https://v2.rdse.site/redetv"
+  },
+  {
+    "id": "cartoonnetwork",
+    "slug": "cartoonnetwork",
+    "title": "Cartoon Network HD",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/cartoonnetwork.png",
+    "sourceUrl": "https://v1.rdse.buzz/cartoonnetwork",
+    "backupUrl": "https://v2.rdse.site/cartoonnetwork"
+  },
+  {
+    "id": "gloob",
+    "slug": "gloob",
+    "title": "Gloob HD",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/gloob.png",
+    "sourceUrl": "https://v1.rdse.buzz/gloob",
+    "backupUrl": "https://v2.rdse.site/gloob"
+  },
+  {
+    "id": "discoverykids",
+    "slug": "discoverykids",
+    "title": "Discovery Kids HD",
+    "genre": "infantil",
+    "category": "Documentários & Ciência",
+    "logo": "https://reidosembeds.online/img/discoverykids.png",
+    "sourceUrl": "https://v1.rdse.buzz/discoverykids",
+    "backupUrl": "https://v2.rdse.site/discoverykids"
+  },
+  {
+    "id": "globonews",
+    "slug": "globonews",
+    "title": "GloboNews HD",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globonews.png",
+    "sourceUrl": "https://v1.rdse.buzz/globonews",
+    "backupUrl": "https://v2.rdse.site/globonews"
+  },
+  {
+    "id": "jovempannews",
+    "slug": "jovempannews",
+    "title": "Jovem Pan News HD",
+    "genre": "noticias",
+    "category": "Notícias & Jornalismo",
+    "logo": "https://reidosembeds.online/img/jovempannews.png",
+    "sourceUrl": "https://v1.rdse.buzz/jovempannews",
+    "backupUrl": "https://v2.rdse.site/jovempannews"
+  },
+  {
+    "id": "bandnews",
+    "slug": "bandnews",
+    "title": "BandNews HD",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/bandnews.png",
+    "sourceUrl": "https://v1.rdse.buzz/bandnews",
+    "backupUrl": "https://v2.rdse.site/bandnews"
+  },
+  {
+    "id": "recordnews",
+    "slug": "recordnews",
+    "title": "Record News HD",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/recordnews.png",
+    "sourceUrl": "https://v1.rdse.buzz/recordnews",
+    "backupUrl": "https://v2.rdse.site/recordnews"
+  },
+  {
+    "id": "24h-chaves",
+    "slug": "24h-chaves",
+    "title": "Chaves 24h",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-chaves.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-chaves",
+    "backupUrl": "https://v2.rdse.site/24h-chaves"
+  },
+  {
+    "id": "24h-chapolin",
+    "slug": "24h-chapolin",
+    "title": "Chapolin Colorado 24h",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-chapolin.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-chapolin",
+    "backupUrl": "https://v2.rdse.site/24h-chapolin"
+  },
+  {
+    "id": "24h-todo-mundo-odeia-o-chris",
+    "slug": "24h-todo-mundo-odeia-o-chris",
+    "title": "Todo Mundo Odeia o Chris 24h",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-todo-mundo-odeia-o-chris.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-todo-mundo-odeia-o-chris",
+    "backupUrl": "https://v2.rdse.site/24h-todo-mundo-odeia-o-chris"
+  },
+  {
+    "id": "24h-dragon-ball-z",
+    "slug": "24h-dragon-ball-z",
+    "title": "Dragon Ball Z 24h",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-dragon-ball-z.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-dragon-ball-z",
+    "backupUrl": "https://v2.rdse.site/24h-dragon-ball-z"
+  },
+  {
+    "id": "24h-naruto",
+    "slug": "24h-naruto",
+    "title": "Naruto Shippuden 24h",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-naruto.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-naruto",
+    "backupUrl": "https://v2.rdse.site/24h-naruto"
+  },
+  {
+    "id": "hbo",
+    "slug": "hbo",
+    "title": "HBO HD",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/hbo.png",
+    "sourceUrl": "https://v1.rdse.buzz/hbo",
+    "backupUrl": "https://v2.rdse.site/hbo"
+  },
+  {
+    "id": "hbo2",
+    "slug": "hbo2",
+    "title": "HBO 2 HD",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/hbo2.png",
+    "sourceUrl": "https://v1.rdse.buzz/hbo2",
+    "backupUrl": "https://v2.rdse.site/hbo2"
+  },
+  {
+    "id": "telecinepremium",
+    "slug": "telecinepremium",
+    "title": "Telecine Premium HD",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/telecinepremium.png",
+    "sourceUrl": "https://v1.rdse.buzz/telecinepremium",
+    "backupUrl": "https://v2.rdse.site/telecinepremium"
+  },
+  {
+    "id": "telecineaction",
+    "slug": "telecineaction",
+    "title": "Telecine Action HD",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/telecineaction.png",
+    "sourceUrl": "https://v1.rdse.buzz/telecineaction",
+    "backupUrl": "https://v2.rdse.site/telecineaction"
+  },
+  {
+    "id": "telecinepipoca",
+    "slug": "telecinepipoca",
+    "title": "Telecine Pipoca HD",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/telecinepipoca.png",
+    "sourceUrl": "https://v1.rdse.buzz/telecinepipoca",
+    "backupUrl": "https://v2.rdse.site/telecinepipoca"
+  },
+  {
+    "id": "universaltv",
+    "slug": "universaltv",
+    "title": "Universal TV HD",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/universaltv.png",
+    "sourceUrl": "https://v1.rdse.buzz/universaltv",
+    "backupUrl": "https://v2.rdse.site/universaltv"
+  },
+  {
+    "id": "megapix",
+    "slug": "megapix",
+    "title": "Megapix HD",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/megapix.png",
+    "sourceUrl": "https://v1.rdse.buzz/megapix",
+    "backupUrl": "https://v2.rdse.site/megapix"
+  },
+  {
+    "id": "24h-5-minute-crafts",
+    "slug": "24h-5-minute-crafts",
+    "title": "24h: 5 Minute Crafts",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-5-minute-crafts.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-5-minute-crafts",
+    "backupUrl": "https://v2.rdse.site/24h-5-minute-crafts"
+  },
+  {
+    "id": "24h-invencivel",
+    "slug": "24h-invencivel",
+    "title": "24h: Invencivel",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-invencivel.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-invencivel",
+    "backupUrl": "https://v2.rdse.site/24h-invencivel"
+  },
+  {
+    "id": "24h-irmao-do-jorel",
+    "slug": "24h-irmao-do-jorel",
+    "title": "24h: Irmao Do Jorel",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-irmao-do-jorel.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-irmao-do-jorel",
+    "backupUrl": "https://v2.rdse.site/24h-irmao-do-jorel"
+  },
+  {
+    "id": "24h-master-cheff-brasil",
+    "slug": "24h-master-cheff-brasil",
+    "title": "24h: Master Cheff Brasil",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-master-cheff-brasil.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-master-cheff-brasil",
+    "backupUrl": "https://v2.rdse.site/24h-master-cheff-brasil"
+  },
+  {
+    "id": "24h-os-jetsons",
+    "slug": "24h-os-jetsons",
+    "title": "24h: Os Jetsons",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-os-jetsons.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-os-jetsons",
+    "backupUrl": "https://v2.rdse.site/24h-os-jetsons"
+  },
+  {
+    "id": "24h-spacetoday",
+    "slug": "24h-spacetoday",
+    "title": "24h: Spacetoday",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-spacetoday.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-spacetoday",
+    "backupUrl": "https://v2.rdse.site/24h-spacetoday"
+  },
+  {
+    "id": "ae",
+    "slug": "ae",
+    "title": "A&E",
+    "genre": "filmes-series",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/ae.png",
+    "sourceUrl": "https://v1.rdse.buzz/ae",
+    "backupUrl": "https://v2.rdse.site/ae"
+  },
+  {
+    "id": "adultswim",
+    "slug": "adultswim",
+    "title": "Adultswim",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/adultswim.png",
+    "sourceUrl": "https://v1.rdse.buzz/adultswim",
+    "backupUrl": "https://v2.rdse.site/adultswim"
+  },
+  {
+    "id": "agrocanal",
+    "slug": "agrocanal",
+    "title": "Agrocanal",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/agrocanal.png",
+    "sourceUrl": "https://v1.rdse.buzz/agrocanal",
+    "backupUrl": "https://v2.rdse.site/agrocanal"
+  },
+  {
+    "id": "agromais",
+    "slug": "agromais",
+    "title": "Agromais",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/agromais.png",
+    "sourceUrl": "https://v1.rdse.buzz/agromais",
+    "backupUrl": "https://v2.rdse.site/agromais"
+  },
+  {
+    "id": "agtv",
+    "slug": "agtv",
+    "title": "Agtv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/agtv.png",
+    "sourceUrl": "https://v1.rdse.buzz/agtv",
+    "backupUrl": "https://v2.rdse.site/agtv"
+  },
+  {
+    "id": "amazonsat",
+    "slug": "amazonsat",
+    "title": "Amazonsat",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/amazonsat.png",
+    "sourceUrl": "https://v1.rdse.buzz/amazonsat",
+    "backupUrl": "https://v2.rdse.site/amazonsat"
+  },
+  {
+    "id": "amc",
+    "slug": "amc",
+    "title": "AMC",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/amc.png",
+    "sourceUrl": "https://v1.rdse.buzz/amc",
+    "backupUrl": "https://v2.rdse.site/amc"
+  },
+  {
+    "id": "animalplanet",
+    "slug": "animalplanet",
+    "title": "Animalplanet",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/animalplanet.png",
+    "sourceUrl": "https://v1.rdse.buzz/animalplanet",
+    "backupUrl": "https://v2.rdse.site/animalplanet"
+  },
+  {
+    "id": "animetv",
+    "slug": "animetv",
+    "title": "Animetv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/animetv.png",
+    "sourceUrl": "https://v1.rdse.buzz/animetv",
+    "backupUrl": "https://v2.rdse.site/animetv"
+  },
+  {
+    "id": "appletv",
+    "slug": "appletv",
+    "title": "Appletv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/appletv.png",
+    "sourceUrl": "https://v1.rdse.buzz/appletv",
+    "backupUrl": "https://v2.rdse.site/appletv"
+  },
+  {
+    "id": "appletv2",
+    "slug": "appletv2",
+    "title": "Appletv2",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/appletv2.png",
+    "sourceUrl": "https://v1.rdse.buzz/appletv2",
+    "backupUrl": "https://v2.rdse.site/appletv2"
+  },
+  {
+    "id": "appletv3",
+    "slug": "appletv3",
+    "title": "Appletv3",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/appletv3.png",
+    "sourceUrl": "https://v1.rdse.buzz/appletv3",
+    "backupUrl": "https://v2.rdse.site/appletv3"
+  },
+  {
+    "id": "appletv4",
+    "slug": "appletv4",
+    "title": "Appletv4",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/appletv4.png",
+    "sourceUrl": "https://v1.rdse.buzz/appletv4",
+    "backupUrl": "https://v2.rdse.site/appletv4"
+  },
+  {
+    "id": "appletv5",
+    "slug": "appletv5",
+    "title": "Appletv5",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/appletv5.png",
+    "sourceUrl": "https://v1.rdse.buzz/appletv5",
+    "backupUrl": "https://v2.rdse.site/appletv5"
+  },
+  {
+    "id": "appletv6",
+    "slug": "appletv6",
+    "title": "Appletv6",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/appletv6.png",
+    "sourceUrl": "https://v1.rdse.buzz/appletv6",
+    "backupUrl": "https://v2.rdse.site/appletv6"
+  },
+  {
+    "id": "argentinanews",
+    "slug": "argentinanews",
+    "title": "Argentinanews",
+    "genre": "noticias",
+    "category": "Notícias & Jornalismo",
+    "logo": "https://reidosembeds.online/img/argentinanews.png",
+    "sourceUrl": "https://v1.rdse.buzz/argentinanews",
+    "backupUrl": "https://v2.rdse.site/argentinanews"
+  },
+  {
+    "id": "arte1",
+    "slug": "arte1",
+    "title": "Arte1",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/arte1.png",
+    "sourceUrl": "https://v1.rdse.buzz/arte1",
+    "backupUrl": "https://v2.rdse.site/arte1"
+  },
+  {
+    "id": "assimeportugal",
+    "slug": "assimeportugal",
+    "title": "Assimeportugal",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/assimeportugal.png",
+    "sourceUrl": "https://v1.rdse.buzz/assimeportugal",
+    "backupUrl": "https://v2.rdse.site/assimeportugal"
+  },
+  {
+    "id": "axn",
+    "slug": "axn",
+    "title": "AXN",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/axn.png",
+    "sourceUrl": "https://v1.rdse.buzz/axn",
+    "backupUrl": "https://v2.rdse.site/axn"
+  },
+  {
+    "id": "bandba",
+    "slug": "bandba",
+    "title": "Bandba",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/bandba.png",
+    "sourceUrl": "https://v1.rdse.buzz/bandba",
+    "backupUrl": "https://v2.rdse.site/bandba"
+  },
+  {
+    "id": "bandmg",
+    "slug": "bandmg",
+    "title": "Bandmg",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/bandmg.png",
+    "sourceUrl": "https://v1.rdse.buzz/bandmg",
+    "backupUrl": "https://v2.rdse.site/bandmg"
+  },
+  {
+    "id": "bandpa",
+    "slug": "bandpa",
+    "title": "Bandpa",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/bandpa.png",
+    "sourceUrl": "https://v1.rdse.buzz/bandpa",
+    "backupUrl": "https://v2.rdse.site/bandpa"
+  },
+  {
+    "id": "bandpb",
+    "slug": "bandpb",
+    "title": "Bandpb",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/bandpb.png",
+    "sourceUrl": "https://v1.rdse.buzz/bandpb",
+    "backupUrl": "https://v2.rdse.site/bandpb"
+  },
+  {
+    "id": "bandpe",
+    "slug": "bandpe",
+    "title": "Bandpe",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/bandpe.png",
+    "sourceUrl": "https://v1.rdse.buzz/bandpe",
+    "backupUrl": "https://v2.rdse.site/bandpe"
+  },
+  {
+    "id": "bandsp",
+    "slug": "bandsp",
+    "title": "Bandsp",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/bandsp.png",
+    "sourceUrl": "https://v1.rdse.buzz/bandsp",
+    "backupUrl": "https://v2.rdse.site/bandsp"
+  },
+  {
+    "id": "bis",
+    "slug": "bis",
+    "title": "Bis",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/bis.png",
+    "sourceUrl": "https://v1.rdse.buzz/bis",
+    "backupUrl": "https://v2.rdse.site/bis"
+  },
+  {
+    "id": "bloomberg",
+    "slug": "bloomberg",
+    "title": "Bloomberg",
+    "genre": "noticias",
+    "category": "Notícias & Jornalismo",
+    "logo": "https://reidosembeds.online/img/bloomberg.png",
+    "sourceUrl": "https://v1.rdse.buzz/bloomberg",
+    "backupUrl": "https://v2.rdse.site/bloomberg"
+  },
+  {
+    "id": "canal11",
+    "slug": "canal11",
+    "title": "Canal11",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/canal11.png",
+    "sourceUrl": "https://v1.rdse.buzz/canal11",
+    "backupUrl": "https://v2.rdse.site/canal11"
+  },
+  {
+    "id": "canalbrasil",
+    "slug": "canalbrasil",
+    "title": "Canalbrasil",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/canalbrasil.png",
+    "sourceUrl": "https://v1.rdse.buzz/canalbrasil",
+    "backupUrl": "https://v2.rdse.site/canalbrasil"
+  },
+  {
+    "id": "canale",
+    "slug": "canale",
+    "title": "Canale",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/canale.png",
+    "sourceUrl": "https://v1.rdse.buzz/canale",
+    "backupUrl": "https://v2.rdse.site/canale"
+  },
+  {
+    "id": "canalgoat",
+    "slug": "canalgoat",
+    "title": "Canalgoat",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/canalgoat.png",
+    "sourceUrl": "https://v1.rdse.buzz/canalgoat",
+    "backupUrl": "https://v2.rdse.site/canalgoat"
+  },
+  {
+    "id": "canalgoat2",
+    "slug": "canalgoat2",
+    "title": "Canalgoat2",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/canalgoat2.png",
+    "sourceUrl": "https://v1.rdse.buzz/canalgoat2",
+    "backupUrl": "https://v2.rdse.site/canalgoat2"
+  },
+  {
+    "id": "canalgoat3",
+    "slug": "canalgoat3",
+    "title": "Canalgoat3",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/canalgoat3.png",
+    "sourceUrl": "https://v1.rdse.buzz/canalgoat3",
+    "backupUrl": "https://v2.rdse.site/canalgoat3"
+  },
+  {
+    "id": "canalgov",
+    "slug": "canalgov",
+    "title": "Canalgov",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/canalgov.png",
+    "sourceUrl": "https://v1.rdse.buzz/canalgov",
+    "backupUrl": "https://v2.rdse.site/canalgov"
+  },
+  {
+    "id": "canaloff",
+    "slug": "canaloff",
+    "title": "Canaloff",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/canaloff.png",
+    "sourceUrl": "https://v1.rdse.buzz/canaloff",
+    "backupUrl": "https://v2.rdse.site/canaloff"
+  },
+  {
+    "id": "canalrural",
+    "slug": "canalrural",
+    "title": "Canalrural",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/canalrural.png",
+    "sourceUrl": "https://v1.rdse.buzz/canalrural",
+    "backupUrl": "https://v2.rdse.site/canalrural"
+  },
+  {
+    "id": "canaluol",
+    "slug": "canaluol",
+    "title": "Canaluol",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/canaluol.png",
+    "sourceUrl": "https://v1.rdse.buzz/canaluol",
+    "backupUrl": "https://v2.rdse.site/canaluol"
+  },
+  {
+    "id": "cancao-nova",
+    "slug": "cancao-nova",
+    "title": "Cancao Nova",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/cancao-nova.png",
+    "sourceUrl": "https://v1.rdse.buzz/cancao-nova",
+    "backupUrl": "https://v2.rdse.site/cancao-nova"
+  },
+  {
+    "id": "cartoonito",
+    "slug": "cartoonito",
+    "title": "Cartoonito",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/cartoonito.png",
+    "sourceUrl": "https://v1.rdse.buzz/cartoonito",
+    "backupUrl": "https://v2.rdse.site/cartoonito"
+  },
+  {
+    "id": "cazetv2",
+    "slug": "cazetv2",
+    "title": "Cazetv2",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/cazetv2.png",
+    "sourceUrl": "https://v1.rdse.buzz/cazetv2",
+    "backupUrl": "https://v2.rdse.site/cazetv2"
+  },
+  {
+    "id": "cazetv3",
+    "slug": "cazetv3",
+    "title": "Cazetv3",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/cazetv3.png",
+    "sourceUrl": "https://v1.rdse.buzz/cazetv3",
+    "backupUrl": "https://v2.rdse.site/cazetv3"
+  },
+  {
+    "id": "cazetv4",
+    "slug": "cazetv4",
+    "title": "Cazetv4",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/cazetv4.png",
+    "sourceUrl": "https://v1.rdse.buzz/cazetv4",
+    "backupUrl": "https://v2.rdse.site/cazetv4"
+  },
+  {
+    "id": "cazetv5",
+    "slug": "cazetv5",
+    "title": "Cazetv5",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/cazetv5.png",
+    "sourceUrl": "https://v1.rdse.buzz/cazetv5",
+    "backupUrl": "https://v2.rdse.site/cazetv5"
+  },
+  {
+    "id": "cinemax",
+    "slug": "cinemax",
+    "title": "Cinemax",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/cinemax.png",
+    "sourceUrl": "https://v1.rdse.buzz/cinemax",
+    "backupUrl": "https://v2.rdse.site/cinemax"
+  },
+  {
+    "id": "cnnbrasil",
+    "slug": "cnnbrasil",
+    "title": "Cnnbrasil",
+    "genre": "noticias",
+    "category": "Notícias & Jornalismo",
+    "logo": "https://reidosembeds.online/img/cnnbrasil.png",
+    "sourceUrl": "https://v1.rdse.buzz/cnnbrasil",
+    "backupUrl": "https://v2.rdse.site/cnnbrasil"
+  },
+  {
+    "id": "cnnbrasilmoney",
+    "slug": "cnnbrasilmoney",
+    "title": "Cnnbrasilmoney",
+    "genre": "noticias",
+    "category": "Notícias & Jornalismo",
+    "logo": "https://reidosembeds.online/img/cnnbrasilmoney.png",
+    "sourceUrl": "https://v1.rdse.buzz/cnnbrasilmoney",
+    "backupUrl": "https://v2.rdse.site/cnnbrasilmoney"
+  },
+  {
+    "id": "cnnportugal",
+    "slug": "cnnportugal",
+    "title": "Cnnportugal",
+    "genre": "noticias",
+    "category": "Notícias & Jornalismo",
+    "logo": "https://reidosembeds.online/img/cnnportugal.png",
+    "sourceUrl": "https://v1.rdse.buzz/cnnportugal",
+    "backupUrl": "https://v2.rdse.site/cnnportugal"
+  },
+  {
+    "id": "combrasiltv",
+    "slug": "combrasiltv",
+    "title": "Combrasiltv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/combrasiltv.png",
+    "sourceUrl": "https://v1.rdse.buzz/combrasiltv",
+    "backupUrl": "https://v2.rdse.site/combrasiltv"
+  },
+  {
+    "id": "cuaima",
+    "slug": "cuaima",
+    "title": "Cuaima",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/cuaima.png",
+    "sourceUrl": "https://v1.rdse.buzz/cuaima",
+    "backupUrl": "https://v2.rdse.site/cuaima"
+  },
+  {
+    "id": "cultura-brasil",
+    "slug": "cultura-brasil",
+    "title": "Cultura Brasil",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/cultura-brasil.png",
+    "sourceUrl": "https://v1.rdse.buzz/cultura-brasil",
+    "backupUrl": "https://v2.rdse.site/cultura-brasil"
+  },
+  {
+    "id": "cultura-fm",
+    "slug": "cultura-fm",
+    "title": "Cultura Fm",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/cultura-fm.png",
+    "sourceUrl": "https://v1.rdse.buzz/cultura-fm",
+    "backupUrl": "https://v2.rdse.site/cultura-fm"
+  },
+  {
+    "id": "curta",
+    "slug": "curta",
+    "title": "Curta",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/curta.png",
+    "sourceUrl": "https://v1.rdse.buzz/curta",
+    "backupUrl": "https://v2.rdse.site/curta"
+  },
+  {
+    "id": "dazn",
+    "slug": "dazn",
+    "title": "Dazn",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dazn.png",
+    "sourceUrl": "https://v1.rdse.buzz/dazn",
+    "backupUrl": "https://v2.rdse.site/dazn"
+  },
+  {
+    "id": "dazn10",
+    "slug": "dazn10",
+    "title": "Dazn10",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dazn10.png",
+    "sourceUrl": "https://v1.rdse.buzz/dazn10",
+    "backupUrl": "https://v2.rdse.site/dazn10"
+  },
+  {
+    "id": "dazn2",
+    "slug": "dazn2",
+    "title": "Dazn2",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dazn2.png",
+    "sourceUrl": "https://v1.rdse.buzz/dazn2",
+    "backupUrl": "https://v2.rdse.site/dazn2"
+  },
+  {
+    "id": "dazn3",
+    "slug": "dazn3",
+    "title": "Dazn3",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dazn3.png",
+    "sourceUrl": "https://v1.rdse.buzz/dazn3",
+    "backupUrl": "https://v2.rdse.site/dazn3"
+  },
+  {
+    "id": "dazn4",
+    "slug": "dazn4",
+    "title": "Dazn4",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dazn4.png",
+    "sourceUrl": "https://v1.rdse.buzz/dazn4",
+    "backupUrl": "https://v2.rdse.site/dazn4"
+  },
+  {
+    "id": "dazn5",
+    "slug": "dazn5",
+    "title": "Dazn5",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dazn5.png",
+    "sourceUrl": "https://v1.rdse.buzz/dazn5",
+    "backupUrl": "https://v2.rdse.site/dazn5"
+  },
+  {
+    "id": "dazn6",
+    "slug": "dazn6",
+    "title": "Dazn6",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dazn6.png",
+    "sourceUrl": "https://v1.rdse.buzz/dazn6",
+    "backupUrl": "https://v2.rdse.site/dazn6"
+  },
+  {
+    "id": "dazn7",
+    "slug": "dazn7",
+    "title": "Dazn7",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dazn7.png",
+    "sourceUrl": "https://v1.rdse.buzz/dazn7",
+    "backupUrl": "https://v2.rdse.site/dazn7"
+  },
+  {
+    "id": "dazn8",
+    "slug": "dazn8",
+    "title": "Dazn8",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dazn8.png",
+    "sourceUrl": "https://v1.rdse.buzz/dazn8",
+    "backupUrl": "https://v2.rdse.site/dazn8"
+  },
+  {
+    "id": "dazn9",
+    "slug": "dazn9",
+    "title": "Dazn9",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dazn9.png",
+    "sourceUrl": "https://v1.rdse.buzz/dazn9",
+    "backupUrl": "https://v2.rdse.site/dazn9"
+  },
+  {
+    "id": "discoverychannel",
+    "slug": "discoverychannel",
+    "title": "Discoverychannel",
+    "genre": "documentarios",
+    "category": "Documentários & Ciência",
+    "logo": "https://reidosembeds.online/img/discoverychannel.png",
+    "sourceUrl": "https://v1.rdse.buzz/discoverychannel",
+    "backupUrl": "https://v2.rdse.site/discoverychannel"
+  },
+  {
+    "id": "discoveryheh",
+    "slug": "discoveryheh",
+    "title": "Discoveryheh",
+    "genre": "documentarios",
+    "category": "Documentários & Ciência",
+    "logo": "https://reidosembeds.online/img/discoveryheh.png",
+    "sourceUrl": "https://v1.rdse.buzz/discoveryheh",
+    "backupUrl": "https://v2.rdse.site/discoveryheh"
+  },
+  {
+    "id": "discoveryid",
+    "slug": "discoveryid",
+    "title": "Discoveryid",
+    "genre": "documentarios",
+    "category": "Documentários & Ciência",
+    "logo": "https://reidosembeds.online/img/discoveryid.png",
+    "sourceUrl": "https://v1.rdse.buzz/discoveryid",
+    "backupUrl": "https://v2.rdse.site/discoveryid"
+  },
+  {
+    "id": "discoveryscience",
+    "slug": "discoveryscience",
+    "title": "Discoveryscience",
+    "genre": "documentarios",
+    "category": "Documentários & Ciência",
+    "logo": "https://reidosembeds.online/img/discoveryscience.png",
+    "sourceUrl": "https://v1.rdse.buzz/discoveryscience",
+    "backupUrl": "https://v2.rdse.site/discoveryscience"
+  },
+  {
+    "id": "discoverytheater",
+    "slug": "discoverytheater",
+    "title": "Discoverytheater",
+    "genre": "documentarios",
+    "category": "Documentários & Ciência",
+    "logo": "https://reidosembeds.online/img/discoverytheater.png",
+    "sourceUrl": "https://v1.rdse.buzz/discoverytheater",
+    "backupUrl": "https://v2.rdse.site/discoverytheater"
+  },
+  {
+    "id": "discoveryturbo",
+    "slug": "discoveryturbo",
+    "title": "Discoveryturbo",
+    "genre": "documentarios",
+    "category": "Documentários & Ciência",
+    "logo": "https://reidosembeds.online/img/discoveryturbo.png",
+    "sourceUrl": "https://v1.rdse.buzz/discoveryturbo",
+    "backupUrl": "https://v2.rdse.site/discoveryturbo"
+  },
+  {
+    "id": "discoveryworld",
+    "slug": "discoveryworld",
+    "title": "Discoveryworld",
+    "genre": "documentarios",
+    "category": "Documentários & Ciência",
+    "logo": "https://reidosembeds.online/img/discoveryworld.png",
+    "sourceUrl": "https://v1.rdse.buzz/discoveryworld",
+    "backupUrl": "https://v2.rdse.site/discoveryworld"
+  },
+  {
+    "id": "disneyplus1",
+    "slug": "disneyplus1",
+    "title": "Disneyplus1",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/disneyplus1.png",
+    "sourceUrl": "https://v1.rdse.buzz/disneyplus1",
+    "backupUrl": "https://v2.rdse.site/disneyplus1"
+  },
+  {
+    "id": "disneyplus2",
+    "slug": "disneyplus2",
+    "title": "Disneyplus2",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/disneyplus2.png",
+    "sourceUrl": "https://v1.rdse.buzz/disneyplus2",
+    "backupUrl": "https://v2.rdse.site/disneyplus2"
+  },
+  {
+    "id": "disneyplus3",
+    "slug": "disneyplus3",
+    "title": "Disneyplus3",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/disneyplus3.png",
+    "sourceUrl": "https://v1.rdse.buzz/disneyplus3",
+    "backupUrl": "https://v2.rdse.site/disneyplus3"
+  },
+  {
+    "id": "disneyplus4",
+    "slug": "disneyplus4",
+    "title": "Disneyplus4",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/disneyplus4.png",
+    "sourceUrl": "https://v1.rdse.buzz/disneyplus4",
+    "backupUrl": "https://v2.rdse.site/disneyplus4"
+  },
+  {
+    "id": "disneyplus5",
+    "slug": "disneyplus5",
+    "title": "Disneyplus5",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/disneyplus5.png",
+    "sourceUrl": "https://v1.rdse.buzz/disneyplus5",
+    "backupUrl": "https://v2.rdse.site/disneyplus5"
+  },
+  {
+    "id": "disneyplus6",
+    "slug": "disneyplus6",
+    "title": "Disneyplus6",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/disneyplus6.png",
+    "sourceUrl": "https://v1.rdse.buzz/disneyplus6",
+    "backupUrl": "https://v2.rdse.site/disneyplus6"
+  },
+  {
+    "id": "disneyplus7",
+    "slug": "disneyplus7",
+    "title": "Disneyplus7",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/disneyplus7.png",
+    "sourceUrl": "https://v1.rdse.buzz/disneyplus7",
+    "backupUrl": "https://v2.rdse.site/disneyplus7"
+  },
+  {
+    "id": "disneyplus8",
+    "slug": "disneyplus8",
+    "title": "Disneyplus8",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/disneyplus8.png",
+    "sourceUrl": "https://v1.rdse.buzz/disneyplus8",
+    "backupUrl": "https://v2.rdse.site/disneyplus8"
+  },
+  {
+    "id": "dreamsex",
+    "slug": "dreamsex",
+    "title": "Dreamsex",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/dreamsex.png",
+    "sourceUrl": "https://v1.rdse.buzz/dreamsex",
+    "backupUrl": "https://v2.rdse.site/dreamsex"
+  },
+  {
+    "id": "dreamworks",
+    "slug": "dreamworks",
+    "title": "Dreamworks",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/dreamworks.png",
+    "sourceUrl": "https://v1.rdse.buzz/dreamworks",
+    "backupUrl": "https://v2.rdse.site/dreamworks"
+  },
+  {
+    "id": "dsports",
+    "slug": "dsports",
+    "title": "Dsports",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dsports.png",
+    "sourceUrl": "https://v1.rdse.buzz/dsports",
+    "backupUrl": "https://v2.rdse.site/dsports"
+  },
+  {
+    "id": "dsports2",
+    "slug": "dsports2",
+    "title": "Dsports2",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/dsports2.png",
+    "sourceUrl": "https://v1.rdse.buzz/dsports2",
+    "backupUrl": "https://v2.rdse.site/dsports2"
+  },
+  {
+    "id": "dumdum",
+    "slug": "dumdum",
+    "title": "Dumdum",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/dumdum.png",
+    "sourceUrl": "https://v1.rdse.buzz/dumdum",
+    "backupUrl": "https://v2.rdse.site/dumdum"
+  },
+  {
+    "id": "espn4",
+    "slug": "espn4",
+    "title": "ESPN 4 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/espn4.png",
+    "sourceUrl": "https://v1.rdse.buzz/espn4",
+    "backupUrl": "https://v2.rdse.site/espn4"
+  },
+  {
+    "id": "espn5",
+    "slug": "espn5",
+    "title": "ESPN 5 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/espn5.png",
+    "sourceUrl": "https://v1.rdse.buzz/espn5",
+    "backupUrl": "https://v2.rdse.site/espn5"
+  },
+  {
+    "id": "espn6",
+    "slug": "espn6",
+    "title": "ESPN 6 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/espn6.png",
+    "sourceUrl": "https://v1.rdse.buzz/espn6",
+    "backupUrl": "https://v2.rdse.site/espn6"
+  },
+  {
+    "id": "eurosport",
+    "slug": "eurosport",
+    "title": "Eurosport",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/eurosport.png",
+    "sourceUrl": "https://v1.rdse.buzz/eurosport",
+    "backupUrl": "https://v2.rdse.site/eurosport"
+  },
+  {
+    "id": "eurosport2",
+    "slug": "eurosport2",
+    "title": "Eurosport2",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/eurosport2.png",
+    "sourceUrl": "https://v1.rdse.buzz/eurosport2",
+    "backupUrl": "https://v2.rdse.site/eurosport2"
+  },
+  {
+    "id": "eventos1",
+    "slug": "eventos1",
+    "title": "Eventos1",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/eventos1.png",
+    "sourceUrl": "https://v1.rdse.buzz/eventos1",
+    "backupUrl": "https://v2.rdse.site/eventos1"
+  },
+  {
+    "id": "eventos2",
+    "slug": "eventos2",
+    "title": "Eventos2",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/eventos2.png",
+    "sourceUrl": "https://v1.rdse.buzz/eventos2",
+    "backupUrl": "https://v2.rdse.site/eventos2"
+  },
+  {
+    "id": "eventos3",
+    "slug": "eventos3",
+    "title": "Eventos3",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/eventos3.png",
+    "sourceUrl": "https://v1.rdse.buzz/eventos3",
+    "backupUrl": "https://v2.rdse.site/eventos3"
+  },
+  {
+    "id": "eventos4",
+    "slug": "eventos4",
+    "title": "Eventos4",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/eventos4.png",
+    "sourceUrl": "https://v1.rdse.buzz/eventos4",
+    "backupUrl": "https://v2.rdse.site/eventos4"
+  },
+  {
+    "id": "fashiontv",
+    "slug": "fashiontv",
+    "title": "Fashiontv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/fashiontv.png",
+    "sourceUrl": "https://v1.rdse.buzz/fashiontv",
+    "backupUrl": "https://v2.rdse.site/fashiontv"
+  },
+  {
+    "id": "fifa",
+    "slug": "fifa",
+    "title": "Fifa",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/fifa.png",
+    "sourceUrl": "https://v1.rdse.buzz/fifa",
+    "backupUrl": "https://v2.rdse.site/fifa"
+  },
+  {
+    "id": "fifa2",
+    "slug": "fifa2",
+    "title": "Fifa2",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/fifa2.png",
+    "sourceUrl": "https://v1.rdse.buzz/fifa2",
+    "backupUrl": "https://v2.rdse.site/fifa2"
+  },
+  {
+    "id": "fifa3",
+    "slug": "fifa3",
+    "title": "Fifa3",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/fifa3.png",
+    "sourceUrl": "https://v1.rdse.buzz/fifa3",
+    "backupUrl": "https://v2.rdse.site/fifa3"
+  },
+  {
+    "id": "fifa4",
+    "slug": "fifa4",
+    "title": "Fifa4",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/fifa4.png",
+    "sourceUrl": "https://v1.rdse.buzz/fifa4",
+    "backupUrl": "https://v2.rdse.site/fifa4"
+  },
+  {
+    "id": "filmarts",
+    "slug": "filmarts",
+    "title": "Filmarts",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/filmarts.png",
+    "sourceUrl": "https://v1.rdse.buzz/filmarts",
+    "backupUrl": "https://v2.rdse.site/filmarts"
+  },
+  {
+    "id": "fishtv",
+    "slug": "fishtv",
+    "title": "Fishtv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/fishtv.png",
+    "sourceUrl": "https://v1.rdse.buzz/fishtv",
+    "backupUrl": "https://v2.rdse.site/fishtv"
+  },
+  {
+    "id": "flohockey",
+    "slug": "flohockey",
+    "title": "Flohockey",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/flohockey.png",
+    "sourceUrl": "https://v1.rdse.buzz/flohockey",
+    "backupUrl": "https://v2.rdse.site/flohockey"
+  },
+  {
+    "id": "foodnetwork",
+    "slug": "foodnetwork",
+    "title": "Foodnetwork",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/foodnetwork.png",
+    "sourceUrl": "https://v1.rdse.buzz/foodnetwork",
+    "backupUrl": "https://v2.rdse.site/foodnetwork"
+  },
+  {
+    "id": "foxsports1",
+    "slug": "foxsports1",
+    "title": "Foxsports1",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/foxsports1.png",
+    "sourceUrl": "https://v1.rdse.buzz/foxsports1",
+    "backupUrl": "https://v2.rdse.site/foxsports1"
+  },
+  {
+    "id": "foxsports2",
+    "slug": "foxsports2",
+    "title": "Foxsports2",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/foxsports2.png",
+    "sourceUrl": "https://v1.rdse.buzz/foxsports2",
+    "backupUrl": "https://v2.rdse.site/foxsports2"
+  },
+  {
+    "id": "ftfsports",
+    "slug": "ftfsports",
+    "title": "Ftfsports",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/ftfsports.png",
+    "sourceUrl": "https://v1.rdse.buzz/ftfsports",
+    "backupUrl": "https://v2.rdse.site/ftfsports"
+  },
+  {
+    "id": "fueltv",
+    "slug": "fueltv",
+    "title": "Fueltv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/fueltv.png",
+    "sourceUrl": "https://v1.rdse.buzz/fueltv",
+    "backupUrl": "https://v2.rdse.site/fueltv"
+  },
+  {
+    "id": "futura",
+    "slug": "futura",
+    "title": "Futura",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/futura.png",
+    "sourceUrl": "https://v1.rdse.buzz/futura",
+    "backupUrl": "https://v2.rdse.site/futura"
+  },
+  {
+    "id": "gazeta",
+    "slug": "gazeta",
+    "title": "Gazeta",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/gazeta.png",
+    "sourceUrl": "https://v1.rdse.buzz/gazeta",
+    "backupUrl": "https://v2.rdse.site/gazeta"
+  },
+  {
+    "id": "geekdot",
+    "slug": "geekdot",
+    "title": "Geekdot",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/geekdot.png",
+    "sourceUrl": "https://v1.rdse.buzz/geekdot",
+    "backupUrl": "https://v2.rdse.site/geekdot"
+  },
+  {
+    "id": "getv",
+    "slug": "getv",
+    "title": "Getv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/getv.png",
+    "sourceUrl": "https://v1.rdse.buzz/getv",
+    "backupUrl": "https://v2.rdse.site/getv"
+  },
+  {
+    "id": "globoba",
+    "slug": "globoba",
+    "title": "Globo Bahia",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globoba.png",
+    "sourceUrl": "https://v1.rdse.buzz/globoba",
+    "backupUrl": "https://v2.rdse.site/globoba"
+  },
+  {
+    "id": "globodf",
+    "slug": "globodf",
+    "title": "Globo Brasília (DF)",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globodf.png",
+    "sourceUrl": "https://v1.rdse.buzz/globodf",
+    "backupUrl": "https://v2.rdse.site/globodf"
+  },
+  {
+    "id": "globomg",
+    "slug": "globomg",
+    "title": "Globo Minas Gerais",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globomg.png",
+    "sourceUrl": "https://v1.rdse.buzz/globomg",
+    "backupUrl": "https://v2.rdse.site/globomg"
+  },
+  {
+    "id": "globors",
+    "slug": "globors",
+    "title": "Globo Rio Grande do Sul",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globors.png",
+    "sourceUrl": "https://v1.rdse.buzz/globors",
+    "backupUrl": "https://v2.rdse.site/globors"
+  },
+  {
+    "id": "globoal",
+    "slug": "globoal",
+    "title": "Globoal",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globoal.png",
+    "sourceUrl": "https://v1.rdse.buzz/globoal",
+    "backupUrl": "https://v2.rdse.site/globoal"
+  },
+  {
+    "id": "globoam",
+    "slug": "globoam",
+    "title": "Globoam",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globoam.png",
+    "sourceUrl": "https://v1.rdse.buzz/globoam",
+    "backupUrl": "https://v2.rdse.site/globoam"
+  },
+  {
+    "id": "globogo",
+    "slug": "globogo",
+    "title": "Globogo",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globogo.png",
+    "sourceUrl": "https://v1.rdse.buzz/globogo",
+    "backupUrl": "https://v2.rdse.site/globogo"
+  },
+  {
+    "id": "globoms",
+    "slug": "globoms",
+    "title": "Globoms",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globoms.png",
+    "sourceUrl": "https://v1.rdse.buzz/globoms",
+    "backupUrl": "https://v2.rdse.site/globoms"
+  },
+  {
+    "id": "globoplaynovelas",
+    "slug": "globoplaynovelas",
+    "title": "Globoplaynovelas",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/globoplaynovelas.png",
+    "sourceUrl": "https://v1.rdse.buzz/globoplaynovelas",
+    "backupUrl": "https://v2.rdse.site/globoplaynovelas"
+  },
+  {
+    "id": "gloobinho",
+    "slug": "gloobinho",
+    "title": "Gloobinho",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/gloobinho.png",
+    "sourceUrl": "https://v1.rdse.buzz/gloobinho",
+    "backupUrl": "https://v2.rdse.site/gloobinho"
+  },
+  {
+    "id": "gnt",
+    "slug": "gnt",
+    "title": "Gnt",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/gnt.png",
+    "sourceUrl": "https://v1.rdse.buzz/gnt",
+    "backupUrl": "https://v2.rdse.site/gnt"
+  },
+  {
+    "id": "gospelcartoon",
+    "slug": "gospelcartoon",
+    "title": "Gospelcartoon",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/gospelcartoon.png",
+    "sourceUrl": "https://v1.rdse.buzz/gospelcartoon",
+    "backupUrl": "https://v2.rdse.site/gospelcartoon"
+  },
+  {
+    "id": "hbofamily",
+    "slug": "hbofamily",
+    "title": "HBO Family HD",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/hbofamily.png",
+    "sourceUrl": "https://v1.rdse.buzz/hbofamily",
+    "backupUrl": "https://v2.rdse.site/hbofamily"
+  },
+  {
+    "id": "hbomundi",
+    "slug": "hbomundi",
+    "title": "Hbomundi",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/hbomundi.png",
+    "sourceUrl": "https://v1.rdse.buzz/hbomundi",
+    "backupUrl": "https://v2.rdse.site/hbomundi"
+  },
+  {
+    "id": "hboplus",
+    "slug": "hboplus",
+    "title": "Hboplus",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/hboplus.png",
+    "sourceUrl": "https://v1.rdse.buzz/hboplus",
+    "backupUrl": "https://v2.rdse.site/hboplus"
+  },
+  {
+    "id": "hbopop",
+    "slug": "hbopop",
+    "title": "Hbopop",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/hbopop.png",
+    "sourceUrl": "https://v1.rdse.buzz/hbopop",
+    "backupUrl": "https://v2.rdse.site/hbopop"
+  },
+  {
+    "id": "hbosignature",
+    "slug": "hbosignature",
+    "title": "Hbosignature",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/hbosignature.png",
+    "sourceUrl": "https://v1.rdse.buzz/hbosignature",
+    "backupUrl": "https://v2.rdse.site/hbosignature"
+  },
+  {
+    "id": "hboxtreme",
+    "slug": "hboxtreme",
+    "title": "Hboxtreme",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/hboxtreme.png",
+    "sourceUrl": "https://v1.rdse.buzz/hboxtreme",
+    "backupUrl": "https://v2.rdse.site/hboxtreme"
+  },
+  {
+    "id": "hgtv",
+    "slug": "hgtv",
+    "title": "Hgtv",
+    "genre": "documentarios",
+    "category": "Documentários & Ciência",
+    "logo": "https://reidosembeds.online/img/hgtv.png",
+    "sourceUrl": "https://v1.rdse.buzz/hgtv",
+    "backupUrl": "https://v2.rdse.site/hgtv"
+  },
+  {
+    "id": "hiltonchannel",
+    "slug": "hiltonchannel",
+    "title": "Hiltonchannel",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/hiltonchannel.png",
+    "sourceUrl": "https://v1.rdse.buzz/hiltonchannel",
+    "backupUrl": "https://v2.rdse.site/hiltonchannel"
+  },
+  {
+    "id": "history",
+    "slug": "history",
+    "title": "History",
+    "genre": "documentarios",
+    "category": "Documentários & Ciência",
+    "logo": "https://reidosembeds.online/img/history.png",
+    "sourceUrl": "https://v1.rdse.buzz/history",
+    "backupUrl": "https://v2.rdse.site/history"
+  },
+  {
+    "id": "history2",
+    "slug": "history2",
+    "title": "History2",
+    "genre": "documentarios",
+    "category": "Documentários & Ciência",
+    "logo": "https://reidosembeds.online/img/history2.png",
+    "sourceUrl": "https://v1.rdse.buzz/history2",
+    "backupUrl": "https://v2.rdse.site/history2"
+  },
+  {
+    "id": "jennylive",
+    "slug": "jennylive",
+    "title": "Jennylive",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/jennylive.png",
+    "sourceUrl": "https://v1.rdse.buzz/jennylive",
+    "backupUrl": "https://v2.rdse.site/jennylive"
+  },
+  {
+    "id": "lacrossetv",
+    "slug": "lacrossetv",
+    "title": "Lacrossetv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/lacrossetv.png",
+    "sourceUrl": "https://v1.rdse.buzz/lacrossetv",
+    "backupUrl": "https://v2.rdse.site/lacrossetv"
+  },
+  {
+    "id": "lifetime",
+    "slug": "lifetime",
+    "title": "Lifetime",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/lifetime.png",
+    "sourceUrl": "https://v1.rdse.buzz/lifetime",
+    "backupUrl": "https://v2.rdse.site/lifetime"
+  },
+  {
+    "id": "loading",
+    "slug": "loading",
+    "title": "Loading",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/loading.png",
+    "sourceUrl": "https://v1.rdse.buzz/loading",
+    "backupUrl": "https://v2.rdse.site/loading"
+  },
+  {
+    "id": "max1",
+    "slug": "max1",
+    "title": "Max1",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/max1.png",
+    "sourceUrl": "https://v1.rdse.buzz/max1",
+    "backupUrl": "https://v2.rdse.site/max1"
+  },
+  {
+    "id": "max2",
+    "slug": "max2",
+    "title": "Max2",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/max2.png",
+    "sourceUrl": "https://v1.rdse.buzz/max2",
+    "backupUrl": "https://v2.rdse.site/max2"
+  },
+  {
+    "id": "max3",
+    "slug": "max3",
+    "title": "Max3",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/max3.png",
+    "sourceUrl": "https://v1.rdse.buzz/max3",
+    "backupUrl": "https://v2.rdse.site/max3"
+  },
+  {
+    "id": "max4",
+    "slug": "max4",
+    "title": "Max4",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/max4.png",
+    "sourceUrl": "https://v1.rdse.buzz/max4",
+    "backupUrl": "https://v2.rdse.site/max4"
+  },
+  {
+    "id": "max5",
+    "slug": "max5",
+    "title": "Max5",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/max5.png",
+    "sourceUrl": "https://v1.rdse.buzz/max5",
+    "backupUrl": "https://v2.rdse.site/max5"
+  },
+  {
+    "id": "max6",
+    "slug": "max6",
+    "title": "Max6",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/max6.png",
+    "sourceUrl": "https://v1.rdse.buzz/max6",
+    "backupUrl": "https://v2.rdse.site/max6"
+  },
+  {
+    "id": "max7",
+    "slug": "max7",
+    "title": "Max7",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/max7.png",
+    "sourceUrl": "https://v1.rdse.buzz/max7",
+    "backupUrl": "https://v2.rdse.site/max7"
+  },
+  {
+    "id": "maxanime",
+    "slug": "maxanime",
+    "title": "Maxanime",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/maxanime.png",
+    "sourceUrl": "https://v1.rdse.buzz/maxanime",
+    "backupUrl": "https://v2.rdse.site/maxanime"
+  },
+  {
+    "id": "miamitv",
+    "slug": "miamitv",
+    "title": "Miamitv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitv.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitv",
+    "backupUrl": "https://v2.rdse.site/miamitv"
+  },
+  {
+    "id": "miamitvdj",
+    "slug": "miamitvdj",
+    "title": "Miamitvdj",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvdj.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvdj",
+    "backupUrl": "https://v2.rdse.site/miamitvdj"
+  },
+  {
+    "id": "miamitvevents",
+    "slug": "miamitvevents",
+    "title": "Miamitvevents",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvevents.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvevents",
+    "backupUrl": "https://v2.rdse.site/miamitvevents"
+  },
+  {
+    "id": "miamitvfashion",
+    "slug": "miamitvfashion",
+    "title": "Miamitvfashion",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvfashion.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvfashion",
+    "backupUrl": "https://v2.rdse.site/miamitvfashion"
+  },
+  {
+    "id": "miamitvfood",
+    "slug": "miamitvfood",
+    "title": "Miamitvfood",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvfood.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvfood",
+    "backupUrl": "https://v2.rdse.site/miamitvfood"
+  },
+  {
+    "id": "miamitvgold",
+    "slug": "miamitvgold",
+    "title": "Miamitvgold",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvgold.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvgold",
+    "backupUrl": "https://v2.rdse.site/miamitvgold"
+  },
+  {
+    "id": "miamitvhealth",
+    "slug": "miamitvhealth",
+    "title": "Miamitvhealth",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvhealth.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvhealth",
+    "backupUrl": "https://v2.rdse.site/miamitvhealth"
+  },
+  {
+    "id": "miamitvkids",
+    "slug": "miamitvkids",
+    "title": "Miamitvkids",
+    "genre": "infantil",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvkids.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvkids",
+    "backupUrl": "https://v2.rdse.site/miamitvkids"
+  },
+  {
+    "id": "miamitvlatino",
+    "slug": "miamitvlatino",
+    "title": "Miamitvlatino",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvlatino.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvlatino",
+    "backupUrl": "https://v2.rdse.site/miamitvlatino"
+  },
+  {
+    "id": "miamitvlife",
+    "slug": "miamitvlife",
+    "title": "Miamitvlife",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvlife.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvlife",
+    "backupUrl": "https://v2.rdse.site/miamitvlife"
+  },
+  {
+    "id": "miamitvmistery",
+    "slug": "miamitvmistery",
+    "title": "Miamitvmistery",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvmistery.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvmistery",
+    "backupUrl": "https://v2.rdse.site/miamitvmistery"
+  },
+  {
+    "id": "miamitvmodels",
+    "slug": "miamitvmodels",
+    "title": "Miamitvmodels",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvmodels.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvmodels",
+    "backupUrl": "https://v2.rdse.site/miamitvmodels"
+  },
+  {
+    "id": "miamitvmusic",
+    "slug": "miamitvmusic",
+    "title": "Miamitvmusic",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/miamitvmusic.png",
+    "sourceUrl": "https://v1.rdse.buzz/miamitvmusic",
+    "backupUrl": "https://v2.rdse.site/miamitvmusic"
+  },
+  {
+    "id": "mlb",
+    "slug": "mlb",
+    "title": "Mlb",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/mlb.png",
+    "sourceUrl": "https://v1.rdse.buzz/mlb",
+    "backupUrl": "https://v2.rdse.site/mlb"
+  },
+  {
+    "id": "modoviagem",
+    "slug": "modoviagem",
+    "title": "Modoviagem",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/modoviagem.png",
+    "sourceUrl": "https://v1.rdse.buzz/modoviagem",
+    "backupUrl": "https://v2.rdse.site/modoviagem"
+  },
+  {
+    "id": "motorvision",
+    "slug": "motorvision",
+    "title": "Motorvision",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/motorvision.png",
+    "sourceUrl": "https://v1.rdse.buzz/motorvision",
+    "backupUrl": "https://v2.rdse.site/motorvision"
+  },
+  {
+    "id": "moviesphere",
+    "slug": "moviesphere",
+    "title": "Moviesphere",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/moviesphere.png",
+    "sourceUrl": "https://v1.rdse.buzz/moviesphere",
+    "backupUrl": "https://v2.rdse.site/moviesphere"
+  },
+  {
+    "id": "24h-mr-bean",
+    "slug": "24h-mr-bean",
+    "title": "Mr. Bean 24h",
+    "genre": "24-horas",
+    "category": "Canais 24h",
+    "logo": "https://reidosembeds.online/img/24h-mr-bean.png",
+    "sourceUrl": "https://v1.rdse.buzz/24h-mr-bean",
+    "backupUrl": "https://v2.rdse.site/24h-mr-bean"
+  },
+  {
+    "id": "mtv",
+    "slug": "mtv",
+    "title": "Mtv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/mtv.png",
+    "sourceUrl": "https://v1.rdse.buzz/mtv",
+    "backupUrl": "https://v2.rdse.site/mtv"
+  },
+  {
+    "id": "multishow",
+    "slug": "multishow",
+    "title": "Multishow",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/multishow.png",
+    "sourceUrl": "https://v1.rdse.buzz/multishow",
+    "backupUrl": "https://v2.rdse.site/multishow"
+  },
+  {
+    "id": "musicbox",
+    "slug": "musicbox",
+    "title": "Musicbox",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/musicbox.png",
+    "sourceUrl": "https://v1.rdse.buzz/musicbox",
+    "backupUrl": "https://v2.rdse.site/musicbox"
+  },
+  {
+    "id": "mytimemovienetwork",
+    "slug": "mytimemovienetwork",
+    "title": "Mytimemovienetwork",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/mytimemovienetwork.png",
+    "sourceUrl": "https://v1.rdse.buzz/mytimemovienetwork",
+    "backupUrl": "https://v2.rdse.site/mytimemovienetwork"
+  },
+  {
+    "id": "nbaleaguepass",
+    "slug": "nbaleaguepass",
+    "title": "Nbaleaguepass",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/nbaleaguepass.png",
+    "sourceUrl": "https://v1.rdse.buzz/nbaleaguepass",
+    "backupUrl": "https://v2.rdse.site/nbaleaguepass"
+  },
+  {
+    "id": "nbaleaguepass2",
+    "slug": "nbaleaguepass2",
+    "title": "Nbaleaguepass2",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/nbaleaguepass2.png",
+    "sourceUrl": "https://v1.rdse.buzz/nbaleaguepass2",
+    "backupUrl": "https://v2.rdse.site/nbaleaguepass2"
+  },
+  {
+    "id": "nbaleaguepass3",
+    "slug": "nbaleaguepass3",
+    "title": "Nbaleaguepass3",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/nbaleaguepass3.png",
+    "sourceUrl": "https://v1.rdse.buzz/nbaleaguepass3",
+    "backupUrl": "https://v2.rdse.site/nbaleaguepass3"
+  },
+  {
+    "id": "nbaleaguepass4",
+    "slug": "nbaleaguepass4",
+    "title": "Nbaleaguepass4",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/nbaleaguepass4.png",
+    "sourceUrl": "https://v1.rdse.buzz/nbaleaguepass4",
+    "backupUrl": "https://v2.rdse.site/nbaleaguepass4"
+  },
+  {
+    "id": "nbaleaguepass5",
+    "slug": "nbaleaguepass5",
+    "title": "Nbaleaguepass5",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/nbaleaguepass5.png",
+    "sourceUrl": "https://v1.rdse.buzz/nbaleaguepass5",
+    "backupUrl": "https://v2.rdse.site/nbaleaguepass5"
+  },
+  {
+    "id": "nbaleaguepass6",
+    "slug": "nbaleaguepass6",
+    "title": "Nbaleaguepass6",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/nbaleaguepass6.png",
+    "sourceUrl": "https://v1.rdse.buzz/nbaleaguepass6",
+    "backupUrl": "https://v2.rdse.site/nbaleaguepass6"
+  },
+  {
+    "id": "nbatv",
+    "slug": "nbatv",
+    "title": "Nbatv",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/nbatv.png",
+    "sourceUrl": "https://v1.rdse.buzz/nbatv",
+    "backupUrl": "https://v2.rdse.site/nbatv"
+  },
+  {
+    "id": "nhlnetwork",
+    "slug": "nhlnetwork",
+    "title": "Nhlnetwork",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/nhlnetwork.png",
+    "sourceUrl": "https://v1.rdse.buzz/nhlnetwork",
+    "backupUrl": "https://v2.rdse.site/nhlnetwork"
+  },
+  {
+    "id": "nickonline",
+    "slug": "nickonline",
+    "title": "Nickonline",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/nickonline.png",
+    "sourceUrl": "https://v1.rdse.buzz/nickonline",
+    "backupUrl": "https://v2.rdse.site/nickonline"
+  },
+  {
+    "id": "nsports",
+    "slug": "nsports",
+    "title": "Nsports",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/nsports.png",
+    "sourceUrl": "https://v1.rdse.buzz/nsports",
+    "backupUrl": "https://v2.rdse.site/nsports"
+  },
+  {
+    "id": "nsports2",
+    "slug": "nsports2",
+    "title": "Nsports2",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/nsports2.png",
+    "sourceUrl": "https://v1.rdse.buzz/nsports2",
+    "backupUrl": "https://v2.rdse.site/nsports2"
+  },
+  {
+    "id": "nsports3",
+    "slug": "nsports3",
+    "title": "Nsports3",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/nsports3.png",
+    "sourceUrl": "https://v1.rdse.buzz/nsports3",
+    "backupUrl": "https://v2.rdse.site/nsports3"
+  },
+  {
+    "id": "paramount",
+    "slug": "paramount",
+    "title": "Paramount",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/paramount.png",
+    "sourceUrl": "https://v1.rdse.buzz/paramount",
+    "backupUrl": "https://v2.rdse.site/paramount"
+  },
+  {
+    "id": "paramount2",
+    "slug": "paramount2",
+    "title": "Paramount2",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/paramount2.png",
+    "sourceUrl": "https://v1.rdse.buzz/paramount2",
+    "backupUrl": "https://v2.rdse.site/paramount2"
+  },
+  {
+    "id": "paramount3",
+    "slug": "paramount3",
+    "title": "Paramount3",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/paramount3.png",
+    "sourceUrl": "https://v1.rdse.buzz/paramount3",
+    "backupUrl": "https://v2.rdse.site/paramount3"
+  },
+  {
+    "id": "paramount4",
+    "slug": "paramount4",
+    "title": "Paramount4",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/paramount4.png",
+    "sourceUrl": "https://v1.rdse.buzz/paramount4",
+    "backupUrl": "https://v2.rdse.site/paramount4"
+  },
+  {
+    "id": "penthouse",
+    "slug": "penthouse",
+    "title": "Penthouse",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/penthouse.png",
+    "sourceUrl": "https://v1.rdse.buzz/penthouse",
+    "backupUrl": "https://v2.rdse.site/penthouse"
+  },
+  {
+    "id": "playboytv",
+    "slug": "playboytv",
+    "title": "Playboytv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/playboytv.png",
+    "sourceUrl": "https://v1.rdse.buzz/playboytv",
+    "backupUrl": "https://v2.rdse.site/playboytv"
+  },
+  {
+    "id": "playtv",
+    "slug": "playtv",
+    "title": "Playtv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/playtv.png",
+    "sourceUrl": "https://v1.rdse.buzz/playtv",
+    "backupUrl": "https://v2.rdse.site/playtv"
+  },
+  {
+    "id": "portocanal",
+    "slug": "portocanal",
+    "title": "Portocanal",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/portocanal.png",
+    "sourceUrl": "https://v1.rdse.buzz/portocanal",
+    "backupUrl": "https://v2.rdse.site/portocanal"
+  },
+  {
+    "id": "premiere-4",
+    "slug": "premiere-4",
+    "title": "Premiere 4 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/premiere-4.png",
+    "sourceUrl": "https://v1.rdse.buzz/premiere-4",
+    "backupUrl": "https://v2.rdse.site/premiere-4"
+  },
+  {
+    "id": "premiere-5",
+    "slug": "premiere-5",
+    "title": "Premiere 5 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/premiere-5.png",
+    "sourceUrl": "https://v1.rdse.buzz/premiere-5",
+    "backupUrl": "https://v2.rdse.site/premiere-5"
+  },
+  {
+    "id": "premiere-6",
+    "slug": "premiere-6",
+    "title": "Premiere 6 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/premiere-6.png",
+    "sourceUrl": "https://v1.rdse.buzz/premiere-6",
+    "backupUrl": "https://v2.rdse.site/premiere-6"
+  },
+  {
+    "id": "premiere-7",
+    "slug": "premiere-7",
+    "title": "Premiere 7 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/premiere-7.png",
+    "sourceUrl": "https://v1.rdse.buzz/premiere-7",
+    "backupUrl": "https://v2.rdse.site/premiere-7"
+  },
+  {
+    "id": "premiere-8",
+    "slug": "premiere-8",
+    "title": "Premiere 8 HD",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/premiere-8.png",
+    "sourceUrl": "https://v1.rdse.buzz/premiere-8",
+    "backupUrl": "https://v2.rdse.site/premiere-8"
+  },
+  {
+    "id": "primebox",
+    "slug": "primebox",
+    "title": "Primebox",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/primebox.png",
+    "sourceUrl": "https://v1.rdse.buzz/primebox",
+    "backupUrl": "https://v2.rdse.site/primebox"
+  },
+  {
+    "id": "primevideo",
+    "slug": "primevideo",
+    "title": "Primevideo",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/primevideo.png",
+    "sourceUrl": "https://v1.rdse.buzz/primevideo",
+    "backupUrl": "https://v2.rdse.site/primevideo"
+  },
+  {
+    "id": "primevideo2",
+    "slug": "primevideo2",
+    "title": "Primevideo2",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/primevideo2.png",
+    "sourceUrl": "https://v1.rdse.buzz/primevideo2",
+    "backupUrl": "https://v2.rdse.site/primevideo2"
+  },
+  {
+    "id": "primevideo3",
+    "slug": "primevideo3",
+    "title": "Primevideo3",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/primevideo3.png",
+    "sourceUrl": "https://v1.rdse.buzz/primevideo3",
+    "backupUrl": "https://v2.rdse.site/primevideo3"
+  },
+  {
+    "id": "primevideo4",
+    "slug": "primevideo4",
+    "title": "Primevideo4",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/primevideo4.png",
+    "sourceUrl": "https://v1.rdse.buzz/primevideo4",
+    "backupUrl": "https://v2.rdse.site/primevideo4"
+  },
+  {
+    "id": "racer",
+    "slug": "racer",
+    "title": "Racer",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/racer.png",
+    "sourceUrl": "https://v1.rdse.buzz/racer",
+    "backupUrl": "https://v2.rdse.site/racer"
+  },
+  {
+    "id": "racerselect",
+    "slug": "racerselect",
+    "title": "Racerselect",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/racerselect.png",
+    "sourceUrl": "https://v1.rdse.buzz/racerselect",
+    "backupUrl": "https://v2.rdse.site/racerselect"
+  },
+  {
+    "id": "realmadridtv",
+    "slug": "realmadridtv",
+    "title": "Realmadridtv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/realmadridtv.png",
+    "sourceUrl": "https://v1.rdse.buzz/realmadridtv",
+    "backupUrl": "https://v2.rdse.site/realmadridtv"
+  },
+  {
+    "id": "recordmt",
+    "slug": "recordmt",
+    "title": "Recordmt",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/recordmt.png",
+    "sourceUrl": "https://v1.rdse.buzz/recordmt",
+    "backupUrl": "https://v2.rdse.site/recordmt"
+  },
+  {
+    "id": "recordpb",
+    "slug": "recordpb",
+    "title": "Recordpb",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/recordpb.png",
+    "sourceUrl": "https://v1.rdse.buzz/recordpb",
+    "backupUrl": "https://v2.rdse.site/recordpb"
+  },
+  {
+    "id": "recordrn",
+    "slug": "recordrn",
+    "title": "Recordrn",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/recordrn.png",
+    "sourceUrl": "https://v1.rdse.buzz/recordrn",
+    "backupUrl": "https://v2.rdse.site/recordrn"
+  },
+  {
+    "id": "recordro",
+    "slug": "recordro",
+    "title": "Recordro",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/recordro.png",
+    "sourceUrl": "https://v1.rdse.buzz/recordro",
+    "backupUrl": "https://v2.rdse.site/recordro"
+  },
+  {
+    "id": "redbulltv",
+    "slug": "redbulltv",
+    "title": "Redbulltv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/redbulltv.png",
+    "sourceUrl": "https://v1.rdse.buzz/redbulltv",
+    "backupUrl": "https://v2.rdse.site/redbulltv"
+  },
+  {
+    "id": "redebrasil",
+    "slug": "redebrasil",
+    "title": "Redebrasil",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/redebrasil.png",
+    "sourceUrl": "https://v1.rdse.buzz/redebrasil",
+    "backupUrl": "https://v2.rdse.site/redebrasil"
+  },
+  {
+    "id": "redegospel",
+    "slug": "redegospel",
+    "title": "Redegospel",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/redegospel.png",
+    "sourceUrl": "https://v1.rdse.buzz/redegospel",
+    "backupUrl": "https://v2.rdse.site/redegospel"
+  },
+  {
+    "id": "redeminas",
+    "slug": "redeminas",
+    "title": "Redeminas",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/redeminas.png",
+    "sourceUrl": "https://v1.rdse.buzz/redeminas",
+    "backupUrl": "https://v2.rdse.site/redeminas"
+  },
+  {
+    "id": "redeseculo21",
+    "slug": "redeseculo21",
+    "title": "Redeseculo21",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/redeseculo21.png",
+    "sourceUrl": "https://v1.rdse.buzz/redeseculo21",
+    "backupUrl": "https://v2.rdse.site/redeseculo21"
+  },
+  {
+    "id": "redesuper",
+    "slug": "redesuper",
+    "title": "Redesuper",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/redesuper.png",
+    "sourceUrl": "https://v1.rdse.buzz/redesuper",
+    "backupUrl": "https://v2.rdse.site/redesuper"
+  },
+  {
+    "id": "redevida",
+    "slug": "redevida",
+    "title": "Redevida",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/redevida.png",
+    "sourceUrl": "https://v1.rdse.buzz/redevida",
+    "backupUrl": "https://v2.rdse.site/redevida"
+  },
+  {
+    "id": "retrocartoon",
+    "slug": "retrocartoon",
+    "title": "Retrocartoon",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/retrocartoon.png",
+    "sourceUrl": "https://v1.rdse.buzz/retrocartoon",
+    "backupUrl": "https://v2.rdse.site/retrocartoon"
+  },
+  {
+    "id": "runtime",
+    "slug": "runtime",
+    "title": "Runtime",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/runtime.png",
+    "sourceUrl": "https://v1.rdse.buzz/runtime",
+    "backupUrl": "https://v2.rdse.site/runtime"
+  },
+  {
+    "id": "sbtkids",
+    "slug": "sbtkids",
+    "title": "Sbtkids",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/sbtkids.png",
+    "sourceUrl": "https://v1.rdse.buzz/sbtkids",
+    "backupUrl": "https://v2.rdse.site/sbtkids"
+  },
+  {
+    "id": "sbtnews",
+    "slug": "sbtnews",
+    "title": "Sbtnews",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/sbtnews.png",
+    "sourceUrl": "https://v1.rdse.buzz/sbtnews",
+    "backupUrl": "https://v2.rdse.site/sbtnews"
+  },
+  {
+    "id": "sbtnovelas",
+    "slug": "sbtnovelas",
+    "title": "Sbtnovelas",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/sbtnovelas.png",
+    "sourceUrl": "https://v1.rdse.buzz/sbtnovelas",
+    "backupUrl": "https://v2.rdse.site/sbtnovelas"
+  },
+  {
+    "id": "sbtpi",
+    "slug": "sbtpi",
+    "title": "Sbtpi",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/sbtpi.png",
+    "sourceUrl": "https://v1.rdse.buzz/sbtpi",
+    "backupUrl": "https://v2.rdse.site/sbtpi"
+  },
+  {
+    "id": "sbtraiz",
+    "slug": "sbtraiz",
+    "title": "Sbtraiz",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/sbtraiz.png",
+    "sourceUrl": "https://v1.rdse.buzz/sbtraiz",
+    "backupUrl": "https://v2.rdse.site/sbtraiz"
+  },
+  {
+    "id": "seriesclassic",
+    "slug": "seriesclassic",
+    "title": "Seriesclassic",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/seriesclassic.png",
+    "sourceUrl": "https://v1.rdse.buzz/seriesclassic",
+    "backupUrl": "https://v2.rdse.site/seriesclassic"
+  },
+  {
+    "id": "sesctv",
+    "slug": "sesctv",
+    "title": "Sesctv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/sesctv.png",
+    "sourceUrl": "https://v1.rdse.buzz/sesctv",
+    "backupUrl": "https://v2.rdse.site/sesctv"
+  },
+  {
+    "id": "sexprive",
+    "slug": "sexprive",
+    "title": "Sexprive",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/sexprive.png",
+    "sourceUrl": "https://v1.rdse.buzz/sexprive",
+    "backupUrl": "https://v2.rdse.site/sexprive"
+  },
+  {
+    "id": "sextreme",
+    "slug": "sextreme",
+    "title": "Sextreme",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/sextreme.png",
+    "sourceUrl": "https://v1.rdse.buzz/sextreme",
+    "backupUrl": "https://v2.rdse.site/sextreme"
+  },
+  {
+    "id": "sexyhot",
+    "slug": "sexyhot",
+    "title": "Sexyhot",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/sexyhot.png",
+    "sourceUrl": "https://v1.rdse.buzz/sexyhot",
+    "backupUrl": "https://v2.rdse.site/sexyhot"
+  },
+  {
+    "id": "sony",
+    "slug": "sony",
+    "title": "Sony",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/sony.png",
+    "sourceUrl": "https://v1.rdse.buzz/sony",
+    "backupUrl": "https://v2.rdse.site/sony"
+  },
+  {
+    "id": "sonymovies",
+    "slug": "sonymovies",
+    "title": "Sonymovies",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/sonymovies.png",
+    "sourceUrl": "https://v1.rdse.buzz/sonymovies",
+    "backupUrl": "https://v2.rdse.site/sonymovies"
+  },
+  {
+    "id": "sonyone",
+    "slug": "sonyone",
+    "title": "Sonyone",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/sonyone.png",
+    "sourceUrl": "https://v1.rdse.buzz/sonyone",
+    "backupUrl": "https://v2.rdse.site/sonyone"
+  },
+  {
+    "id": "space",
+    "slug": "space",
+    "title": "Space",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/space.png",
+    "sourceUrl": "https://v1.rdse.buzz/space",
+    "backupUrl": "https://v2.rdse.site/space"
+  },
+  {
+    "id": "spark-tv-luz-e-amor",
+    "slug": "spark-tv-luz-e-amor",
+    "title": "Spark Tv Luz E Amor",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/spark-tv-luz-e-amor.png",
+    "sourceUrl": "https://v1.rdse.buzz/spark-tv-luz-e-amor",
+    "backupUrl": "https://v2.rdse.site/spark-tv-luz-e-amor"
+  },
+  {
+    "id": "sportitalia",
+    "slug": "sportitalia",
+    "title": "Sportitalia",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sportitalia.png",
+    "sourceUrl": "https://v1.rdse.buzz/sportitalia",
+    "backupUrl": "https://v2.rdse.site/sportitalia"
+  },
+  {
+    "id": "sporttv",
+    "slug": "sporttv",
+    "title": "Sporttv",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sporttv.png",
+    "sourceUrl": "https://v1.rdse.buzz/sporttv",
+    "backupUrl": "https://v2.rdse.site/sporttv"
+  },
+  {
+    "id": "sporttv2",
+    "slug": "sporttv2",
+    "title": "Sporttv2",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sporttv2.png",
+    "sourceUrl": "https://v1.rdse.buzz/sporttv2",
+    "backupUrl": "https://v2.rdse.site/sporttv2"
+  },
+  {
+    "id": "sporttv3",
+    "slug": "sporttv3",
+    "title": "Sporttv3",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sporttv3.png",
+    "sourceUrl": "https://v1.rdse.buzz/sporttv3",
+    "backupUrl": "https://v2.rdse.site/sporttv3"
+  },
+  {
+    "id": "sporttv4",
+    "slug": "sporttv4",
+    "title": "Sporttv4",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sporttv4.png",
+    "sourceUrl": "https://v1.rdse.buzz/sporttv4",
+    "backupUrl": "https://v2.rdse.site/sporttv4"
+  },
+  {
+    "id": "sporttv5",
+    "slug": "sporttv5",
+    "title": "Sporttv5",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sporttv5.png",
+    "sourceUrl": "https://v1.rdse.buzz/sporttv5",
+    "backupUrl": "https://v2.rdse.site/sporttv5"
+  },
+  {
+    "id": "sporttv6",
+    "slug": "sporttv6",
+    "title": "Sporttv6",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sporttv6.png",
+    "sourceUrl": "https://v1.rdse.buzz/sporttv6",
+    "backupUrl": "https://v2.rdse.site/sporttv6"
+  },
+  {
+    "id": "sporttvplus",
+    "slug": "sporttvplus",
+    "title": "Sporttvplus",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sporttvplus.png",
+    "sourceUrl": "https://v1.rdse.buzz/sporttvplus",
+    "backupUrl": "https://v2.rdse.site/sporttvplus"
+  },
+  {
+    "id": "sportv4",
+    "slug": "sportv4",
+    "title": "Sportv4",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sportv4.png",
+    "sourceUrl": "https://v1.rdse.buzz/sportv4",
+    "backupUrl": "https://v2.rdse.site/sportv4"
+  },
+  {
+    "id": "sportynet",
+    "slug": "sportynet",
+    "title": "Sportynet",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sportynet.png",
+    "sourceUrl": "https://v1.rdse.buzz/sportynet",
+    "backupUrl": "https://v2.rdse.site/sportynet"
+  },
+  {
+    "id": "sportynet2",
+    "slug": "sportynet2",
+    "title": "Sportynet2",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sportynet2.png",
+    "sourceUrl": "https://v1.rdse.buzz/sportynet2",
+    "backupUrl": "https://v2.rdse.site/sportynet2"
+  },
+  {
+    "id": "sportynet3",
+    "slug": "sportynet3",
+    "title": "Sportynet3",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/sportynet3.png",
+    "sourceUrl": "https://v1.rdse.buzz/sportynet3",
+    "backupUrl": "https://v2.rdse.site/sportynet3"
+  },
+  {
+    "id": "studiouniversal",
+    "slug": "studiouniversal",
+    "title": "Studiouniversal",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/studiouniversal.png",
+    "sourceUrl": "https://v1.rdse.buzz/studiouniversal",
+    "backupUrl": "https://v2.rdse.site/studiouniversal"
+  },
+  {
+    "id": "surftvnow",
+    "slug": "surftvnow",
+    "title": "Surftvnow",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/surftvnow.png",
+    "sourceUrl": "https://v1.rdse.buzz/surftvnow",
+    "backupUrl": "https://v2.rdse.site/surftvnow"
+  },
+  {
+    "id": "tcm",
+    "slug": "tcm",
+    "title": "Tcm",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tcm.png",
+    "sourceUrl": "https://v1.rdse.buzz/tcm",
+    "backupUrl": "https://v2.rdse.site/tcm"
+  },
+  {
+    "id": "telecinecult",
+    "slug": "telecinecult",
+    "title": "Telecinecult",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/telecinecult.png",
+    "sourceUrl": "https://v1.rdse.buzz/telecinecult",
+    "backupUrl": "https://v2.rdse.site/telecinecult"
+  },
+  {
+    "id": "telecinefun",
+    "slug": "telecinefun",
+    "title": "Telecinefun",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/telecinefun.png",
+    "sourceUrl": "https://v1.rdse.buzz/telecinefun",
+    "backupUrl": "https://v2.rdse.site/telecinefun"
+  },
+  {
+    "id": "telecinetouch",
+    "slug": "telecinetouch",
+    "title": "Telecinetouch",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/telecinetouch.png",
+    "sourceUrl": "https://v1.rdse.buzz/telecinetouch",
+    "backupUrl": "https://v2.rdse.site/telecinetouch"
+  },
+  {
+    "id": "tennischannel",
+    "slug": "tennischannel",
+    "title": "Tennischannel",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/tennischannel.png",
+    "sourceUrl": "https://v1.rdse.buzz/tennischannel",
+    "backupUrl": "https://v2.rdse.site/tennischannel"
+  },
+  {
+    "id": "terraviva",
+    "slug": "terraviva",
+    "title": "Terraviva",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/terraviva.png",
+    "sourceUrl": "https://v1.rdse.buzz/terraviva",
+    "backupUrl": "https://v2.rdse.site/terraviva"
+  },
+  {
+    "id": "tlc",
+    "slug": "tlc",
+    "title": "Tlc",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tlc.png",
+    "sourceUrl": "https://v1.rdse.buzz/tlc",
+    "backupUrl": "https://v2.rdse.site/tlc"
+  },
+  {
+    "id": "tnt",
+    "slug": "tnt",
+    "title": "Tnt",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/tnt.png",
+    "sourceUrl": "https://v1.rdse.buzz/tnt",
+    "backupUrl": "https://v2.rdse.site/tnt"
+  },
+  {
+    "id": "tntnovelas",
+    "slug": "tntnovelas",
+    "title": "Tntnovelas",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/tntnovelas.png",
+    "sourceUrl": "https://v1.rdse.buzz/tntnovelas",
+    "backupUrl": "https://v2.rdse.site/tntnovelas"
+  },
+  {
+    "id": "tntseries",
+    "slug": "tntseries",
+    "title": "Tntseries",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/tntseries.png",
+    "sourceUrl": "https://v1.rdse.buzz/tntseries",
+    "backupUrl": "https://v2.rdse.site/tntseries"
+  },
+  {
+    "id": "toon-goggles",
+    "slug": "toon-goggles",
+    "title": "Toon Goggles",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/toon-goggles.png",
+    "sourceUrl": "https://v1.rdse.buzz/toon-goggles",
+    "backupUrl": "https://v2.rdse.site/toon-goggles"
+  },
+  {
+    "id": "tooncast",
+    "slug": "tooncast",
+    "title": "Tooncast",
+    "genre": "infantil",
+    "category": "Infantil & Desenhos",
+    "logo": "https://reidosembeds.online/img/tooncast.png",
+    "sourceUrl": "https://v1.rdse.buzz/tooncast",
+    "backupUrl": "https://v2.rdse.site/tooncast"
+  },
+  {
+    "id": "tracebrasil",
+    "slug": "tracebrasil",
+    "title": "Tracebrasil",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tracebrasil.png",
+    "sourceUrl": "https://v1.rdse.buzz/tracebrasil",
+    "backupUrl": "https://v2.rdse.site/tracebrasil"
+  },
+  {
+    "id": "travelbox",
+    "slug": "travelbox",
+    "title": "Travelbox",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/travelbox.png",
+    "sourceUrl": "https://v1.rdse.buzz/travelbox",
+    "backupUrl": "https://v2.rdse.site/travelbox"
+  },
+  {
+    "id": "tv-classicos",
+    "slug": "tv-classicos",
+    "title": "Tv Classicos",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tv-classicos.png",
+    "sourceUrl": "https://v1.rdse.buzz/tv-classicos",
+    "backupUrl": "https://v2.rdse.site/tv-classicos"
+  },
+  {
+    "id": "tvalego",
+    "slug": "tvalego",
+    "title": "Tvalego",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvalego.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvalego",
+    "backupUrl": "https://v2.rdse.site/tvalego"
+  },
+  {
+    "id": "tvalmg",
+    "slug": "tvalmg",
+    "title": "Tvalmg",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvalmg.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvalmg",
+    "backupUrl": "https://v2.rdse.site/tvalmg"
+  },
+  {
+    "id": "tvaparecida",
+    "slug": "tvaparecida",
+    "title": "Tvaparecida",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvaparecida.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvaparecida",
+    "backupUrl": "https://v2.rdse.site/tvaparecida"
+  },
+  {
+    "id": "tvbrasil",
+    "slug": "tvbrasil",
+    "title": "Tvbrasil",
+    "genre": "canais-abertos",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvbrasil.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvbrasil",
+    "backupUrl": "https://v2.rdse.site/tvbrasil"
+  },
+  {
+    "id": "tvcamara",
+    "slug": "tvcamara",
+    "title": "Tvcamara",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvcamara.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvcamara",
+    "backupUrl": "https://v2.rdse.site/tvcamara"
+  },
+  {
+    "id": "tvcultura",
+    "slug": "tvcultura",
+    "title": "Tvcultura",
+    "genre": "canais-abertos",
+    "category": "TV Aberta",
+    "logo": "https://reidosembeds.online/img/tvcultura.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvcultura",
+    "backupUrl": "https://v2.rdse.site/tvcultura"
+  },
+  {
+    "id": "tvescola",
+    "slug": "tvescola",
+    "title": "Tvescola",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvescola.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvescola",
+    "backupUrl": "https://v2.rdse.site/tvescola"
+  },
+  {
+    "id": "tvevangelizar",
+    "slug": "tvevangelizar",
+    "title": "Tvevangelizar",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvevangelizar.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvevangelizar",
+    "backupUrl": "https://v2.rdse.site/tvevangelizar"
+  },
+  {
+    "id": "tvkidmais",
+    "slug": "tvkidmais",
+    "title": "Tvkidmais",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvkidmais.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvkidmais",
+    "backupUrl": "https://v2.rdse.site/tvkidmais"
+  },
+  {
+    "id": "tvmaanaim",
+    "slug": "tvmaanaim",
+    "title": "Tvmaanaim",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvmaanaim.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvmaanaim",
+    "backupUrl": "https://v2.rdse.site/tvmaanaim"
+  },
+  {
+    "id": "tvnovotempo",
+    "slug": "tvnovotempo",
+    "title": "Tvnovotempo",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvnovotempo.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvnovotempo",
+    "backupUrl": "https://v2.rdse.site/tvnovotempo"
+  },
+  {
+    "id": "tvpaieterno",
+    "slug": "tvpaieterno",
+    "title": "Tvpaieterno",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvpaieterno.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvpaieterno",
+    "backupUrl": "https://v2.rdse.site/tvpaieterno"
+  },
+  {
+    "id": "tvratimbum",
+    "slug": "tvratimbum",
+    "title": "Tvratimbum",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/tvratimbum.png",
+    "sourceUrl": "https://v1.rdse.buzz/tvratimbum",
+    "backupUrl": "https://v2.rdse.site/tvratimbum"
+  },
+  {
+    "id": "tycsports",
+    "slug": "tycsports",
+    "title": "Tycsports",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/tycsports.png",
+    "sourceUrl": "https://v1.rdse.buzz/tycsports",
+    "backupUrl": "https://v2.rdse.site/tycsports"
+  },
+  {
+    "id": "ufcfightpass",
+    "slug": "ufcfightpass",
+    "title": "Ufcfightpass",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/ufcfightpass.png",
+    "sourceUrl": "https://v1.rdse.buzz/ufcfightpass",
+    "backupUrl": "https://v2.rdse.site/ufcfightpass"
+  },
+  {
+    "id": "universalpremiere",
+    "slug": "universalpremiere",
+    "title": "Universalpremiere",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/universalpremiere.png",
+    "sourceUrl": "https://v1.rdse.buzz/universalpremiere",
+    "backupUrl": "https://v2.rdse.site/universalpremiere"
+  },
+  {
+    "id": "universalreality",
+    "slug": "universalreality",
+    "title": "Universalreality",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/universalreality.png",
+    "sourceUrl": "https://v1.rdse.buzz/universalreality",
+    "backupUrl": "https://v2.rdse.site/universalreality"
+  },
+  {
+    "id": "usa",
+    "slug": "usa",
+    "title": "Usa",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/usa.png",
+    "sourceUrl": "https://v1.rdse.buzz/usa",
+    "backupUrl": "https://v2.rdse.site/usa"
+  },
+  {
+    "id": "venus",
+    "slug": "venus",
+    "title": "Venus",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/venus.png",
+    "sourceUrl": "https://v1.rdse.buzz/venus",
+    "backupUrl": "https://v2.rdse.site/venus"
+  },
+  {
+    "id": "warner",
+    "slug": "warner",
+    "title": "Warner",
+    "genre": "filmes-series",
+    "category": "Filmes & Séries",
+    "logo": "https://reidosembeds.online/img/warner.png",
+    "sourceUrl": "https://v1.rdse.buzz/warner",
+    "backupUrl": "https://v2.rdse.site/warner"
+  },
+  {
+    "id": "woohoo",
+    "slug": "woohoo",
+    "title": "Woohoo",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/woohoo.png",
+    "sourceUrl": "https://v1.rdse.buzz/woohoo",
+    "backupUrl": "https://v2.rdse.site/woohoo"
+  },
+  {
+    "id": "xsports",
+    "slug": "xsports",
+    "title": "Xsports",
+    "genre": "esportes",
+    "category": "Esportes Ao Vivo",
+    "logo": "https://reidosembeds.online/img/xsports.png",
+    "sourceUrl": "https://v1.rdse.buzz/xsports",
+    "backupUrl": "https://v2.rdse.site/xsports"
+  },
+  {
+    "id": "xtremetv",
+    "slug": "xtremetv",
+    "title": "Xtremetv",
+    "genre": "outros",
+    "category": "Geral",
+    "logo": "https://reidosembeds.online/img/xtremetv.png",
+    "sourceUrl": "https://v1.rdse.buzz/xtremetv",
+    "backupUrl": "https://v2.rdse.site/xtremetv"
+  }
+]
