@@ -7,6 +7,6 @@ import { Analytics } from '@vercel/analytics/react';
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
-    <Analytics />
+    {typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') && <Analytics />}
   </React.StrictMode>,
 );

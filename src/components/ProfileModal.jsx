@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Check, Loader2, LogOut, Link as LinkIcon, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { X, User, Check, Loader2, LogOut, Link as LinkIcon, Sparkles, AlertCircle, RefreshCw, ShieldCheck, Crown, Zap, Shield, ChevronRight } from 'lucide-react';
 import { updateUserProfile, PRESET_AVATARS, DEFAULT_AVATAR } from '../services/supabase';
+import { isUserAdmin } from '../services/adminAnalytics';
+import { getUserLevelInfo, isVipUser, getVipSubscriptionData } from '../services/vipService';
 
 export default function ProfileModal({
   isOpen,
@@ -8,6 +10,8 @@ export default function ProfileModal({
   user,
   profile,
   onProfileUpdated,
+  onOpenAdmin,
+  onOpenSubscription,
   onSignOut,
 }) {
   const [displayName, setDisplayName] = useState('');
@@ -15,6 +19,9 @@ export default function ProfileModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+
+  const levelInfo = getUserLevelInfo(user, profile);
+  const vipData = getVipSubscriptionData(user, profile);
 
   useEffect(() => {
     if (user) {
@@ -92,8 +99,8 @@ export default function ProfileModal({
         </button>
 
         {/* Header Preview */}
-        <div className="flex items-center gap-4 pb-5 border-b border-slate-800">
-          <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-sky-400/80 shadow-lg shadow-sky-500/10 shrink-0 bg-slate-900">
+        <div className="flex items-center gap-4 pb-4 border-b border-slate-800">
+          <div className={`relative w-16 h-16 rounded-2xl overflow-hidden border-2 ${levelInfo.isVip ? 'border-amber-400 shadow-amber-500/20' : 'border-sky-400/80 shadow-sky-500/10'} shadow-lg shrink-0 bg-slate-900`}>
             <img
               src={displayAvatar}
               alt="Avatar"
@@ -107,14 +114,128 @@ export default function ProfileModal({
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-bold text-white flex items-center gap-2 truncate">
               <span>{displayName || 'Meu Perfil'}</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 font-normal shrink-0">
-                Kairou Member
-              </span>
+              {levelInfo.isVip ? (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 font-extrabold flex items-center gap-1 shrink-0">
+                  <Crown size={11} className="fill-amber-400 text-amber-400" />
+                  <span>VIP Diamante</span>
+                </span>
+              ) : (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 font-semibold shrink-0">
+                  {levelInfo.tierBadge}
+                </span>
+              )}
             </h3>
             <p className="text-xs text-slate-400 truncate">{user.email}</p>
-            <p className="text-[11px] text-sky-400/90 mt-0.5">Pré-visualização da foto ao vivo</p>
+            <p className="text-[11px] text-sky-400/90 mt-0.5">Nível atual: <strong className="text-white">{levelInfo.title}</strong></p>
           </div>
         </div>
+
+        {/* Card de Nível do Usuário & Progressão de XP */}
+        <div className="mt-4 p-4 rounded-2xl bg-gradient-to-br from-[#121927] to-[#0c101a] border border-white/[0.08] shadow-inner">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${levelInfo.isVip ? 'bg-amber-500/20 text-amber-400 border border-amber-400/30' : 'bg-sky-500/20 text-sky-400 border border-sky-400/30'}`}>
+                {levelInfo.isVip ? <Crown size={18} className="fill-amber-400" /> : <Zap size={16} />}
+              </div>
+              <div>
+                <p className="text-xs font-bold text-white leading-tight flex items-center gap-1.5">
+                  <span>{levelInfo.title}</span>
+                  {levelInfo.isVip && <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 font-extrabold uppercase">VIP</span>}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  {levelInfo.isVip ? 'Status Diamante Perpétuo' : `${levelInfo.titlesCount} títulos assistidos`}
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <p className="text-xs font-mono font-bold text-slate-200">
+                {levelInfo.isVip ? 'XP MÁXIMO' : `${levelInfo.currentXp} / ${levelInfo.nextLevelXp} XP`}
+              </p>
+              <p className="text-[10px] text-slate-400">{levelInfo.progressPercent}% do nível</p>
+            </div>
+          </div>
+
+          {/* Barra de Progresso XP */}
+          <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mt-1 mb-3">
+            <div
+              className={`h-full transition-all duration-500 ${
+                levelInfo.isVip
+                  ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500'
+                  : 'bg-gradient-to-r from-sky-400 via-cyan-400 to-blue-500'
+              }`}
+              style={{ width: `${levelInfo.progressPercent}%` }}
+            />
+          </div>
+
+          {/* Perks do Nível vs VIP */}
+          <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px] text-slate-300">
+            <div className="flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${levelInfo.isVip ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+              <span>{levelInfo.isVip ? 'Zero Anúncios' : 'Com Anúncios'}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${levelInfo.isVip ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+              <span>{levelInfo.isVip ? '4K Ultra HD & Dolby' : '1080p Standard'}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${levelInfo.isVip ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+              <span>{levelInfo.isVip ? 'Downloads Liberados' : 'Sem Downloads'}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${levelInfo.isVip ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+              <span>{levelInfo.isVip ? 'Servidores VIP' : 'Servidores Padrão'}</span>
+            </div>
+          </div>
+
+          {/* Botão Upgrade para VIP (Apenas usuários gratuitos) */}
+          {!levelInfo.isVip && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenSubscription?.();
+              }}
+              className="mt-3.5 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-sky-500/20 via-blue-500/20 to-sky-500/20 hover:from-sky-500/30 hover:to-blue-500/30 border border-sky-400/40 backdrop-blur-md text-sky-300 hover:text-white text-xs font-bold flex items-center justify-between transition-all cursor-pointer shadow-sm group"
+            >
+              <div className="flex items-center gap-2">
+                <Crown size={15} className="text-amber-400 fill-amber-400 group-hover:scale-110 transition-transform" />
+                <span>Fazer Upgrade para VIP (MB WAY & Crypto)</span>
+              </div>
+              <ChevronRight size={14} className="text-sky-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          )}
+        </div>
+
+        {/* Admin Shortcut for shizuu122@gmail.com */}
+        {isUserAdmin(user) && (
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onOpenAdmin?.();
+            }}
+            className="mt-3 p-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-sky-500/15 to-amber-500/20 hover:from-amber-500/30 hover:to-sky-500/25 border border-amber-500/40 flex items-center justify-between gap-3 text-amber-300 hover:text-white transition-all shadow-md group cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
+                <ShieldCheck size={18} />
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                  Painel de Administração
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 font-extrabold uppercase">
+                    Admin
+                  </span>
+                </p>
+                <p className="text-[10px] text-slate-400">Ver pessoas online, tráfego e ferramentas</p>
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-amber-400 group-hover:translate-x-0.5 transition-transform">
+              Abrir &rarr;
+            </span>
+          </button>
+        )}
 
         {/* Feedback Alert */}
         {error && (

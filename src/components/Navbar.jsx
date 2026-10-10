@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Bell, X, Play, ChevronDown, Bookmark, SlidersHorizontal, Menu, User, LogOut, Edit3, Heart } from 'lucide-react';
+import { Search, Bell, X, Play, ChevronDown, Bookmark, SlidersHorizontal, Menu, User, LogOut, Edit3, Heart, ShieldCheck, Crown, Sparkles, ExternalLink } from 'lucide-react';
 import KairouIcon from './KairouIcon';
 import { TelegramIcon } from './DiscordNoticeModal';
+import { isUserAdmin } from '../services/adminAnalytics';
+import { getUserLevelInfo, isVipUser } from '../services/vipService';
 
 export default function Navbar({
   activeTab,
@@ -13,7 +15,9 @@ export default function Navbar({
   profile,
   onOpenAuth,
   onOpenProfile,
+  onOpenAdmin,
   onOpenDiscordNotice,
+  onOpenSubscription,
   onOpenDonation,
   onSignOut,
 }) {
@@ -21,6 +25,7 @@ export default function Navbar({
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const levelInfo = getUserLevelInfo(user, profile);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const searchInputRef = useRef(null);
 
@@ -139,15 +144,29 @@ export default function Navbar({
             </div>
           </div>
 
-          {/* Botão de Doações Pix */}
-          <button
-            onClick={onOpenDonation}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 border border-emerald-500/35 text-emerald-400 hover:text-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 shrink-0"
-            title="Apoiar o Kairou com qualquer valor via Pix"
-            aria-label="Doar via Pix"
+          {/* Botão de Doações Pix (PixGG) */}
+          <a
+            href="https://pixgg.com/pommern"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 border border-emerald-500/35 text-emerald-400 hover:text-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 group"
+            title="Apoiar com qualquer valor via PixGG"
+            aria-label="Doar via PixGG"
           >
-            <Heart size={13} className="fill-emerald-400 text-emerald-400" />
+            <Heart size={13} className="fill-emerald-400 text-emerald-400 group-hover:scale-110 transition-transform" />
             <span>Doar Pix</span>
+          </a>
+
+          {/* Botão de Assinatura VIP (MB WAY & Crypto) com Glassmorphism Azul */}
+          <button
+            onClick={onOpenSubscription || onOpenDonation}
+            className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-sky-500/15 via-blue-500/15 to-sky-500/15 hover:from-sky-500/25 hover:to-blue-500/25 border border-sky-400/40 backdrop-blur-md text-sky-300 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.15)] active:scale-95 shrink-0 group"
+            title="Assinatura VIP — 100% Sem Anúncios, 4K & Downloads (Aceitamos MB WAY e Criptomoedas)"
+            aria-label="Assinar Kairou VIP"
+          >
+            <Crown size={14} className="text-amber-400 fill-amber-400/30 group-hover:scale-110 transition-transform" />
+            <span>Assinar VIP</span>
+            <span className="hidden xl:inline text-[10px] text-sky-400/80 font-normal border-l border-sky-400/30 pl-1.5">MB WAY · Crypto</span>
           </button>
 
           {/* Telegram Community Button (Desktop / Tablet) */}
@@ -201,7 +220,29 @@ export default function Navbar({
 
           {/* User Profile / Login Button */}
           {user ? (
-            <div className="relative">
+            <div className="relative flex items-center gap-1.5">
+              {/* Badge de Nível Visível no Topo */}
+              <div
+                onClick={() => {
+                  setProfileOpen(!profileOpen);
+                  setNotificationsOpen(false);
+                }}
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/80 border border-white/10 hover:border-sky-400/40 transition-all cursor-pointer select-none text-xs"
+                title={`Nível: ${levelInfo.title} (${levelInfo.isVip ? 'VIP Diamante' : `${levelInfo.currentXp} XP`})`}
+              >
+                {levelInfo.isVip ? (
+                  <span className="flex items-center gap-1 text-amber-300 font-extrabold text-[11px]">
+                    <Crown size={12} className="fill-amber-400 text-amber-400" />
+                    <span>VIP</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-sky-400 text-[11px] font-bold">
+                    <span>Nv. {levelInfo.level}</span>
+                    <span className="text-[10px] text-slate-400 font-normal max-w-[85px] truncate">({levelInfo.title})</span>
+                  </span>
+                )}
+              </div>
+
               <button
                 onClick={() => {
                   setProfileOpen(!profileOpen);
@@ -209,7 +250,7 @@ export default function Navbar({
                 }}
                 className="flex items-center gap-2 p-1 rounded-full hover:bg-slate-800/60 transition-colors focus:outline-none"
               >
-                <div className="w-8 h-8 rounded-full overflow-hidden border border-sky-400/60 bg-slate-800 flex items-center justify-center">
+                <div className={`w-8 h-8 rounded-full overflow-hidden border ${levelInfo.isVip ? 'border-amber-400 ring-2 ring-amber-400/20' : 'border-sky-400/60'} bg-slate-800 flex items-center justify-center`}>
                   <img
                     src={profile?.avatar_url || user.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'}
                     alt="Perfil"
@@ -224,14 +265,77 @@ export default function Navbar({
               </button>
 
               {profileOpen && (
-                <div className="absolute right-0 mt-3 w-56 rounded-2xl bg-[#0f141e] border border-white/[0.1] shadow-2xl p-3 animate-scale-in z-50">
+                <div className="absolute right-0 top-full mt-3 w-64 rounded-2xl bg-[#0f141e] border border-white/[0.1] shadow-2xl p-3 animate-scale-in z-50">
+                  {/* Cabeçalho do Perfil com Nível e XP */}
                   <div className="px-3 py-2 border-b border-slate-800/80">
-                    <p className="text-xs font-bold text-white truncate">
-                      {profile?.display_name || user.user_metadata?.display_name || 'Membro Kairou'}
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-white truncate">
+                        {profile?.display_name || user.user_metadata?.display_name || 'Membro Kairou'}
+                      </p>
+                      {levelInfo.isVip ? (
+                        <span className="flex items-center gap-1 text-[9px] font-black text-amber-300 bg-amber-500/20 border border-amber-400/35 px-1.5 py-0.5 rounded-full shrink-0">
+                          <Crown size={10} className="fill-amber-400 text-amber-400" />
+                          <span>VIP</span>
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-bold text-sky-400 bg-sky-500/15 border border-sky-400/25 px-1.5 py-0.5 rounded-full shrink-0">
+                          {levelInfo.tierBadge}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[10px] text-slate-400 truncate mt-0.5">{user.email}</p>
+
+                    {/* Barra de Progresso de XP */}
+                    <div className="mt-2.5 pt-2 border-t border-slate-800/60">
+                      <div className="flex items-center justify-between text-[10px] text-slate-300 mb-1">
+                        <span className="font-semibold text-slate-200">{levelInfo.title}</span>
+                        <span className="text-slate-400 font-mono text-[9px]">
+                          {levelInfo.isVip ? 'XP Máximo 👑' : `${levelInfo.currentXp} / ${levelInfo.nextLevelXp} XP`}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-800/90 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-500 ${
+                            levelInfo.isVip
+                              ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500'
+                              : 'bg-gradient-to-r from-sky-400 to-blue-500'
+                          }`}
+                          style={{ width: `${levelInfo.progressPercent}%` }}
+                        />
+                      </div>
+
+                      {!levelInfo.isVip && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfileOpen(false);
+                            (onOpenSubscription || onOpenDonation)?.();
+                          }}
+                          className="mt-2.5 w-full py-1.5 px-2 rounded-xl bg-gradient-to-r from-sky-500/20 to-blue-500/20 hover:from-sky-500/30 hover:to-blue-500/30 border border-sky-400/40 text-sky-300 hover:text-white text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                        >
+                          <Crown size={12} className="text-amber-400 fill-amber-400" />
+                          <span>Virar VIP (Zero Anúncios & 4K)</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
+
                   <div className="space-y-1 mt-2 text-xs">
+                    {isUserAdmin(user) && (
+                      <button
+                        onClick={() => {
+                          setProfileOpen(false);
+                          onOpenAdmin?.();
+                        }}
+                        className="w-full text-left px-3 py-2 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 rounded-xl transition-colors flex items-center gap-2.5 font-bold border border-amber-500/25 mb-1 cursor-pointer"
+                      >
+                        <ShieldCheck size={14} className="text-amber-400" />
+                        <span>Painel Admin</span>
+                        <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-extrabold uppercase tracking-wider">
+                          Admin
+                        </span>
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setProfileOpen(false);
@@ -240,7 +344,7 @@ export default function Navbar({
                       className="w-full text-left px-3 py-2 text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-colors flex items-center gap-2.5 font-medium"
                     >
                       <Edit3 size={14} className="text-sky-400" />
-                      <span>Editar Perfil & Foto</span>
+                      <span>Meu Nível & Editar Perfil</span>
                     </button>
                     <button
                       onClick={() => {
@@ -310,18 +414,58 @@ export default function Navbar({
             </button>
           ))}
 
-          {/* Botão Doar Pix no Menu Mobile */}
+          {/* Botão Painel Admin no Menu Mobile (Apenas shizuu122@gmail.com) */}
+          {isUserAdmin(user) && (
+            <button
+              type="button"
+              onClick={() => {
+                onOpenAdmin?.();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold text-amber-400 hover:text-white bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 flex items-center justify-between transition-all mt-3 cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck size={16} className="text-amber-400" />
+                <span>Painel Administrativo</span>
+              </div>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/25 text-amber-300 font-extrabold uppercase">
+                Admin
+              </span>
+            </button>
+          )}
+
+          {/* Botão Assinatura VIP no Menu Mobile */}
           <button
             type="button"
             onClick={() => {
-              onOpenDonation();
+              (onOpenSubscription || onOpenDonation)?.();
               setMobileMenuOpen(false);
             }}
-            className="w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold text-emerald-400 hover:text-white bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 flex items-center gap-2.5 transition-all mt-3 cursor-pointer"
+            className="w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold text-sky-300 hover:text-white bg-gradient-to-r from-sky-500/20 via-blue-500/20 to-sky-500/20 hover:from-sky-500/30 hover:to-blue-500/30 border border-sky-400/40 backdrop-blur-md flex items-center justify-between transition-all mt-3 cursor-pointer shadow-sm"
           >
-            <Heart size={16} className="fill-emerald-400 text-emerald-400" />
-            <span>Apoiar o Kairou (Doar Pix)</span>
+            <div className="flex items-center gap-2.5">
+              <Crown size={16} className="text-amber-400 fill-amber-400" />
+              <span>Assinatura VIP (MB WAY & Crypto)</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/30 text-sky-200 font-extrabold uppercase">
+              Sem Anúncios
+            </span>
           </button>
+
+          {/* Botão Doar Pix (PixGG) no Menu Mobile */}
+          <a
+            href="https://pixgg.com/pommern"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setMobileMenuOpen(false)}
+            className="w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold text-emerald-400 hover:text-white bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 flex items-center justify-between transition-all mt-2.5 cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <Heart size={16} className="fill-emerald-400 text-emerald-400" />
+              <span>Apoiar (Doar PixGG)</span>
+            </div>
+            <ExternalLink size={14} className="text-emerald-400" />
+          </a>
 
           {/* Link Telegram no Menu Mobile */}
           <a

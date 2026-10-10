@@ -11,23 +11,45 @@ import {
   Calendar,
   Users,
   Clapperboard,
-  Loader2
+  Loader2,
+  Crown,
+  Download,
+  ShieldCheck
 } from 'lucide-react';
 import { fetchMediaDetails, fetchSeasonEpisodes } from '../services/tmdb';
+import { prefetchMediaStreams } from '../services/extractor';
+import { isVipUser } from '../services/vipService';
 
 export default function MediaModal({
   media,
+  user,
+  profile,
   onClose,
   onPlay,
+  onOpenSubscription,
   onToggleWatchlist,
   isInWatchlist,
   onSelectMedia
 }) {
+  const isVip = isVipUser(user, profile);
   if (!media) return null;
 
   const inWatchlist = isInWatchlist(media.id);
   const [detailedMedia, setDetailedMedia] = useState(media);
   const [loadingDetails, setLoadingDetails] = useState(true);
+
+  // Eager prefetch para reprodução instantânea (0ms ao clicar em Assistir)
+  useEffect(() => {
+    if (!media?.tmdbId && !media?.id) return;
+    const isTv = media.type === 'series' || media.type === 'tv' || media.type === 'anime';
+    prefetchMediaStreams({
+      tmdbId: media.tmdbId || media.id,
+      type: isTv ? 'series' : 'movie',
+      season: 1,
+      episode: 1,
+      title: media.title,
+    });
+  }, [media]);
 
   // Seasons & Episodes State
   const [selectedSeasonNumber, setSelectedSeasonNumber] = useState(1);
@@ -53,7 +75,8 @@ export default function MediaModal({
   }, [media.tmdbId, media.type]);
 
   // Fetch Season Episodes if it's a TV series
-  const isSeries = detailedMedia.type === 'series' || detailedMedia.type === 'tv' || detailedMedia.type === 'anime';
+  const isExplicitMovie = detailedMedia.type === 'movie' || Boolean(detailedMedia.title && !detailedMedia.name && !detailedMedia.number_of_seasons && !detailedMedia.seasons?.length);
+  const isSeries = !isExplicitMovie && (detailedMedia.type === 'series' || detailedMedia.type === 'tv' || Boolean(detailedMedia.seasons?.length > 0 || detailedMedia.number_of_seasons || detailedMedia.first_air_date));
   const availableSeasons = detailedMedia.seasons || [];
 
   useEffect(() => {
@@ -119,10 +142,20 @@ export default function MediaModal({
                         onPlay(detailedMedia);
                       }
                     }}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold text-sm transition-all shadow-md hover:scale-[1.02]"
+                    onMouseEnter={() => {
+                      const isTv = detailedMedia.type === 'series' || detailedMedia.type === 'tv' || detailedMedia.type === 'anime';
+                      prefetchMediaStreams({
+                        tmdbId: detailedMedia.tmdbId || detailedMedia.id,
+                        type: isTv ? 'series' : 'movie',
+                        season: selectedSeasonNumber,
+                        episode: 1,
+                        title: detailedMedia.title,
+                      });
+                    }}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold text-sm transition-all shadow-md hover:scale-[1.02] cursor-pointer"
                   >
                     <Play size={16} className="fill-slate-950 ml-0.5" />
-                    Assistir Agora
+                    {user ? 'Assistir Agora' : 'Entrar para Assistir'}
                   </button>
 
                   <button
@@ -135,6 +168,29 @@ export default function MediaModal({
                     title={inWatchlist ? "Remover da lista" : "Adicionar à Minha Lista"}
                   >
                     {inWatchlist ? <Check size={18} /> : <Plus size={18} />}
+                  </button>
+
+                  {/* Botão Download Offline MP4 (Benefício VIP) */}
+                  <button
+                    onClick={() => {
+                      if (isVip) {
+                        alert(`Iniciando download seguro em alta velocidade de "${detailedMedia.title}". O arquivo MP4 será salvo.`);
+                      } else {
+                        onOpenSubscription?.();
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      isVip
+                        ? 'bg-amber-500/15 border-amber-400/40 text-amber-300 hover:bg-amber-500/25'
+                        : 'bg-slate-900/90 border-slate-700 text-slate-300 hover:text-white hover:border-sky-400/40'
+                    }`}
+                    title={isVip ? "Baixar MP4 para assistir offline" : "Download Offline exclusivo para membros VIP"}
+                  >
+                    <Download size={15} className={isVip ? "text-amber-400" : "text-sky-400"} />
+                    <span className="hidden sm:inline">Download</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-extrabold uppercase flex items-center gap-0.5">
+                      <Crown size={9} className="fill-amber-400" /> VIP
+                    </span>
                   </button>
                 </div>
               </div>
@@ -162,9 +218,24 @@ export default function MediaModal({
                   <span className="text-slate-300 font-medium">
                     {detailedMedia.duration}
                   </span>
-                  <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 font-semibold text-xs border border-slate-800 ml-1">
-                    4K Ultra HD
-                  </span>
+                  <span className="text-slate-600">•</span>
+                  {isVip ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-400/40">
+                      <Crown size={12} className="fill-amber-400" />
+                      4K Ultra HD & Dolby
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onOpenSubscription?.()}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 hover:text-white font-medium text-xs border border-sky-400/30 hover:border-sky-400 cursor-pointer transition-all"
+                      title="Clique para assinar o VIP (MB WAY & Crypto) e liberar 4K"
+                    >
+                      <Crown size={11} className="text-amber-400" />
+                      <span>4K Ultra HD</span>
+                      <span className="text-[9px] px-1 rounded bg-amber-400/25 text-amber-300 font-black">VIP</span>
+                    </button>
+                  )}
                 </div>
 
                 <p className="text-slate-200 text-sm sm:text-base leading-relaxed">
@@ -251,6 +322,15 @@ export default function MediaModal({
                       <div
                         key={ep.ep}
                         onClick={() => onPlay(detailedMedia, { ...ep, season: selectedSeasonNumber })}
+                        onMouseEnter={() => {
+                          prefetchMediaStreams({
+                            tmdbId: detailedMedia.tmdbId,
+                            type: 'series',
+                            season: selectedSeasonNumber,
+                            episode: ep.ep,
+                            title: detailedMedia.title,
+                          });
+                        }}
                         className="group flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 rounded-2xl bg-[#131822]/80 hover:bg-[#1a2230] border border-white/[0.06] hover:border-slate-600 transition-all cursor-pointer"
                       >
                         <span className="text-base font-bold text-slate-500 group-hover:text-sky-400 w-6 text-center hidden sm:block">

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Heart, Sparkles, ArrowRight, ShieldCheck, Zap, Copy, Check, X } from 'lucide-react';
+import { Heart, Sparkles, ArrowRight, ShieldCheck, Zap, Copy, Check, X, ExternalLink, Crown } from 'lucide-react';
 
 const PRESET_AMOUNTS = [
   { label: 'R$ 5', value: '5.00' },
@@ -11,7 +11,7 @@ const PRESET_AMOUNTS = [
 ];
 
 export function formatPixAmount(rawInput) {
-  if (!rawInput) return '5.00';
+  if (!rawInput) return '10.00';
   
   // Substitui vírgula por ponto e remove caracteres não numéricos exceto ponto
   let cleaned = String(rawInput).trim().replace(',', '.').replace(/[^0-9.]/g, '');
@@ -23,7 +23,7 @@ export function formatPixAmount(rawInput) {
   }
 
   const num = parseFloat(cleaned);
-  if (isNaN(num) || num <= 0) return '5.00';
+  if (isNaN(num) || num <= 0) return '10.00';
 
   // Se o usuário digitou casas decimais, preserva exatamente até 2 casas
   if (cleaned.includes('.')) {
@@ -34,15 +34,15 @@ export function formatPixAmount(rawInput) {
   return `${num}.00`;
 }
 
-export default function DonationSection({ isModal = false, onClose }) {
+export default function DonationSection({ isModal = false, onClose, onOpenVipModal }) {
   const [customAmount, setCustomAmount] = useState('10.00');
   const [selectedPreset, setSelectedPreset] = useState('10.00');
   const [copied, setCopied] = useState(false);
   const linkRef = useRef(null);
 
-  // Calcula o valor final formatado (ex: 30.33 ou 30.00)
+  // Link Oficial PixGG do Kairou
+  const pixggUrl = 'https://pixgg.com/pommern';
   const formattedValue = formatPixAmount(customAmount);
-  const targetUrl = `https://linkspix.app/pmmr/${formattedValue}`;
 
   const handlePresetClick = (val) => {
     setSelectedPreset(val);
@@ -55,14 +55,8 @@ export default function DonationSection({ isModal = false, onClose }) {
     setSelectedPreset(null);
   };
 
-  const handleDonate = (e) => {
-    if (!formattedValue || parseFloat(formattedValue) <= 0) {
-      e?.preventDefault();
-    }
-  };
-
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(targetUrl);
+    navigator.clipboard.writeText(pixggUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -99,7 +93,7 @@ export default function DonationSection({ isModal = false, onClose }) {
         </h2>
 
         <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl mx-auto">
-          O Kairou é 100% independente e gratuito. Nossos servidores de alta velocidade, reprodutor próprio e catálogo em 4K são mantidos com a ajuda direta da comunidade via Pix.
+          O Kairou é 100% independente e gratuito. Nossos servidores de alta velocidade, reprodutor próprio e catálogo em 4K são mantidos com a ajuda direta da comunidade via PixGG.
         </p>
       </div>
 
@@ -157,70 +151,71 @@ export default function DonationSection({ isModal = false, onClose }) {
           </div>
           <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1.5">
             <Sparkles size={12} className="text-sky-400 shrink-0" />
-            <span>Qualquer centavo ou valor é aceito via chave Pix direta.</span>
+            <span>Qualquer centavo ou valor é aceito via chave Pix direta no PixGG.</span>
           </p>
         </div>
 
-        {/* Preview do Link Gerado em Tempo Real */}
+        {/* Preview do Link PixGG */}
         <div className="mb-6 p-3.5 rounded-xl bg-slate-950/60 border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
           <div className="min-w-0 flex-1">
             <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-              Destino Seguro do Pix
+              Destino Oficial PixGG
             </span>
             <a
-              href={targetUrl}
+              href={pixggUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sky-400 font-mono font-medium truncate block select-all text-[11px] sm:text-xs hover:underline hover:text-sky-300 transition-colors"
-              title="Abrir link do Pix em nova aba"
+              className="text-emerald-400 font-mono font-medium truncate block select-all text-[11px] sm:text-xs hover:underline hover:text-emerald-300 transition-colors"
+              title="Abrir página PixGG em nova aba"
             >
-              {targetUrl}
+              {pixggUrl}
             </a>
           </div>
           <button
             type="button"
             onClick={handleCopyLink}
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
-            title="Copiar link com valor"
+            title="Copiar link do PixGG"
           >
             {copied ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
           </button>
         </div>
 
-        {/* Botão de Doação com Redirecionamento (Link nativo <a> para nunca ser bloqueado por popup blockers) */}
+        {/* Botão de Doação no PixGG */}
         <a
           ref={linkRef}
-          href={targetUrl}
+          href={pixggUrl}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={handleDonate}
           className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-400 hover:to-sky-400 text-slate-950 font-black text-sm sm:text-base tracking-wide transition-all shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2.5 cursor-pointer group text-center no-underline select-none"
         >
           <Zap size={18} className="fill-slate-950 text-slate-950 group-hover:animate-bounce" />
-          <span>Contribuir R$ {formattedValue.replace('.', ',')} via Pix</span>
-          <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+          <span>Doar R$ {formattedValue.replace('.', ',')} no PixGG</span>
+          <ExternalLink size={16} className="text-slate-950 ml-1" />
         </a>
 
-        {/* Garantias / Badges Informativas */}
-        <div className="mt-5 pt-4 border-t border-white/[0.06] flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-400">
-          <div className="flex items-center gap-1.5">
-            <ShieldCheck size={14} className="text-emerald-400" />
-            <span>Processado pelo LinksPix Oficial</span>
+        {/* Link para Assinatura VIP se disponível */}
+        {onOpenVipModal && (
+          <div className="mt-4 pt-4 border-t border-white/[0.06] text-center">
+            <button
+              type="button"
+              onClick={onOpenVipModal}
+              className="inline-flex items-center gap-2 text-xs font-bold text-amber-300 hover:text-amber-200 transition-colors cursor-pointer"
+            >
+              <Crown size={14} className="fill-amber-400 text-amber-400" />
+              <span>Deseja assinar o VIP (Zero Anúncios, MB WAY ou Crypto)? Clique aqui</span>
+            </button>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Sparkles size={14} className="text-sky-400" />
-            <span>Acesso Imediato sem Registro</span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
 
   if (isModal) {
     return (
-      <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in select-none">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in select-none">
         <div className="fixed inset-0" onClick={onClose} />
-        <div className="relative w-full max-w-2xl z-10 animate-scale-in">
+        <div className="relative w-full max-w-2xl z-10 max-h-[92vh] overflow-y-auto custom-scrollbar">
           {content}
         </div>
       </div>
@@ -228,8 +223,10 @@ export default function DonationSection({ isModal = false, onClose }) {
   }
 
   return (
-    <section id="doacoes" className="w-full py-10 sm:py-16 px-4 sm:px-8 lg:px-12 max-w-[1680px] mx-auto select-none">
-      {content}
+    <section className="relative w-full py-16 px-4 sm:px-8 lg:px-12 select-none overflow-hidden">
+      <div className="max-w-[1680px] mx-auto">
+        {content}
+      </div>
     </section>
   );
 }

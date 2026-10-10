@@ -1,9 +1,8 @@
-// Servico Local de Resolucao de Canais de TV Ao Vivo (100% Client-Side)
-// Elimina a dependencia do endpoint /api/channels da Vercel.
-// Resolve streams HLS diretos (.m3u8) para reproducao nativa no player.
+// Serviço Local de Resolução de Canais de TV Ao Vivo
+// Waterfall: BestCine (primário) → RDSE (secundário) → BestCine iframe (fallback)
 
 const cache = new Map();
-const CACHE_TTL_MS = 25 * 60 * 1000; // 25 minutos
+const CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutos
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
   const controller = new AbortController();
@@ -13,7 +12,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
       ...options,
       signal: controller.signal,
       headers: {
-        'Accept': 'application/json, text/plain, */*',
+        Accept: 'application/json, text/plain, */*',
         ...(options.headers || {}),
       },
     });
@@ -26,105 +25,56 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
 }
 
 /**
- * Resolve o stream direto de um canal de TV via slug (ex: premiere, sportv, espn, cazetv)
- * @param {string} slug 
- * @returns {Promise<{ ok: boolean, streamUrl: string, type: 'hls'|'iframe', isHls: boolean, isIframe: boolean, slug: string }>}
+ * Resolve o stream de um canal de TV via /api/channels (backend local).
+ * @param {string} slug  ex: "sportv", "cazetv", "globosp"
+ * @returns {Promise<{ ok, streamUrl, isHls, isIframe, type, slug }>}
  */
 export async function resolveChannelStream(slug) {
-  if (!slug) {
-    return { ok: false, error: 'Slug do canal não informado' };
-  }
+  if (!slug) return { ok: false, error: 'Slug do canal não informado' };
 
   const cleanSlug = String(slug).trim().toLowerCase();
 
-  // 1. Checar cache em memória
+  // 1. Cache em memória (25 min TTL)
   if (cache.has(cleanSlug)) {
     const entry = cache.get(cleanSlug);
     if (Date.now() - entry.timestamp < CACHE_TTL_MS) {
-      return {
-        ok: true,
-        cached: true,
-        type: 'hls',
-        isHls: true,
-        isIframe: false,
-        streamUrl: entry.streamUrl,
-        slug: cleanSlug,
-      };
+      return { ok: true, cached: true, ...entry.result };
     }
   }
 
-  // 2. Primário: Resolver via BRFLIX TV API
+  // 2. Backend local → /api/channels (faz o waterfall BestCine → RDSE)
   try {
-    const resolveUrl = `https://brflix.online/api/resolve/${cleanSlug}?directUrl=${cleanSlug}`;
-    const brRes = await fetchWithTimeout(resolveUrl, {}, 4500);
-
-    if (brRes && brRes.ok) {
-      const data = await brRes.json();
-      if (data && data.ok && data.hlsUrl) {
-        const fullStreamUrl = data.hlsUrl.startsWith('http')
-          ? data.hlsUrl
-          : `https://brflix.online${data.hlsUrl}`;
-
-        cache.set(cleanSlug, {
-          streamUrl: fullStreamUrl,
-          rawHlsUrl: data.rawHlsUrl,
-          timestamp: Date.now(),
-        });
-
-        return {
-          ok: true,
-          type: 'hls',
-          isHls: true,
-          isIframe: false,
-          streamUrl: fullStreamUrl,
-          rawHlsUrl: data.rawHlsUrl,
+    const res = await fetchWithTimeout(`/api/channels?slug=${cleanSlug}`, {}, 6000);
+    if (res?.ok) {
+      const data = await res.json();
+      if (data?.ok && data.streamUrl) {
+        const result = {
+          type: data.type || 'iframe',
+          isHls: Boolean(data.isHls),
+          isIframe: Boolean(data.isIframe),
+          streamUrl: data.streamUrl,
+          fallbackRdse: data.fallbackRdse || `https://v1.rdse.buzz/${cleanSlug}`,
           slug: cleanSlug,
-          source: 'brflix_direct',
+          source: data.source || 'api',
         };
+        cache.set(cleanSlug, { result, timestamp: Date.now() });
+        return { ok: true, ...result };
       }
     }
   } catch (err) {
-    console.warn('[channelsResolver] Tentativa primária falhou:', err?.message);
+    console.warn('[channelsResolver] Erro na API local:', err?.message);
   }
 
-  // 3. Secundário: Tentar proxy CORS se direto falhou
-  try {
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://brflix.online/api/resolve/${cleanSlug}?directUrl=${cleanSlug}`)}`;
-    const pRes = await fetchWithTimeout(proxyUrl, {}, 4000);
-    if (pRes && pRes.ok) {
-      const data = await pRes.json();
-      if (data && data.ok && data.hlsUrl) {
-        const fullStreamUrl = data.hlsUrl.startsWith('http')
-          ? data.hlsUrl
-          : `https://brflix.online${data.hlsUrl}`;
-
-        cache.set(cleanSlug, {
-          streamUrl: fullStreamUrl,
-          timestamp: Date.now(),
-        });
-
-        return {
-          ok: true,
-          type: 'hls',
-          isHls: true,
-          isIframe: false,
-          streamUrl: fullStreamUrl,
-          slug: cleanSlug,
-          source: 'brflix_proxy',
-        };
-      }
-    }
-  } catch {}
-
-  // 4. Fallback confiável: URL direta de resolução ou embed Rei dos Embeds
-  const fallbackHls = `https://brflix.online/api/resolve/${cleanSlug}?directUrl=${cleanSlug}`;
+  // 3. Fallback: Embed direto v2.rdembed.sbs
+  const embedUrl = `https://v2.rdembed.sbs/${cleanSlug}`;
   return {
     ok: true,
-    type: 'hls',
-    isHls: true,
-    isIframe: false,
-    streamUrl: fallbackHls,
-    fallbackIframeUrl: `https://v1.rdse.buzz/${cleanSlug}`,
+    type: 'iframe',
+    isHls: false,
+    isIframe: true,
+    streamUrl: embedUrl,
+    fallbackRdse: embedUrl,
     slug: cleanSlug,
+    source: 'client_fallback',
   };
 }

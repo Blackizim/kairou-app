@@ -45,3 +45,9 @@ ios/App/Pods
 ios/App/DerivedData
 *.apk
 *.ipa
+
+# AI / IDE tools & Archives
+.gemini/
+.claude/
+.cursor/
+*.tar.gz

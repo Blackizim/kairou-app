@@ -13,13 +13,11 @@ import {
   Wifi,
   Film,
   Flame,
-  Calendar,
   Users,
   Swords,
-  ChevronRight,
-  ChevronLeft,
   RefreshCw,
-  ExternalLink
+  BookOpen,
+  Globe,
 } from 'lucide-react';
 import channelsData from '../data/channels.json';
 import { fetchMatchesList } from '../services/matchesResolver.js';
@@ -30,10 +28,12 @@ const CHANNEL_GENRES = [
   { id: 'all', label: 'Todos os Canais', icon: Sparkles },
   { id: 'esportes', label: 'Esportes', icon: Trophy },
   { id: 'canais-abertos', label: 'Canais Abertos', icon: Tv },
-  { id: 'infantil', label: 'Infantil', icon: Baby },
-  { id: 'noticias', label: 'Notícias', icon: Newspaper },
-  { id: '24-horas', label: 'Canais 24h', icon: Clock },
   { id: 'filmes-series', label: 'Filmes & Séries', icon: Film },
+  { id: '24-horas', label: 'Canais 24h', icon: Clock },
+  { id: 'infantil', label: 'Infantil', icon: Baby },
+  { id: 'documentarios', label: 'Documentários', icon: BookOpen },
+  { id: 'noticias', label: 'Notícias', icon: Newspaper },
+  { id: 'outros', label: 'Outros', icon: Globe },
 ];
 
 // Main tab categories
@@ -43,7 +43,7 @@ const SPORTS_CATEGORIES = [
   { id: 'basquete', label: 'NBA & Basquete', icon: Flame },
   { id: 'lutas', label: 'UFC & Lutas', icon: Swords },
   { id: 'motor', label: 'F1 & Motor', icon: Flame },
-  { id: 'channels', label: 'Grade de Canais (319)', icon: Tv },
+  { id: 'channels', label: `Grade de Canais (${channelsData.length})`, icon: Tv },
 ];
 
 export default function ChannelsTab({ onPlayChannel }) {
@@ -171,33 +171,39 @@ export default function ChannelsTab({ onPlayChannel }) {
           slug: slug,
           streamUrl: data.streamUrl,
           isIframe: Boolean(data.isIframe),
+          isHls: Boolean(data.isHls),
+          fallbackUrl: data.fallbackRdse || `https://v1.rdse.buzz/${slug}`,
           poster,
           backdrop_path: target.bannerBackdrop || poster,
+          source: data.source,
         });
       } else {
-        // Fallback to iframe
+        const fallbackTarget = data?.fallbackRdse || `https://v2.rdembed.sbs/${slug}`;
         onPlayChannel({
           id: `live-${slug}`,
           title: title,
           type: 'live',
           isLive: true,
           slug: slug,
-          streamUrl: `https://v1.rdse.buzz/${slug}`,
+          streamUrl: fallbackTarget,
           isIframe: true,
+          fallbackUrl: fallbackTarget,
           poster,
           backdrop_path: target.bannerBackdrop || poster,
         });
       }
     } catch (err) {
       console.warn('[ChannelsTab] Fallback direto:', err);
+      const fallbackTarget = `https://v2.rdembed.sbs/${slug}`;
       onPlayChannel({
         id: `live-${slug}`,
         title: title,
         type: 'live',
         isLive: true,
         slug: slug,
-        streamUrl: `https://v1.rdse.buzz/${slug}`,
+        streamUrl: fallbackTarget,
         isIframe: true,
+        fallbackUrl: fallbackTarget,
         poster,
       });
     } finally {
@@ -215,8 +221,8 @@ export default function ChannelsTab({ onPlayChannel }) {
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
               Ao Vivo & Grade de TV
             </span>
-            <span className="hidden sm:inline-flex items-center gap-1 text-xs text-sky-400 font-semibold px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/20">
-              <Wifi size={12} /> HLS Nativo • Zero Anúncios
+            <span className="hidden sm:inline-flex items-center gap-1 text-xs text-violet-400 font-semibold px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20">
+              <Wifi size={12} /> BestCine • RDSE • Zero Ads
             </span>
           </div>
 
@@ -225,7 +231,7 @@ export default function ChannelsTab({ onPlayChannel }) {
           </h1>
 
           <p className="text-xs sm:text-sm text-slate-400 max-w-2xl leading-relaxed">
-            Acompanhe futebol brasileiro e europeu, NBA, UFC e 319 canais de TV 24h com transmissão direta em Full HD.
+            Acompanhe futebol brasileiro e europeu, NBA, UFC e {channelsData.length} canais de TV 24h via <span className="text-violet-400 font-semibold">BestCine</span> + <span className="text-sky-400 font-semibold">Rei dos Embeds</span> em transmissão direta.
           </p>
         </div>
 
@@ -590,11 +596,11 @@ export default function ChannelsTab({ onPlayChannel }) {
         </div>
       )}
 
-      {/* 6. SECTION: GRADE COMPLETA DE CANAIS DE TV 24H (319 CANAIS) */}
+      {/* 6. SECTION: GRADE COMPLETA DE CANAIS DE TV */}
       <div className="pt-6 border-t border-white/[0.08] space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse" />
               <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                 📺 Grade de Canais de TV Ao Vivo
@@ -602,14 +608,17 @@ export default function ChannelsTab({ onPlayChannel }) {
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-white/[0.08]">
                 {channelsData.length} canais
               </span>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400 border border-violet-500/30 tracking-wider">
+                ✦ BestCine + RDSE
+              </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Transmissão contínua 24 horas por dia em alta definição
+            <p className="text-xs text-slate-400">
+              Transmissão contínua 24 horas · Fontes: BestCine → Rei dos Embeds → Fallback direto
             </p>
           </div>
 
           {/* Channels Genre Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 shrink-0">
             {CHANNEL_GENRES.map((g) => {
               const Icon = g.icon;
               const isSelected = selectedChannelGenre === g.id;
@@ -631,13 +640,13 @@ export default function ChannelsTab({ onPlayChannel }) {
           </div>
         </div>
 
-        {/* 319 Channels Grid */}
+        {/* Channels Grid */}
         {filteredChannels.length === 0 ? (
           <div className="p-12 text-center text-slate-500 text-xs sm:text-sm">
-            Nenhum canal encontrado para "{searchQuery}".
+            Nenhum canal encontrado para "{searchQuery || selectedChannelGenre}".
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4">
             {filteredChannels.map((channel) => {
               const isSelectedLoading = loadingSlug === channel.slug;
 
@@ -645,12 +654,14 @@ export default function ChannelsTab({ onPlayChannel }) {
                 <div
                   key={channel.id}
                   onClick={() => handlePlay(channel)}
-                  className="group relative bg-[#0e121a]/95 hover:bg-[#151c2a] border border-white/[0.07] hover:border-sky-400/50 rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between transition-all duration-300 shadow-md hover:shadow-2xl hover:shadow-sky-500/10 cursor-pointer overflow-hidden transform hover:-translate-y-1"
+                  className="group relative bg-[#0e121a]/95 hover:bg-[#141c2c] border border-white/[0.07] hover:border-sky-400/50 rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between transition-all duration-300 shadow-md hover:shadow-2xl hover:shadow-sky-500/10 cursor-pointer overflow-hidden transform hover:-translate-y-1"
                 >
+                  {/* Hover glow */}
                   <div className="absolute inset-x-0 -top-8 h-16 bg-sky-500/0 group-hover:bg-sky-500/15 blur-xl transition-all duration-300 pointer-events-none" />
 
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-3">
+                      {/* Logo */}
                       <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-black/60 border border-white/[0.08] p-2 flex items-center justify-center overflow-hidden shrink-0 group-hover:border-sky-400/40 transition-colors">
                         <img
                           src={channel.logo}
@@ -667,13 +678,14 @@ export default function ChannelsTab({ onPlayChannel }) {
                         </div>
                       </div>
 
+                      {/* Status badges */}
                       <div className="flex flex-col items-end gap-1">
                         <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 tracking-wider">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
                           Ao Vivo
                         </span>
-                        <span className="text-[10px] font-semibold text-slate-400 px-1.5 py-0.5 rounded bg-slate-800/80">
-                          Full HD
+                        <span className="text-[10px] font-semibold text-violet-400 px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20">
+                          BestCine
                         </span>
                       </div>
                     </div>
@@ -686,10 +698,10 @@ export default function ChannelsTab({ onPlayChannel }) {
                     </p>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-white/[0.04] flex items-center justify-between text-xs">
+                  <div className="mt-3.5 pt-3 border-t border-white/[0.04] flex items-center justify-between text-xs">
                     <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1 group-hover:text-slate-300 transition-colors">
                       <Radio size={11} className="text-sky-400" />
-                      <span>HLS Direto</span>
+                      <span>HLS / Embed</span>
                     </span>
 
                     <div className="w-7 h-7 rounded-full bg-sky-400/10 group-hover:bg-sky-400 text-sky-400 group-hover:text-slate-950 flex items-center justify-center transition-all shadow-sm">

@@ -116,13 +116,13 @@ export const DEFAULT_MATCHES = [
     homeTeam: {
       name: 'Santos',
       shortName: 'SAN',
-      logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/2674.png',
+      logo: 'https://media.api-sports.io/football/teams/128.png',
       score: '2',
     },
     awayTeam: {
       name: 'Cruzeiro',
       shortName: 'CRU',
-      logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/3450.png',
+      logo: 'https://media.api-sports.io/football/teams/135.png',
       score: '1',
     },
     status: 'AO VIVO',
@@ -142,13 +142,13 @@ export const DEFAULT_MATCHES = [
     homeTeam: {
       name: 'Inter Miami',
       shortName: 'MIA',
-      logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/19830.png',
+      logo: 'https://media.api-sports.io/football/teams/9568.png',
       score: '3',
     },
     awayTeam: {
       name: 'Nashville SC',
       shortName: 'NSH',
-      logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/19827.png',
+      logo: 'https://media.api-sports.io/football/teams/1062.png',
       score: '1',
     },
     status: 'AO VIVO',
@@ -168,13 +168,13 @@ export const DEFAULT_MATCHES = [
     homeTeam: {
       name: 'Palmeiras',
       shortName: 'PAL',
-      logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/2029.png',
+      logo: 'https://media.api-sports.io/football/teams/121.png',
       score: '',
     },
     awayTeam: {
       name: 'São Paulo',
       shortName: 'SPFC',
-      logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/2026.png',
+      logo: 'https://media.api-sports.io/football/teams/126.png',
       score: '',
     },
     status: 'EM BREVE',
@@ -194,13 +194,13 @@ export const DEFAULT_MATCHES = [
     homeTeam: {
       name: 'Flamengo',
       shortName: 'FLA',
-      logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/2028.png',
+      logo: 'https://media.api-sports.io/football/teams/127.png',
       score: '',
     },
     awayTeam: {
       name: 'Corinthians',
       shortName: 'COR',
-      logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/1930.png',
+      logo: 'https://media.api-sports.io/football/teams/131.png',
       score: '',
     },
     status: 'EM BREVE',

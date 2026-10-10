@@ -1,9 +1,9 @@
-// Vercel Serverless Function: /api/channels
-// Resolves direct HLS streams from Rei dos Embeds (via BRFLIX TV resolver and direct fallbacks)
-// Returns direct .m3u8 HLS streams to play 100% natively in hls.js with ZERO ADS and no iframes.
+// Vercel Serverless & Local Node API: /api/channels
+// Source waterfall: BestCine (primary) → Rei dos Embeds → Direct iframe fallback
+// Zero ads on HLS path; iframe fallback uses the original embed page cleanly.
 
 const cache = new Map();
-const CACHE_TTL_MS = 25 * 60 * 1000; // 25 minutes
+const CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutes
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
   const controller = new AbortController();
@@ -18,102 +18,108 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
   }
 }
 
+// Try to extract a direct .m3u8 HLS URL from an embed page HTML
+function extractHlsFromHtml(html) {
+  // Pattern 1: sources = [{src: "..."}]
+  const m1 = html.match(/sources\s*=\s*(\[[\s\S]*?\])/);
+  if (m1) {
+    try {
+      const srcs = JSON.parse(m1[1]);
+      if (Array.isArray(srcs) && srcs[0]?.src) return srcs[0].src;
+    } catch { /* continue */ }
+  }
+  // Pattern 2: "file":"https://...m3u8..."
+  const m2 = html.match(/"file"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/);
+  if (m2) return m2[1];
+  // Pattern 3: source src="...m3u8"
+  const m3 = html.match(/src=['"](https?:\/\/[^'"]+\.m3u8[^'"]*)['"]/);
+  if (m3) return m3[1];
+  // Pattern 4: hls.loadSource("...")
+  const m4 = html.match(/hls\.loadSource\(['"](https?:\/\/[^'"]+)['"]\)/);
+  if (m4) return m4[1];
+  // Pattern 5: var source = "..."
+  const m5 = html.match(/var\s+source\s*=\s*['"](https?:\/\/[^'"]+\.m3u8[^'"]*)['"]/);
+  if (m5) return m5[1];
+  return null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { slug, m3u8, format } = req.query || {};
-
-  if (!slug) {
-    return res.status(400).json({ ok: false, error: 'Parâmetro slug é obrigatório' });
-  }
+  const { slug, format } = req.query || {};
+  if (!slug) return res.status(200).json({ ok: true, service: 'Kairou Channels API Online' });
 
   const cleanSlug = String(slug).trim().toLowerCase();
 
-  // 1. Check in-memory cache
+  // 1. Memory cache hit
   if (cache.has(cleanSlug)) {
     const entry = cache.get(cleanSlug);
     if (Date.now() - entry.timestamp < CACHE_TTL_MS) {
-      if (m3u8 === '1' || format === 'm3u8') {
-        const mRes = await fetchWithTimeout(entry.streamUrl, {
-          headers: { 'Referer': 'https://v1.rdse.buzz/', 'User-Agent': 'Mozilla/5.0' }
-        }, 5000);
-        if (mRes && mRes.ok) {
+      if (entry.isIframe) {
+        return res.status(200).json({ ok: true, cached: true, type: 'iframe', isIframe: true, streamUrl: entry.streamUrl, slug: cleanSlug });
+      }
+      if (format === 'm3u8') {
+        const mRes = await fetchWithTimeout(entry.streamUrl, { headers: { Referer: 'https://bestcine.dpdns.org/', 'User-Agent': 'Mozilla/5.0' } }, 5000);
+        if (mRes?.ok) {
           const text = await mRes.text();
           res.setHeader('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8');
-          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Cache-Control', 'no-cache');
           return res.status(200).send(text);
         }
       }
-      return res.status(200).json({
-        ok: true,
-        cached: true,
-        type: 'hls',
-        isHls: true,
-        streamUrl: entry.streamUrl,
-        slug: cleanSlug,
-      });
+      return res.status(200).json({ ok: true, cached: true, type: 'hls', isHls: true, streamUrl: entry.streamUrl, slug: cleanSlug });
     }
   }
 
-  // 2. Primary: Resolve via BRFLIX TV's dedicated high-speed resolver
+  // ----------------------------------------------------------------
+  // 2. PRIMARY: BestCine
+  // ----------------------------------------------------------------
+  const bestcineUrl = `https://bestcine.dpdns.org/stream/tv/${cleanSlug}`;
   try {
-    const resolveUrl = `https://brflix.online/api/resolve/${cleanSlug}?directUrl=${cleanSlug}`;
-    const brRes = await fetchWithTimeout(resolveUrl, {
+    const bcRes = await fetchWithTimeout(bestcineUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Referer': 'https://brflix.online/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://bestcine.dpdns.org/',
+        'Accept': 'text/html,application/xhtml+xml,*/*',
       },
-    }, 4500);
+    }, 4000);
 
-    if (brRes && brRes.ok) {
-      const data = await brRes.json();
-      if (data && data.ok && data.hlsUrl) {
-        const fullStreamUrl = data.hlsUrl.startsWith('http')
-          ? data.hlsUrl
-          : `https://brflix.online${data.hlsUrl}`;
-
-        cache.set(cleanSlug, {
-          streamUrl: fullStreamUrl,
-          rawHlsUrl: data.rawHlsUrl,
-          timestamp: Date.now(),
-        });
-
-        if (m3u8 === '1' || format === 'm3u8') {
-          const mRes = await fetchWithTimeout(fullStreamUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-          }, 5000);
-          if (mRes && mRes.ok) {
-            const text = await mRes.text();
-            res.setHeader('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8');
-            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-            return res.status(200).send(text);
+    if (bcRes?.ok) {
+      const html = await bcRes.text();
+      // Check for iframe redirect to a player
+      const iframeMatch = html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+      if (iframeMatch) {
+        const embedUrl = iframeMatch[1].replace(/&amp;/g, '&');
+        const embedRes = await fetchWithTimeout(embedUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': bestcineUrl },
+        }, 4000);
+        if (embedRes?.ok) {
+          const embedHtml = await embedRes.text();
+          const hlsUrl = extractHlsFromHtml(embedHtml);
+          if (hlsUrl) {
+            cache.set(cleanSlug, { streamUrl: hlsUrl, isIframe: false, timestamp: Date.now() });
+            return res.status(200).json({ ok: true, type: 'hls', isHls: true, streamUrl: hlsUrl, slug: cleanSlug, source: 'bestcine_hls' });
           }
         }
-
-        return res.status(200).json({
-          ok: true,
-          type: 'hls',
-          isHls: true,
-          streamUrl: fullStreamUrl,
-          rawHlsUrl: data.rawHlsUrl,
-          slug: cleanSlug,
-          source: 'brflix_direct',
-        });
+      }
+      // Direct HLS in page
+      const directHls = extractHlsFromHtml(html);
+      if (directHls) {
+        cache.set(cleanSlug, { streamUrl: directHls, isIframe: false, timestamp: Date.now() });
+        return res.status(200).json({ ok: true, type: 'hls', isHls: true, streamUrl: directHls, slug: cleanSlug, source: 'bestcine_direct' });
       }
     }
-  } catch (err) {
-    console.warn('[channels] Erro ao resolver via brflix:', err.message);
-  }
+  } catch { /* Fall through */ }
 
-  // 3. Secondary: Direct Rei dos Embeds Scraper
-  const domains = ['https://v1.rdse.buzz', 'https://v2.rdse.site'];
-  for (const domain of domains) {
+  // ----------------------------------------------------------------
+  // 3. SECONDARY: Rei dos Embeds scraper
+  // ----------------------------------------------------------------
+  const rdseDomains = ['https://v1.rdse.buzz', 'https://v2.rdse.site', 'https://reidosembeds.com'];
+  for (const domain of rdseDomains) {
     try {
       const channelUrl = `${domain}/${cleanSlug}`;
       const pageRes = await fetchWithTimeout(channelUrl, {
@@ -121,54 +127,49 @@ export default async function handler(req, res) {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           'Referer': `${domain}/`,
         },
-      }, 4000);
+      }, 3500);
+      if (!pageRes?.ok) continue;
 
-      if (!pageRes || !pageRes.ok) continue;
       const html = await pageRes.text();
       const iframeMatch = html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
       if (!iframeMatch) continue;
 
       const iframeUrl = iframeMatch[1].replace(/&amp;/g, '&');
       const ifrRes = await fetchWithTimeout(iframeUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': channelUrl,
-        },
-      }, 4000);
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': channelUrl },
+      }, 3500);
+      if (!ifrRes?.ok) continue;
 
-      if (!ifrRes || !ifrRes.ok) continue;
       const ifrHtml = await ifrRes.text();
-      const sourcesMatch = ifrHtml.match(/var\s+sources\s*=\s*(\[[^;]+\]);/) || ifrHtml.match(/sources\s*=\s*(\[[^;]+\])/);
-      if (!sourcesMatch) continue;
-
-      const sources = JSON.parse(sourcesMatch[1]);
-      if (Array.isArray(sources) && sources.length > 0 && sources[0].src) {
-        const streamUrl = sources[0].src;
-        cache.set(cleanSlug, {
-          streamUrl,
-          timestamp: Date.now(),
-        });
-
-        return res.status(200).json({
-          ok: true,
-          type: 'hls',
-          isHls: true,
-          streamUrl,
-          slug: cleanSlug,
-          source: 'rdse_direct',
-        });
+      const hlsUrl = extractHlsFromHtml(ifrHtml);
+      if (hlsUrl) {
+        cache.set(cleanSlug, { streamUrl: hlsUrl, isIframe: false, timestamp: Date.now() });
+        if (format === 'm3u8') {
+          const mRes = await fetchWithTimeout(hlsUrl, { headers: { Referer: domain, 'User-Agent': 'Mozilla/5.0' } }, 4000);
+          if (mRes?.ok) {
+            const text = await mRes.text();
+            res.setHeader('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache');
+            return res.status(200).send(text);
+          }
+        }
+        return res.status(200).json({ ok: true, type: 'hls', isHls: true, streamUrl: hlsUrl, slug: cleanSlug, source: 'rdse' });
       }
-    } catch {
-      // Continue
-    }
+    } catch { /* Try next domain */ }
   }
 
-  // 4. Fallback: return direct stream endpoint
+  // ----------------------------------------------------------------
+  // 4. FALLBACK: Direct RDSE / Embed iframe
+  // ----------------------------------------------------------------
+  const fallbackUrl = `https://v2.rdembed.sbs/${cleanSlug}`;
+  cache.set(cleanSlug, { streamUrl: fallbackUrl, isIframe: true, timestamp: Date.now() });
   return res.status(200).json({
     ok: true,
-    type: 'hls',
-    isHls: true,
-    streamUrl: `https://brflix.online/api/resolve/${cleanSlug}?directUrl=${cleanSlug}`,
+    type: 'iframe',
+    isIframe: true,
+    streamUrl: fallbackUrl,
+    fallbackRdse: fallbackUrl,
     slug: cleanSlug,
+    source: 'rdse_iframe',
   });
 }

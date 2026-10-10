@@ -122,7 +122,8 @@ export default function ContinueWatchingRow({
           className="flex items-center gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth"
         >
           {items.map((item) => {
-            const isSeries = item.media_type === 'series' || item.media_type === 'tv' || Boolean(item.season);
+            const isExplicitMovie = item.media_type === 'movie' || String(item.media_id).startsWith('movie-');
+            const isSeries = !isExplicitMovie && (item.media_type === 'series' || item.media_type === 'tv' || String(item.media_id).startsWith('series-') || Boolean(item.episode_title));
             const episodeLabel = isSeries ? `T${item.season || 1}:E${item.episode || 1}` : null;
             const remainingText = formatRemaining(item.duration, item.playback_time);
 

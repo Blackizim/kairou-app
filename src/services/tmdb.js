@@ -1,4 +1,4 @@
-// Serviço Oficial TMDB para kairou Streaming
+// Serviço Oficial TMDB para Kairou Streaming
 const TMDB_READ_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4MjljMjk3OTUwZTYxZTBjNzE3OGI1ZmQ5YzllNmZhMCIsIm5iZiI6MTc1MTgyNDMyMC40NTcsInN1YiI6IjY4NmFiN2MwZDQ4OWE5YzMyYTUzZmFjNCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.IBBf0y2Nv9mzgXSpswQC2MsezfsDKAkhtKTC3211BpY';
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMAGE_BASE_W500 = 'https://image.tmdb.org/t/p/w500';
@@ -57,6 +57,9 @@ export const getBackdropUrl = (path) => {
   return `${IMAGE_BASE_ORIGINAL}${path}`;
 };
 
+const tmdbCache = new Map();
+const TMDB_CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutos de cache em memória
+
 async function tmdbFetch(endpoint, params = {}) {
   const url = new URL(`${BASE_URL}${endpoint}`);
   url.searchParams.set('language', 'pt-BR');
@@ -66,19 +69,36 @@ async function tmdbFetch(endpoint, params = {}) {
     }
   });
 
+  const cacheKey = url.toString();
+  if (tmdbCache.has(cacheKey)) {
+    const cached = tmdbCache.get(cacheKey);
+    if (Date.now() - cached.timestamp < TMDB_CACHE_TTL_MS) {
+      return cached.data;
+    }
+  }
+
   try {
-    const res = await fetch(url.toString(), {
+    const res = await fetch(cacheKey, {
       headers: {
         Authorization: `Bearer ${TMDB_READ_TOKEN}`,
         accept: 'application/json',
       },
     });
     if (!res.ok) {
+      if (res.status === 404) {
+        // Armazena 404 no cache para nunca re-consultar endpoints inexistentes
+        tmdbCache.set(cacheKey, { data: null, timestamp: Date.now() });
+        return null;
+      }
       throw new Error(`TMDB error ${res.status}: ${res.statusText}`);
     }
-    return await res.json();
+    const data = await res.json();
+    tmdbCache.set(cacheKey, { data, timestamp: Date.now() });
+    return data;
   } catch (error) {
-    console.error(`Falha ao buscar TMDB [${endpoint}]:`, error);
+    if (!error.message?.includes('404')) {
+      console.warn(`[TMDB] Falha em ${endpoint}:`, error.message);
+    }
     return null;
   }
 }
@@ -87,16 +107,16 @@ export function formatMedia(item, explicitType = null) {
   if (!item) return null;
 
   let type = explicitType;
-  if (!type) {
+  if (!type || type === 'anime') {
     if (item.media_type === 'tv' || item.media_type === 'series') {
       type = 'series';
     } else if (item.media_type === 'movie') {
       type = 'movie';
-    } else if (item.name && !item.title) {
+    } else if (item.number_of_seasons || (item.seasons && item.seasons.length > 0) || item.first_air_date) {
       type = 'series';
     } else if (item.title && !item.name) {
       type = 'movie';
-    } else if (item.number_of_seasons || item.seasons) {
+    } else if (item.name && !item.title) {
       type = 'series';
     } else {
       type = 'movie';
@@ -227,17 +247,51 @@ export async function fetchTopAnime() {
     .map((item) => formatMedia(item, 'series'));
 }
 
+const mediaDetailsCache = new Map();
+const seasonEpisodesCache = new Map();
+const externalIdsCache = new Map();
+
 // Detalhes Completos com Elenco, Trailer e Títulos Semelhantes
 export async function fetchMediaDetails(tmdbId, type = 'movie') {
+  if (!tmdbId) return null;
   const isSeries = type === 'series' || type === 'tv';
-  const endpoint = isSeries ? `/tv/${tmdbId}` : `/movie/${tmdbId}`;
-  const data = await tmdbFetch(endpoint, {
+  const cacheKey = `${tmdbId}_${isSeries ? 'tv' : 'movie'}`;
+  if (mediaDetailsCache.has(cacheKey)) {
+    return mediaDetailsCache.get(cacheKey);
+  }
+
+  let primaryEndpoint = isSeries ? `/tv/${tmdbId}` : `/movie/${tmdbId}`;
+  let fallbackEndpoint = isSeries ? `/movie/${tmdbId}` : `/tv/${tmdbId}`;
+
+  let data = await tmdbFetch(primaryEndpoint, {
     append_to_response: 'credits,videos,similar,external_ids',
   });
 
-  if (!data) return null;
+  let resolvedType = isSeries ? 'series' : 'movie';
+  // Fallback transparente se o item for na verdade um filme ou uma série com ID invertido no catálogo
+  if (!data) {
+    data = await tmdbFetch(fallbackEndpoint, {
+      append_to_response: 'credits,videos,similar,external_ids',
+    });
+    if (data) {
+      resolvedType = isSeries ? 'movie' : 'series';
+    }
+  }
 
-  const formatted = formatMedia(data, isSeries ? 'series' : 'movie');
+  if (!data) {
+    mediaDetailsCache.set(cacheKey, null);
+    return null;
+  }
+
+  // Garante que o tipo final corresponda com o objeto retornado (se tem title e release_date, é filme)
+  if (data.title && !data.name && !data.number_of_seasons) {
+    resolvedType = 'movie';
+  } else if (data.name && (data.number_of_seasons || data.seasons)) {
+    resolvedType = 'series';
+  }
+
+  const formatted = formatMedia(data, resolvedType);
+  formatted.type = resolvedType;
   formatted.imdbId = data.external_ids?.imdb_id || data.imdb_id || null;
 
   // Elenco principal
@@ -267,22 +321,35 @@ export async function fetchMediaDetails(tmdbId, type = 'movie') {
     formatted.similar = data.similar.results
       .filter((i) => i.poster_path)
       .slice(0, 6)
-      .map((item) => formatMedia(item, type));
+      .map((item) => formatMedia(item, resolvedType));
   }
 
   // Temporadas completas (para TV)
-  if (type === 'series' && data.seasons) {
+  if (resolvedType === 'series' && data.seasons) {
     formatted.seasons = data.seasons.filter((s) => s.season_number > 0);
+  } else {
+    formatted.seasons = [];
   }
 
+  mediaDetailsCache.set(cacheKey, formatted);
+  mediaDetailsCache.set(`${tmdbId}_${resolvedType}`, formatted);
   return formatted;
 }
 
 // Busca episódios de uma temporada específica
 export async function fetchSeasonEpisodes(tvTmdbId, seasonNumber) {
+  if (!tvTmdbId) return [];
+  const cacheKey = `${tvTmdbId}_s${seasonNumber}`;
+  if (seasonEpisodesCache.has(cacheKey)) {
+    return seasonEpisodesCache.get(cacheKey);
+  }
+
   const data = await tmdbFetch(`/tv/${tvTmdbId}/season/${seasonNumber}`);
-  if (!data?.episodes) return [];
-  return data.episodes.map((ep) => ({
+  if (!data?.episodes) {
+    seasonEpisodesCache.set(cacheKey, []);
+    return [];
+  }
+  const result = data.episodes.map((ep) => ({
     ep: ep.episode_number,
     title: ep.name || `Episódio ${ep.episode_number}`,
     duration: ep.runtime ? `${ep.runtime}m` : '50m',
@@ -291,6 +358,9 @@ export async function fetchSeasonEpisodes(tvTmdbId, seasonNumber) {
       : 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?q=80&w=600&auto=format&fit=crop',
     synopsis: ep.overview || 'Sinopse deste episódio disponível na transmissão.',
   }));
+
+  seasonEpisodesCache.set(cacheKey, result);
+  return result;
 }
 
 // Busca Ao Vivo
@@ -308,9 +378,25 @@ export async function searchTMDB(query) {
 
 // Busca IDs externos (IMDb ID)
 export async function fetchMediaExternalIds(id, type = 'movie') {
+  if (!id) return null;
   const isSeries = type === 'series' || type === 'tv';
-  const data = await tmdbFetch(`/${isSeries ? 'tv' : 'movie'}/${id}/external_ids`);
-  return data?.imdb_id || null;
+  const cacheKey = `${id}_${isSeries ? 'tv' : 'movie'}`;
+  if (externalIdsCache.has(cacheKey)) {
+    return externalIdsCache.get(cacheKey);
+  }
+
+  let data = await tmdbFetch(`/${isSeries ? 'tv' : 'movie'}/${id}/external_ids`);
+  if (!data?.imdb_id) {
+    // Tenta o endpoint alternativo caso o tipo tenha sido inferido errado
+    const fallbackData = await tmdbFetch(`/${isSeries ? 'movie' : 'tv'}/${id}/external_ids`);
+    if (fallbackData?.imdb_id) {
+      externalIdsCache.set(cacheKey, fallbackData.imdb_id);
+      return fallbackData.imdb_id;
+    }
+  }
+  const result = data?.imdb_id || null;
+  externalIdsCache.set(cacheKey, result);
+  return result;
 }
 
 

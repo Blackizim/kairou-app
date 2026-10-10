@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, Heart, Shield, Sparkles, Check } from 'lucide-react';
+import { X, Heart, Shield, Sparkles, Check, ExternalLink } from 'lucide-react';
 import KairouIcon from './KairouIcon';
 
 export default function SupportPromptModal({ isOpen, onSelectChoice, onOpenDonation }) {
@@ -115,31 +115,32 @@ export default function SupportPromptModal({ isOpen, onSelectChoice, onOpenDonat
             </div>
           </button>
 
-          {/* Opcao 3: Apoiar com Doação Pix */}
-          {onOpenDonation && (
-            <button
-              type="button"
-              onClick={() => {
-                onSelectChoice(false);
-                onOpenDonation();
-              }}
-              className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-white border border-emerald-500/25 transition-all cursor-pointer group text-left"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
-                  <Heart size={16} className="fill-emerald-400 text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-xs sm:text-sm font-bold leading-tight">
-                    Prefere apoiar com Pix? (Qualquer valor)
-                  </p>
-                  <p className="text-[11px] text-emerald-400/80 font-normal mt-0.5">
-                    Contribua com qualquer valor direto pelo LinksPix
-                  </p>
-                </div>
+          {/* Opcao 3: Apoiar com Doação Pix (PixGG) */}
+          <a
+            href="https://pixgg.com/pommern"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              onSelectChoice(false);
+              onOpenDonation?.();
+            }}
+            className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-white border border-emerald-500/25 transition-all cursor-pointer group text-left no-underline"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Heart size={16} className="fill-emerald-400 text-emerald-400" />
               </div>
-            </button>
-          )}
+              <div>
+                <p className="text-xs sm:text-sm font-bold leading-tight">
+                  Prefere apoiar com Pix? (Qualquer valor)
+                </p>
+                <p className="text-[11px] text-emerald-400/80 font-normal mt-0.5">
+                  Contribua com qualquer valor direto pelo PixGG
+                </p>
+              </div>
+            </div>
+            <ExternalLink size={16} className="text-emerald-400/70 group-hover:text-emerald-300 shrink-0 ml-2" />
+          </a>
         </div>
       </div>
     </div>

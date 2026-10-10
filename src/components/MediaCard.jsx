@@ -1,4 +1,5 @@
 import React from 'react';
+import { prefetchMediaStreams } from '../services/extractor';
 
 export default function MediaCard({
   media,
@@ -17,6 +18,18 @@ export default function MediaCard({
         width: isBackdrop ? 'clamp(220px, 42vw, 290px)' : 'clamp(130px, 30vw, 185px)',
       }}
       onClick={() => onOpenDetails(media)}
+      onMouseEnter={() => {
+        if (media?.tmdbId || media?.id) {
+          const isTv = media.type === 'series' || media.type === 'tv' || media.type === 'anime';
+          prefetchMediaStreams({
+            tmdbId: media.tmdbId || media.id,
+            type: isTv ? 'series' : 'movie',
+            season: 1,
+            episode: 1,
+            title: media.title,
+          });
+        }
+      }}
     >
       {/* Thumbnail Frame */}
       <div

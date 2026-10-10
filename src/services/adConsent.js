@@ -1,12 +1,13 @@
-// Servico de Gerenciamento de Avisos (24h) e Consentimento de Anuncios com Isolamento Real
+import { isVipUser } from './vipService';
+
+// Servico de Gerenciamento de Avisos (24h) e Anúncios Isolados para Modo Reprodução Kairou
 const NOTICE_TIMESTAMP_KEY = 'kairou_notice_dismissed_time';
 const AD_CONSENT_KEY = 'kairou_ad_consent';
-const DAILY_ENTRY_DATE_KEY = 'kairou_daily_ad_entry_date';
 
 const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000; // 24 horas em ms
 
 /**
- * Verifica se o aviso do Telegram/Discord deve ser exibido (a cada 24 horas)
+ * Verifica se o aviso do Telegram deve ser exibido (a cada 24 horas)
  */
 export function shouldShowNoticeModal() {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -39,76 +40,36 @@ export function markNoticeModalDismissed() {
 }
 
 /**
- * Verifica se e o primeiro acesso do dia no site para exibir o popup de anuncios
- */
-export function shouldShowDailyEntryPrompt() {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return true;
-  }
-  try {
-    const today = new Date().toDateString();
-    const lastDate = localStorage.getItem(DAILY_ENTRY_DATE_KEY);
-    return lastDate !== today;
-  } catch (err) {
-    console.warn('[AdConsent] Erro ao checar primeiro acesso do dia:', err);
-    return true;
-  }
-}
-
-/**
- * Marca que o popup do primeiro acesso do dia foi exibido
- */
-export function markDailyEntryPromptShown() {
-  if (typeof window === 'undefined' || !window.localStorage) return;
-  try {
-    localStorage.setItem(DAILY_ENTRY_DATE_KEY, new Date().toDateString());
-  } catch (err) {
-    console.warn('[AdConsent] Erro ao salvar data do primeiro acesso:', err);
-  }
-}
-
-/**
  * Verifica se os scripts de anuncios foram carregados na janela atual
  */
 export function isAdScriptLoaded() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return false;
   return Boolean(
     window.__kairou_ads_active ||
+    window.__borlaflix_ads_active ||
     document.querySelector('script[src*="quge5.com"]') ||
-    document.querySelector('script[src*="5gvci.com"]')
+    document.querySelector('script[src*="pemsrv.com"]') ||
+    document.querySelector('script[src*="magsrv.com"]')
   );
 }
 
 /**
- * Injeta script de anúncios (Monetag removido)
+ * Remove todos os anúncios e listeners ao sair do player para não atrapalhar na página principal
  */
-export function loadAdScript() {
-  // Monetag ads removed por solicitação do usuário
+export function unloadWatchingAds() {
+  if (typeof window === 'undefined') return;
+  window.__kairou_is_watching = false;
   window.__kairou_ads_active = false;
-}
-
-/**
- * Desativa anuncios, desregistra Service Workers e remove elementos do DOM
- * Retorna true se um reload de memoria for necessario para limpar listeners
- */
-export function disableAds() {
-  if (typeof window === 'undefined') return false;
-
-  const wasActive = isAdScriptLoaded();
-  window.__kairou_ads_active = false;
+  window.__borlaflix_is_watching = false;
+  window.__borlaflix_ads_active = false;
 
   try {
-    localStorage.setItem(AD_CONSENT_KEY, 'no_ads');
+    document.querySelectorAll('script[src*="quge5.com"], script[id*="multitag"], script[src*="pemsrv.com"], script[src*="magsrv.com"], script[id*="popunder"], script[id="popmagicldr"]').forEach(el => el.remove());
+    document.querySelectorAll('iframe[src*="quge5.com"], iframe[src*="pemsrv.com"], iframe[src*="magsrv.com"]').forEach(el => el.remove());
+    document.querySelectorAll('ins.eas6a97888e35, ins.eas6a97888e29').forEach(el => { el.style.display = 'none'; el.remove(); });
   } catch (e) {}
 
-  // Remove elementos e scripts de anuncios
-  try {
-    document.querySelectorAll('script[src*="quge5.com"], script[src*="5gvci.com"], script[src*="3nbf4.com"]').forEach(el => el.remove());
-    document.querySelectorAll('iframe[src*="quge5.com"], iframe[src*="5gvci.com"]').forEach(el => el.remove());
-    document.querySelectorAll('div[id*="zone_"], div[class*="zone_"]').forEach(el => el.remove());
-  } catch (e) {}
-
-  // Desregistra Service Workers para cessar notificacoes e redirects
+  // Desregistra Service Workers adicionados por redes de anúncios
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(registrations => {
       for (const reg of registrations) {
@@ -117,46 +78,120 @@ export function disableAds() {
     }).catch(() => {});
   }
 
-  return wasActive;
+  console.info('[AdConsent] 🛡️ Anúncios desativados. Página principal mantida 100% limpa sem popunders.');
 }
 
 /**
- * Salva a escolha do usuario
+ * Injeta script de anúncios SOMENTE quando o usuário está assistindo (VideoPlayer / canais)
+ * Na página principal / catálogo, esta função NÃO é executada para não atrapalhar o usuário.
  */
-export function setAdConsent(consented) {
-  if (consented) {
-    loadAdScript();
-    return false; // Nao requer reload
+export function loadWatchingAds(user = null, profile = null) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  // Membros VIP NUNCA recebem anúncios
+  if (isVipUser(user, profile)) {
+    unloadWatchingAds();
+    return;
+  }
+
+  // Marca que o usuário está ativamente no modo player de vídeo
+  window.__kairou_is_watching = true;
+  window.__borlaflix_is_watching = true;
+  if (window.__kairou_ads_active || window.__borlaflix_ads_active) return;
+  window.__kairou_ads_active = true;
+  window.__borlaflix_ads_active = true;
+
+  try {
+    localStorage.setItem(AD_CONSENT_KEY, 'with_ads');
+  } catch (e) {}
+
+  // Estratégia de monetização inteligente e usável:
+  // - ZERO popups na página principal
+  // - No player: limita a no máximo 1 interação a cada 20 minutos (Frequency Capping)
+  const AD_COOLDOWN_MS = 20 * 60 * 1000; // 20 minutos
+  const lastAdTime = parseInt(sessionStorage.getItem('kairou_last_ad_time') || '0', 10);
+  const now = Date.now();
+  
+  if (now - lastAdTime < AD_COOLDOWN_MS) {
+    console.info('[AdConsent] 🛡️ Cooldown de anúncios ativo (1 a cada 20min). Navegação mantida limpa e fluida.');
+    return;
+  }
+  sessionStorage.setItem('kairou_last_ad_time', now.toString());
+
+  // 1. Multitag Principal (Carregamento único, controlado e profissional)
+  if (!document.querySelector('script[src*="quge5.com"]') && !document.querySelector('script[src*="3nbf4.com"]')) {
+    const sMulti = document.createElement('script');
+    sMulti.src = 'https://quge5.com/88/tag.min.js';
+    sMulti.setAttribute('data-zone', '291063');
+    sMulti.setAttribute('data-cfasync', 'false');
+    sMulti.async = true;
+    sMulti.id = 'kairou_multitag_lovely';
+    document.head.appendChild(sMulti);
+    console.info('[AdConsent] 🎬 Anúncio controlado ativado no player com capping de 20 min.');
+  }
+}
+
+// Mantem compatibilidade com chamadas legadas
+export const loadAdScript = loadWatchingAds;
+
+/**
+ * Desativa anúncios SOMENTE para membros VIP
+ */
+export function disableAds(user = null, profile = null) {
+  if (typeof window === 'undefined') return false;
+  unloadWatchingAds();
+  try {
+    localStorage.setItem(AD_CONSENT_KEY, 'no_ads_vip');
+  } catch (e) {}
+  return true;
+}
+
+/**
+ * Atualiza consentimento
+ */
+export function setAdConsent(consented, user = null, profile = null) {
+  if (consented && (window.__kairou_is_watching || window.__borlaflix_is_watching)) {
+    loadWatchingAds(user, profile);
+    return false;
   } else {
-    return disableAds(); // Retorna se requer reload para limpar memoria
+    return disableAds(user, profile);
   }
 }
 
 /**
- * Neutralizador de popunders e redirecionamentos quando o usuario escolhe sem anuncios
+ * Escudo protetor inteligente contra popups/popunders:
+ * - Se o usuário estiver na página principal / catálogo (não estiver assistindo): BLOQUEIA 100% de popunders para não atrapalhar!
+ * - Se o usuário for VIP: BLOQUEIA 100% sempre.
+ * - Somente se o usuário estiver ativamente assistindo no player (!isVip && isWatching) o popunder de apoio é autorizado.
  */
-function protectAgainstRoguePopups() {
+function protectAgainstRoguePopups(user = null, profile = null) {
   if (typeof window === 'undefined') return;
 
-  if (window.__kairou_shield_installed) return;
+  if (window.__kairou_shield_installed || window.__borlaflix_shield_installed) return;
   window.__kairou_shield_installed = true;
+  window.__borlaflix_shield_installed = true;
 
   const originalOpen = window.open;
   window.open = function(url, target, features) {
     try {
-      const choice = localStorage.getItem(AD_CONSENT_KEY);
-      if (choice === 'no_ads') {
+      const isVip = isVipUser(user, profile);
+      const isWatching = Boolean(window.__kairou_is_watching || window.__borlaflix_is_watching);
+
+      // Se for VIP OU se estiver na página principal (NÃO assistindo), bloqueia anúncios e popunders
+      if (isVip || !isWatching) {
         const urlStr = String(url || '').toLowerCase();
-        // Se a URL for de rede de anuncios ou externa suspeita
         if (
           urlStr.includes('quge5') ||
-          urlStr.includes('5gvci') ||
-          urlStr.includes('3nbf4') ||
+          urlStr.includes('monetag') ||
+          urlStr.includes('pemsrv') ||
+          urlStr.includes('magsrv') ||
+          urlStr.includes('exdynsrv') ||
           urlStr.includes('click') ||
           urlStr.includes('zone') ||
-          (urlStr.startsWith('http') && !urlStr.startsWith(window.location.origin))
+          urlStr.includes('ad-provider') ||
+          (urlStr.startsWith('http') && !urlStr.startsWith(window.location.origin) && !urlStr.includes('t.me') && !urlStr.includes('telegram'))
         ) {
-          console.warn('[AdShield] Bloqueando popunder indesejado:', url);
+          console.warn('[AdShield] Popunder bloqueado (usuário na página principal ou VIP):', url);
           return null;
         }
       }
@@ -167,19 +202,14 @@ function protectAgainstRoguePopups() {
 
 /**
  * Inicializacao no boot da aplicacao
+ * - Na página principal: NENHUM anúncio é carregado, garantindo navegação limpa e ágil.
+ * - Ativa o escudo de proteção para barrar popunders fora do player.
  */
-export function initAdConsent() {
+export function initAdConsent(user = null, profile = null) {
   if (typeof window === 'undefined') return;
-  protectAgainstRoguePopups();
-
-  // NUNCA auto-carrega scripts de anuncios no boot sem consentimento explicito
-  // Se estiver sem anuncios, garante que os service workers estejam desativados
-  try {
-    const choice = localStorage.getItem(AD_CONSENT_KEY);
-    if (choice === 'no_ads') {
-      disableAds();
-    }
-  } catch (err) {
-    console.warn('[AdConsent] Erro na inicializacao:', err);
-  }
+  window.__kairou_is_watching = false;
+  window.__borlaflix_is_watching = false;
+  protectAgainstRoguePopups(user, profile);
+  // Garante que a página principal comece limpa sem scripts de anúncios
+  unloadWatchingAds();
 }

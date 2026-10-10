@@ -1,9 +1,11 @@
 import React from 'react';
-import { Heart } from 'lucide-react';
+import { Crown, Sparkles, Heart } from 'lucide-react';
 import KairouIcon from './KairouIcon';
 import { TelegramIcon } from './DiscordNoticeModal';
 
-export default function Footer({ onOpenDonation, onOpenDiscordNotice }) {
+export default function Footer({ onOpenSubscription, onOpenDonation, onOpenDiscordNotice }) {
+  const handleOpenVip = onOpenSubscription || onOpenDonation;
+
   return (
     <footer className="w-full bg-[#07090e] border-t border-white/[0.06] pt-12 pb-10 text-slate-400 select-none">
       <div className="max-w-[1680px] mx-auto px-4 sm:px-8 lg:px-12">
@@ -23,15 +25,27 @@ export default function Footer({ onOpenDonation, onOpenDiscordNotice }) {
 
           {/* Action Links */}
           <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
-            {onOpenDonation && (
+            {/* Botão Doar Pix (PixGG) */}
+            <a
+              href="https://pixgg.com/pommern"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500/15 via-teal-500/15 to-emerald-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 border border-emerald-500/40 backdrop-blur-md text-emerald-300 hover:text-white transition-all text-xs font-semibold cursor-pointer shadow-sm active:scale-95 group"
+              title="Apoiar o projeto com qualquer valor via PixGG"
+            >
+              <Heart size={15} className="text-emerald-400 fill-emerald-400/30 group-hover:scale-110 transition-transform" />
+              <span>Doar via Pix (PixGG)</span>
+            </a>
+
+            {handleOpenVip && (
               <button
                 type="button"
-                onClick={onOpenDonation}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 hover:text-white transition-all text-xs font-semibold cursor-pointer shadow-sm active:scale-95"
-                title="Apoiar com qualquer valor via Pix"
+                onClick={handleOpenVip}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-sky-500/15 via-blue-500/15 to-sky-500/15 hover:from-sky-500/25 hover:to-blue-500/25 border border-sky-400/40 backdrop-blur-md text-sky-300 hover:text-white transition-all text-xs font-semibold cursor-pointer shadow-sm active:scale-95 group"
+                title="Assinatura VIP — 100% Sem Anúncios (MB WAY & Cripto)"
               >
-                <Heart size={15} className="fill-emerald-400 text-emerald-400" />
-                <span>Apoiar via Pix</span>
+                <Crown size={15} className="text-amber-400 fill-amber-400/30 group-hover:scale-110 transition-transform" />
+                <span>Assinatura VIP (MB WAY · Crypto)</span>
               </button>
             )}
 
@@ -57,15 +71,26 @@ export default function Footer({ onOpenDonation, onOpenDiscordNotice }) {
               <li><a href="#" className="hover:text-sky-400 transition-colors">Séries Populares</a></li>
               <li><a href="#" className="hover:text-sky-400 transition-colors">Filmes em Alta</a></li>
               <li><a href="#" className="hover:text-sky-400 transition-colors">Top 10 Avaliados</a></li>
-              {onOpenDonation && (
+              <li>
+                <a
+                  href="https://pixgg.com/pommern"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-emerald-300 text-emerald-400/90 transition-colors cursor-pointer text-left flex items-center gap-1.5"
+                >
+                  <Heart size={12} className="text-emerald-400 fill-emerald-400" />
+                  <span>Apoiar via PixGG</span>
+                </a>
+              </li>
+              {handleOpenVip && (
                 <li>
                   <button
                     type="button"
-                    onClick={onOpenDonation}
-                    className="hover:text-emerald-400 text-emerald-400/90 transition-colors cursor-pointer text-left flex items-center gap-1"
+                    onClick={handleOpenVip}
+                    className="hover:text-sky-300 text-sky-400/90 transition-colors cursor-pointer text-left flex items-center gap-1.5"
                   >
-                    <Heart size={12} className="fill-emerald-400" />
-                    <span>Doações Pix</span>
+                    <Crown size={12} className="text-amber-400 fill-amber-400" />
+                    <span>Planos VIP (Sem Anúncios)</span>
                   </button>
                 </li>
               )}
@@ -114,11 +139,11 @@ export default function Footer({ onOpenDonation, onOpenDiscordNotice }) {
 
         {/* Bottom Bar */}
         <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
-          <p>© {new Date().getFullYear()} kairou. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} Kairou. Todos os direitos reservados.</p>
           <div className="flex items-center gap-1 text-slate-400">
             <span>Design Cinema Clean</span>
             <span className="text-slate-600">•</span>
-            <span className="text-sky-400 font-semibold">kairou Streaming</span>
+            <span className="text-sky-400 font-semibold">Kairou Streaming</span>
           </div>
         </div>
       </div>

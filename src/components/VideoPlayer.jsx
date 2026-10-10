@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import {
   ArrowLeft,
@@ -30,12 +30,18 @@ import {
   X,
   SkipBack,
   SkipForward,
-  Send
+  Send,
+  Activity,
+  Crown,
+  Download,
+  Sparkles
 } from 'lucide-react';
 import { extractAllServers, clearStreamCache } from '../services/extractor';
 import { saveWatchProgress } from '../services/supabase';
-import { fetchSeasonEpisodes, fetchMediaDetails } from '../services/tmdb';
+import { fetchSeasonEpisodes, fetchMediaDetails, fetchMediaExternalIds } from '../services/tmdb';
 import { resolveChannelStream } from '../services/channelsResolver';
+import { isVipUser } from '../services/vipService';
+import { loadWatchingAds, unloadWatchingAds } from '../services/adConsent';
 
 // Opções de Qualidade Padrão
 const STANDARD_QUALITIES = [
@@ -72,7 +78,7 @@ function processHlsLevels(rawLevels) {
       }
     }
 
-    // Se ainda não tiver, tentar pela URL da playlist (ex: "index_1920x1080.m3u8")
+    // Se ainda não tiver height, tentar pela URL da playlist (ex: "index_1920x1080.m3u8")
     if (!height && lvl.url) {
       const urlStr = Array.isArray(lvl.url) ? lvl.url.join(' ') : String(lvl.url);
       const urlMatch = urlStr.match(/(?:_|\/|-)(\d{3,4})x(\d{3,4})|(?:_|\/|-)(\d{3,4})p/i);
@@ -81,13 +87,28 @@ function processHlsLevels(rawLevels) {
       }
     }
 
+    // Se ainda não tiver height, inferir pelo bitrate
+    if (!height && bitrate > 0) {
+      if (bitrate >= 10000000) height = 2160;
+      else if (bitrate >= 3500000) height = 1080;
+      else if (bitrate >= 1600000) height = 720;
+      else if (bitrate >= 800000) height = 480;
+      else height = 360;
+    }
+
+    // Se não tiver metadados de resolução, assumir o padrão Full HD 1080p
+    if (!height) {
+      height = 1080;
+      width = 1920;
+    }
+
     let label = '';
     let key = '';
     if (height >= 2160 || width >= 3840) {
       label = '4K Ultra HD';
       key = '4k';
     } else if (height >= 1440 || width >= 2560) {
-      label = '1440p (2K)';
+      label = '1440p 2K';
       key = '1440p';
     } else if (height >= 1080 || width >= 1920) {
       label = '1080p Full HD';
@@ -105,8 +126,8 @@ function processHlsLevels(rawLevels) {
       label = `${height}p`;
       key = `${height}p`;
     } else {
-      label = `Opção ${originalIndex + 1}`;
-      key = `q-${originalIndex}`;
+      label = '1080p Full HD';
+      key = '1080p';
     }
 
     return {
@@ -207,6 +228,24 @@ function normalizeAudioTrackLabel(tr, index, allTracks) {
   return `Áudio ${index + 1}`;
 }
 
+// Helper para detecção estrita de áudio em Português / Dublado
+function isPortugueseAudioTrack(tr) {
+  if (!tr) return false;
+  const rawLang = String(tr.lang || tr.language || '').toLowerCase().trim();
+  const rawName = String(tr.name || tr.label || '').toLowerCase().trim();
+  return (
+    rawLang.startsWith('por') ||
+    rawLang.startsWith('pt') ||
+    rawLang === 'pob' ||
+    rawName.includes('portug') ||
+    rawName.includes('dublado') ||
+    rawName.includes('brasil') ||
+    rawName.includes('brazil') ||
+    rawName.includes('nacional') ||
+    rawName.includes('pt-br')
+  );
+}
+
 // Normalizador de Legendas
 function normalizeSubtitleTrackLabel(st, index) {
   const lang = String(st.lang || '').toLowerCase().trim();
@@ -233,7 +272,30 @@ function normalizeSubtitleTrackLabel(st, index) {
   return `Legenda ${index + 1}`;
 }
 
-export default function VideoPlayer({ media, episode, initialTime = 0, autoCast = false, onClose }) {
+export default function VideoPlayer({
+  media,
+  episode,
+  initialTime = 0,
+  autoCast = false,
+  user,
+  profile,
+  onOpenSubscription,
+  onClose,
+}) {
+  const isVip = isVipUser(user, profile);
+  const [ambientGlow, setAmbientGlow] = useState(isVip);
+  const [dolbyBoost, setDolbyBoost] = useState(false);
+
+  // Carrega anúncios apenas enquanto assiste (exclusivo para plano gratuito) e descarrega ao fechar
+  useEffect(() => {
+    if (!isVip) {
+      loadWatchingAds(user, profile);
+    }
+    return () => {
+      unloadWatchingAds();
+    };
+  }, [isVip, user, profile]);
+
   const videoRef = useRef(null);
   const playerContainerRef = useRef(null);
   const hlsRef = useRef(null);
@@ -248,7 +310,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
 
-  // Extração e Servidores Kairou
+  // Extração e servidores Kairou
   const [servers, setServers] = useState([]);
   const [activeServerIndex, setActiveServerIndex] = useState(0);
   const [isExtracting, setIsExtracting] = useState(true);
@@ -259,6 +321,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
 
   // Modais de Controle
   const [serverModalOpen, setServerModalOpen] = useState(false);
+  const [serverLangFilter, setServerLangFilter] = useState('all'); // 'all' | 'dub' | 'sub'
   const [audioSubModalOpen, setAudioSubModalOpen] = useState(false);
   const [qualityModalOpen, setQualityModalOpen] = useState(false);
   const [castModalOpen, setCastModalOpen] = useState(false);
@@ -277,6 +340,22 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
   const activeSubtitleTrackRef = useRef(-1);
   const subtitleTracksRef = useRef([]);
 
+  // Painel de Debug de Rede
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugInfo, setDebugInfo] = useState({
+    serverUrl: '',
+    ttfbMs: null,
+    manifestMs: null,
+    firstFrameMs: null,
+    bandwidth: null,
+    bufferLen: null,
+    droppedFrames: null,
+    readyState: null,
+    networkState: null,
+    startedAt: null,
+    verdict: '',
+  });
+
   useEffect(() => {
     activeSubtitleTrackRef.current = activeSubtitleTrack;
   }, [activeSubtitleTrack]);
@@ -287,9 +366,153 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
 
   const activeServer = servers[activeServerIndex] || null;
 
+  // Ctrl+D: toggle painel de debug de rede
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        setShowDebug((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Atualizar info de debug a cada segundo quando painel estiver aberto
+  useEffect(() => {
+    if (!showDebug) return;
+    const interval = setInterval(() => {
+      const vid = videoRef.current;
+      const hls = hlsRef.current;
+      if (!vid) return;
+
+      const buffered = vid.buffered.length > 0
+        ? (vid.buffered.end(vid.buffered.length - 1) - vid.currentTime).toFixed(1)
+        : '0';
+
+      const bw = hls?.bandwidthEstimate
+        ? (hls.bandwidthEstimate / 1e6).toFixed(2) + ' Mbps'
+        : null;
+
+      const dropped = vid.getVideoPlaybackQuality?.()?.droppedVideoFrames ?? null;
+      const total = vid.getVideoPlaybackQuality?.()?.totalVideoFrames ?? null;
+      const droppedStr = dropped !== null ? `${dropped}/${total}` : 'N/A';
+
+      const rsMap = ['HAVE_NOTHING', 'HAVE_METADATA', 'HAVE_CURRENT_DATA', 'HAVE_FUTURE_DATA', 'HAVE_ENOUGH_DATA'];
+      const nsMap = ['EMPTY', 'IDLE', 'LOADING', 'NO_SOURCE'];
+
+      setDebugInfo((prev) => {
+        const now = Date.now();
+        const elapsedSec = prev.startedAt ? ((now - prev.startedAt) / 1000).toFixed(1) : null;
+
+        // Calcular veredito
+        let verdict = '';
+        if (prev.manifestMs === null && elapsedSec > 5) {
+          verdict = '🔴 Servidor não respondeu ao manifesto — problema no servidor ou DNS/proxy';
+        } else if (prev.manifestMs !== null && prev.firstFrameMs === null && elapsedSec > 8) {
+          verdict = '🟡 Manifesto recebido mas sem frames — possível lentidão na sua rede';
+        } else if (prev.firstFrameMs !== null && parseFloat(buffered) < 1 && !vid.paused) {
+          verdict = '🟡 Buffer baixo (<1s) — sua conexão está acompanhando no limite';
+        } else if (prev.firstFrameMs !== null && parseFloat(buffered) >= 2) {
+          verdict = '🟢 Stream OK — buffer saudável';
+        } else if (prev.firstFrameMs !== null) {
+          verdict = '🟢 Reproduzindo';
+        }
+
+        return {
+          ...prev,
+          bandwidth: bw,
+          bufferLen: buffered + 's',
+          droppedFrames: droppedStr,
+          readyState: rsMap[vid.readyState] || vid.readyState,
+          networkState: nsMap[vid.networkState] || vid.networkState,
+          verdict,
+        };
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showDebug]);
+
+
+  // O modo iframe é exclusivo para canais de TV ao vivo quando não há stream HLS direto. Filmes e séries utilizam APENAS o player nativo.
+  const isLiveMedia = Boolean(media?.type === 'live' || media?.isLive);
+  const isIframeMode = Boolean(isLiveMedia && (activeServer?.isIframe || activeServer?.type === 'iframe'));
+
+  const userSelectedAudioRef = useRef(false);
+  const userSelectedSubtitleRef = useRef(false);
+  const userSelectedServerRef = useRef(false);
+
+  useEffect(() => {
+    userSelectedAudioRef.current = false;
+    userSelectedSubtitleRef.current = false;
+  }, [activeServerIndex]);
+
+  // Identificação do áudio do servidor ativo (Dublado vs Original)
+  const isCurrentDub = Boolean(
+    activeServer?.isDub ||
+    (activeServer?.providerName || '').toLowerCase().includes('dub') ||
+    (activeServer?.providerName || '').toLowerCase().includes('nacional')
+  );
+
+  // Servidor alternativo caso exista versão com áudio oposto (Dublado vs Legendado)
+  const alternateAudioServer = useMemo(() => {
+    if (!servers || servers.length <= 1) return null;
+    const altIdx = servers.findIndex((s, idx) => {
+      if (idx === activeServerIndex) return false;
+      const sDub = Boolean(
+        s.isDub ||
+        (s.providerName || '').toLowerCase().includes('dub') ||
+        (s.providerName || '').toLowerCase().includes('nacional')
+      );
+      return sDub !== isCurrentDub;
+    });
+    if (altIdx >= 0) {
+      const srv = servers[altIdx];
+      const isAltDub = Boolean(
+        srv.isDub ||
+        (srv.providerName || '').toLowerCase().includes('dub') ||
+        (srv.providerName || '').toLowerCase().includes('nacional')
+      );
+      return { index: altIdx, server: srv, isDub: isAltDub };
+    }
+    return null;
+  }, [servers, activeServerIndex, isCurrentDub]);
+
+  // Contadores e Filtro de Servidores (Dublado 🇧🇷 vs Áudio Original 🇺🇸)
+  const dubServersCount = useMemo(() => {
+    return (servers || []).filter((s) => Boolean(s.isDub || (s.providerName || '').includes('[Dublado]'))).length;
+  }, [servers]);
+
+  const subServersCount = useMemo(() => {
+    return (servers || []).filter((s) => !s.isDub && !(s.providerName || '').includes('[Dublado]')).length;
+  }, [servers]);
+
+  const filteredServers = useMemo(() => {
+    if (!servers || servers.length === 0) return [];
+    if (serverLangFilter === 'dub') {
+      return servers.filter((s) => Boolean(s.isDub || (s.providerName || '').includes('[Dublado]')));
+    }
+    if (serverLangFilter === 'sub') {
+      return servers.filter((s) => !s.isDub && !(s.providerName || '').includes('[Dublado]'));
+    }
+    return servers;
+  }, [servers, serverLangFilter]);
+
   // Informações da mídia e Gerenciamento de Episódios
-  const tmdbId = media?.tmdbId || parseInt(String(media?.id || '').replace(/^(movie|series|tv)-/, ''), 10);
-  const isSeries = media?.type === 'series' || media?.type === 'tv' || media?.type === 'anime' || Boolean(episode);
+  const rawMediaId = String(media?.id || media?.tmdbId || '');
+  const isImdb = rawMediaId.startsWith('tt');
+  const parsedTmdb = parseInt(rawMediaId.replace(/^(movie|series|tv)-/, ''), 10);
+  const tmdbId = media?.tmdbId || (!isNaN(parsedTmdb) ? parsedTmdb : null);
+  const [detectedType, setDetectedType] = useState(null);
+  const isExplicitMovie =
+    detectedType === 'movie' ||
+    media?.type === 'movie' ||
+    media?.media_type === 'movie' ||
+    media?.isMovie ||
+    rawMediaId.startsWith('movie-') ||
+    Boolean(media?.title && !media?.name && !media?.number_of_seasons && !media?.seasons?.length && !media?.first_air_date && !episode?.title);
+  const isSeries = !isExplicitMovie && (media?.type === 'series' || media?.type === 'tv' || rawMediaId.startsWith('series-') || (Boolean(episode) && !isExplicitMovie) || (media?.seasons && media.seasons.length > 0) || Boolean(media?.number_of_seasons));
+  const imdbId = media?.imdb_id || media?.imdbId || episode?.imdb_id || (isImdb ? rawMediaId : null);
 
   const [currentSeasonNumber, setCurrentSeasonNumber] = useState(episode?.season || 1);
   const [currentEpisodeNumber, setCurrentEpisodeNumber] = useState(episode?.ep || 1);
@@ -299,6 +522,10 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
   const [episodesModalOpen, setEpisodesModalOpen] = useState(false);
   const isEpisodeSwitchedRef = useRef(false);
+
+  const fetchedSeasonsRef = useRef(new Set());
+  const fetchedEpisodesRef = useRef(new Set());
+  const fetchedSubsRef = useRef(new Set());
 
   // Sincronizar caso a prop episode mude externamente
   useEffect(() => {
@@ -311,43 +538,146 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
 
   // Carregar lista de temporadas caso não venha no objeto media
   useEffect(() => {
-    if (!isSeries || !tmdbId) return;
+    if (!isSeries || !tmdbId || detectedType === 'movie') return;
+    if (fetchedSeasonsRef.current.has(tmdbId)) return;
+    fetchedSeasonsRef.current.add(tmdbId);
+
     let isMounted = true;
-
-    if (!seasons || seasons.length === 0) {
-      fetchMediaDetails(tmdbId, 'series').then((details) => {
-        if (!isMounted || !details?.seasons) return;
-        setSeasons(details.seasons);
-      });
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isSeries, tmdbId, seasons]);
-
-  // Carregar lista de episódios da temporada ativa
-  useEffect(() => {
-    if (!isSeries || !tmdbId) return;
-    let isMounted = true;
-    setLoadingEpisodes(true);
-
-    fetchSeasonEpisodes(tmdbId, currentSeasonNumber).then((eps) => {
+    fetchMediaDetails(tmdbId, 'series').then((details) => {
       if (!isMounted) return;
-      setEpisodesList(eps || []);
-      setLoadingEpisodes(false);
-      if (eps && eps.length > 0) {
-        const found = eps.find((e) => e.ep === currentEpisodeNumber);
-        if (found) {
-          setCurrentEpisode((prev) => ({ ...prev, ...found, season: currentSeasonNumber }));
-        }
+      if (details?.type === 'movie' || (details?.title && !details?.number_of_seasons && !details?.seasons?.length)) {
+        setDetectedType('movie');
+        return;
+      }
+      if (details?.seasons && details.seasons.length > 0) {
+        setSeasons(details.seasons);
       }
     });
 
     return () => {
       isMounted = false;
     };
-  }, [isSeries, tmdbId, currentSeasonNumber, currentEpisodeNumber]);
+  }, [isSeries, tmdbId, detectedType]);
+
+  // Carregar lista de episódios da temporada ativa
+  useEffect(() => {
+    if (!isSeries || !tmdbId || detectedType === 'movie') return;
+    const epKey = `${tmdbId}-s${currentSeasonNumber}`;
+    if (fetchedEpisodesRef.current.has(epKey)) return;
+    fetchedEpisodesRef.current.add(epKey);
+
+    let isMounted = true;
+    setLoadingEpisodes(true);
+
+    fetchSeasonEpisodes(tmdbId, currentSeasonNumber)
+      .then((eps) => {
+        if (!isMounted) return;
+        setEpisodesList(eps || []);
+        setLoadingEpisodes(false);
+        if (eps && eps.length > 0) {
+          const found = eps.find((e) => e.ep === currentEpisodeNumber);
+          if (found) {
+            setCurrentEpisode((prev) => ({ ...prev, ...found, season: currentSeasonNumber }));
+          }
+        }
+      })
+      .catch(() => {
+        if (isMounted) setLoadingEpisodes(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isSeries, tmdbId, currentSeasonNumber, detectedType]);
+
+  // Carregamento resiliente de legendas do OpenSubtitles (Stremio v3)
+  useEffect(() => {
+    let isMounted = true;
+    const effectiveIsSeries = isSeries && detectedType !== 'movie';
+    const subKey = `${tmdbId || imdbId}-${effectiveIsSeries ? 's' + currentSeasonNumber + 'e' + currentEpisodeNumber : 'm'}`;
+    if (fetchedSubsRef.current.has(subKey)) return;
+    fetchedSubsRef.current.add(subKey);
+
+    async function loadSubs() {
+      let targetImdb = imdbId;
+      if (!targetImdb && tmdbId) {
+        try {
+          targetImdb = await fetchMediaExternalIds(tmdbId, effectiveIsSeries ? 'series' : 'movie');
+        } catch {}
+      }
+      if (!targetImdb || !isMounted) return;
+
+      const path = effectiveIsSeries
+        ? `series/${targetImdb}:${currentSeasonNumber}:${currentEpisodeNumber}.json`
+        : `movie/${targetImdb}.json`;
+
+      try {
+        const res = await fetch(`https://opensubtitles-v3.strem.io/subtitles/${path}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!isMounted || !Array.isArray(data?.subtitles) || data.subtitles.length === 0) return;
+
+        const langNames = {
+          pob: 'Português (Brasil)',
+          por: 'Português',
+          eng: 'Inglês',
+          spa: 'Espanhol',
+          fre: 'Francês',
+          fra: 'Francês',
+        };
+        const allowed = ['pob', 'por', 'eng', 'spa', 'fre', 'fra'];
+        const counts = {};
+        const formatted = [];
+        const sorted = [...data.subtitles].sort((a, b) => {
+          const order = { pob: 1, por: 2, eng: 3, spa: 4, fre: 5, fra: 5 };
+          return (order[a.lang] || 99) - (order[b.lang] || 99);
+        });
+
+        for (const item of sorted) {
+          const l = item.lang;
+          if (!allowed.includes(l)) continue;
+          if (!item.url) continue;
+          counts[l] = (counts[l] || 0) + 1;
+          if (counts[l] <= 2) {
+            const baseName = langNames[l] || l.toUpperCase();
+            const label = counts[l] > 1 ? `${baseName} (Opção ${counts[l]})` : baseName;
+            formatted.push({
+              id: 1000 + formatted.length,
+              originalId: item.id || `sub-${l}-${counts[l]}`,
+              lang: l === 'pob' ? 'pt-BR' : (l === 'por' ? 'pt' : (l === 'eng' ? 'en' : l)),
+              label,
+              url: `/api/proxy?format=vtt&url=${encodeURIComponent(item.url)}`,
+              originalUrl: item.url,
+              isExternal: true,
+            });
+          }
+        }
+
+        if (isMounted && formatted.length > 0) {
+          setSubtitleTracks((prev) => {
+            if (!prev || prev.length === 0) {
+              subtitleTracksRef.current = formatted;
+              return formatted;
+            }
+            const combined = [...prev];
+            for (const f of formatted) {
+              if (!combined.some((c) => c.label.toLowerCase() === f.label.toLowerCase())) {
+                combined.push(f);
+              }
+            }
+            subtitleTracksRef.current = combined;
+            return combined;
+          });
+        }
+      } catch {}
+    }
+
+    loadSubs();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [imdbId, tmdbId, isSeries, currentSeasonNumber, currentEpisodeNumber, detectedType]);
 
   // Mostra notificação temporária no player
   const triggerNotification = useCallback((msg) => {
@@ -407,10 +737,12 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
 
   // Referência para controlar servidores que falharam e evitar loops
   const failedServersRef = useRef(new Set());
+  const lastFallbackTimeRef = useRef(0);
+  const fallbackTimeoutRef = useRef(null);
+  const previousLoadedUrlRef = useRef(null);
 
-  const imdbId = media?.imdb_id || media?.imdbId || episode?.imdb_id || null;
 
-  // 1. Extração dos Servidores Kairou ao carregar mídia ou mudar episódio
+  // 1. Extração dos servidores Kairou ao carregar mídia ou mudar episódio
   useEffect(() => {
     let isMounted = true;
 
@@ -479,10 +811,11 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       }
     }
 
-    if (!tmdbId && !media?.id) return;
+    if (!tmdbId && !media?.id && !imdbId) return;
 
     setIsExtracting(true);
     setStreamError(null);
+    userSelectedServerRef.current = false;
     failedServersRef.current.clear();
     setExtractionStatus('Conectando aos servidores Kairou...');
 
@@ -496,13 +829,51 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       onProgress: (status) => {
         if (isMounted) setExtractionStatus(status);
       },
+      onStreamsAvailable: (fastList) => {
+        if (!isMounted) return;
+        if (fastList && fastList.length > 0) {
+          setServers((prev) => {
+            if (!prev || prev.length === 0) {
+              setActiveServerIndex(0);
+              triggerNotification(`Conectado: ${fastList[0].providerName}`);
+              setIsExtracting(false);
+              return fastList;
+            }
+            return prev;
+          });
+        }
+      },
     })
       .then((extractedList) => {
         if (!isMounted) return;
         if (extractedList && extractedList.length > 0) {
-          setServers(extractedList);
-          setActiveServerIndex(0);
-          triggerNotification(`Conectado: ${extractedList[0].providerName}`);
+          setServers((prevServers) => {
+            const currentActive = prevServers && prevServers[activeServerIndex];
+
+            // Se o usuário selecionou manualmente um servidor, mantenha a seleção dele buscando o mesmo ID/URL na nova lista
+            if (userSelectedServerRef.current && currentActive) {
+              const matchingIdx = extractedList.findIndex(
+                (s) => (s.url && s.url === currentActive.url) || (s.id && s.id === currentActive.id)
+              );
+              if (matchingIdx >= 0) {
+                setActiveServerIndex(matchingIdx);
+              }
+              return extractedList;
+            }
+
+            const currentRank = currentActive?.rank ?? 4;
+            const newBestRank = extractedList[0]?.rank ?? 4;
+            // Se a lista completa trouxe resolução superior (ex: 1080p ou 4K superando 720p)
+            // mas apenas se o usuário NÃO selecionou um servidor e o servidor 0 ainda não tiver falhado!
+            if (!userSelectedServerRef.current && !failedServersRef.current.has(0) && newBestRank < currentRank) {
+              setActiveServerIndex(0);
+              triggerNotification(`Qualidade máxima disponível: ${extractedList[0].providerName}`);
+            } else if (!currentActive && !failedServersRef.current.has(0)) {
+              setActiveServerIndex(0);
+              triggerNotification(`Conectado: ${extractedList[0].providerName}`);
+            }
+            return extractedList;
+          });
         } else {
           setStreamError(isSeries ? 'Ainda não temos este episódio disponível' : 'Ainda não temos este filme disponível');
         }
@@ -518,7 +889,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
     return () => {
       isMounted = false;
     };
-  }, [tmdbId, imdbId, isSeries, currentSeasonNumber, currentEpisodeNumber, media, triggerNotification]);
+  }, [tmdbId, imdbId, isSeries, currentSeasonNumber, currentEpisodeNumber, media?.id, media?.title, triggerNotification]);
 
   // Função para tentar novamente a extração com 3 novas tentativas limpas
   const handleRetryExtraction = useCallback(() => {
@@ -542,12 +913,35 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       onProgress: (status) => {
         setExtractionStatus(status);
       },
+      onStreamsAvailable: (fastList) => {
+        if (fastList && fastList.length > 0) {
+          setServers((prev) => {
+            if (!prev || prev.length === 0) {
+              setActiveServerIndex(0);
+              triggerNotification(`Conectado: ${fastList[0].providerName}`);
+              setIsExtracting(false);
+              return fastList;
+            }
+            return prev;
+          });
+        }
+      },
     })
       .then((extractedList) => {
         if (extractedList && extractedList.length > 0) {
-          setServers(extractedList);
-          setActiveServerIndex(0);
-          triggerNotification(`Conectado: ${extractedList[0].providerName}`);
+          setServers((prevServers) => {
+            const currentActive = prevServers && prevServers[activeServerIndex];
+            const currentRank = currentActive?.rank ?? 4;
+            const newBestRank = extractedList[0]?.rank ?? 4;
+            if (newBestRank < currentRank) {
+              setActiveServerIndex(0);
+              triggerNotification(`Qualidade máxima disponível: ${extractedList[0].providerName}`);
+            } else if (!currentActive) {
+              setActiveServerIndex(0);
+              triggerNotification(`Conectado: ${extractedList[0].providerName}`);
+            }
+            return extractedList;
+          });
         } else {
           setStreamError(isSeries ? 'Ainda não temos este episódio disponível' : 'Ainda não temos este filme disponível');
         }
@@ -596,6 +990,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       setIsPlaying(true);
       setServers([]);
       setActiveServerIndex(0);
+      userSelectedServerRef.current = false;
       failedServersRef.current.clear();
 
       setCurrentSeasonNumber(seasonNum);
@@ -656,15 +1051,34 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       return;
     }
 
+    failedServersRef.current.add(activeServerIndex);
+
+    const now = Date.now();
+    if (now - lastFallbackTimeRef.current < 600) {
+      if (!fallbackTimeoutRef.current) {
+        fallbackTimeoutRef.current = setTimeout(() => {
+          fallbackTimeoutRef.current = null;
+          handleAutoFallback();
+        }, 700);
+      }
+      return;
+    }
+    if (fallbackTimeoutRef.current) {
+      clearTimeout(fallbackTimeoutRef.current);
+      fallbackTimeoutRef.current = null;
+    }
+    lastFallbackTimeRef.current = now;
+
     if (media?.type === 'live' || media?.isLive) {
       const slug = media.slug || media.channel?.slug;
       if (slug && !activeServer?.isIframe) {
         console.warn('[VideoPlayer] Transmissão HLS nativa falhou. Alternando para servidor reserva de transmissão...');
+        const fallbackTarget = media.fallbackUrl || `https://v2.rdembed.sbs/${slug}`;
         const iframeServer = {
           id: `kairou-live-fallback-${slug}`,
           server: 'Kairou Live TV (Reserva)',
           providerName: `Kairou · ${media.title} (Transmissão Reserva)`,
-          url: `https://v1.rdse.buzz/${slug}`,
+          url: fallbackTarget,
           type: 'iframe',
           isHls: false,
           isIframe: true,
@@ -690,8 +1104,8 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
     // Se todos os servidores disponíveis falharam
     if (failedServersRef.current.size >= servers.length) {
       console.warn('[VideoPlayer] Todos os servidores disponíveis falharam.');
-      // Proteção: se o vídeo começou a tocar no momento da falha, não exibe modal
-      if (vid && (vid.currentTime > 0.5 || vid.readyState >= 2)) {
+      // Proteção: se o vídeo começou a tocar no momento da falha ou tem buffer carregado, não exibe modal
+      if (vid && (vid.currentTime > 0 || vid.readyState >= 1 || !vid.paused)) {
         setStreamError(null);
         return;
       }
@@ -699,15 +1113,43 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       return;
     }
 
-    // Encontrar o próximo servidor que ainda não foi tentado
-    let nextIndex = (activeServerIndex + 1) % servers.length;
-    let attempts = 0;
-    while (failedServersRef.current.has(nextIndex) && attempts < servers.length) {
-      nextIndex = (nextIndex + 1) % servers.length;
-      attempts++;
+    const currentServer = servers[activeServerIndex];
+    const isCurrentDub = Boolean(
+      currentServer?.isDub ||
+      (currentServer?.providerName || '').toLowerCase().includes('dub') ||
+      (currentServer?.providerName || '').toLowerCase().includes('nacional')
+    );
+
+    // 1. Encontrar primeiro outro servidor do MESMO idioma que ainda não foi tentado
+    let nextIndex = -1;
+    for (let i = 1; i < servers.length; i++) {
+      const candidateIdx = (activeServerIndex + i) % servers.length;
+      if (!failedServersRef.current.has(candidateIdx)) {
+        const candidateSrv = servers[candidateIdx];
+        const isCandidateDub = Boolean(
+          candidateSrv?.isDub ||
+          (candidateSrv?.providerName || '').toLowerCase().includes('dub') ||
+          (candidateSrv?.providerName || '').toLowerCase().includes('nacional')
+        );
+        if (isCandidateDub === isCurrentDub) {
+          nextIndex = candidateIdx;
+          break;
+        }
+      }
     }
 
-    if (failedServersRef.current.has(nextIndex)) {
+    // 2. Se não houver mais servidores do mesmo idioma, tentar qualquer outro não tentado
+    if (nextIndex === -1) {
+      for (let i = 1; i < servers.length; i++) {
+        const candidateIdx = (activeServerIndex + i) % servers.length;
+        if (!failedServersRef.current.has(candidateIdx)) {
+          nextIndex = candidateIdx;
+          break;
+        }
+      }
+    }
+
+    if (nextIndex === -1 || failedServersRef.current.has(nextIndex)) {
       if (vid && (vid.currentTime > 0.5 || vid.readyState >= 2)) {
         setStreamError(null);
         return;
@@ -720,6 +1162,12 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
     triggerNotification(`Servidor instável. Alternando para: ${nextSrv.providerName}`);
     setActiveServerIndex(nextIndex);
   }, [servers, activeServerIndex, isSeries, triggerNotification]);
+
+  // Ref estável para handleAutoFallback — garante que o useEffect de playback não re-execute quando deps mudam
+  const handleAutoFallbackRef = useRef(handleAutoFallback);
+  useEffect(() => {
+    handleAutoFallbackRef.current = handleAutoFallback;
+  }, [handleAutoFallback]);
 
   // Aplica o modo 'showing' na trilha de legendas ativa e desativa as demais
   const applySubtitleMode = useCallback((trackId, customTracks = null) => {
@@ -770,10 +1218,50 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
 
     const video = videoRef.current;
     const currentUrl = activeServer.url;
+
+    // Se este mesmo stream já está carregando ou tocando, não reinicia tudo do zero!
+    if (previousLoadedUrlRef.current === currentUrl && video.src) {
+      return;
+    }
+    previousLoadedUrlRef.current = currentUrl;
+    // Novo servidor/URL: limpar histórico de falhas para esta sessão de carregamento
+    failedServersRef.current.clear();
+
     const isHlsStream = activeServer.type === 'hls' || activeServer.isHls || currentUrl.includes('.m3u8') || currentUrl.includes('__index.txt');
 
+    const debugStartedAt = Date.now();
     setIsVideoBuffering(true);
     setStreamError(null);
+    setDebugInfo({
+      serverUrl: currentUrl,
+      ttfbMs: null,
+      manifestMs: null,
+      firstFrameMs: null,
+      bandwidth: null,
+      bufferLen: null,
+      droppedFrames: null,
+      readyState: null,
+      networkState: null,
+      startedAt: debugStartedAt,
+      verdict: '⏳ Conectando ao servidor...',
+    });
+
+    // Inicializar legendas externas se o servidor fornecer
+    if (activeServer?.subtitles && activeServer.subtitles.length > 0) {
+      const extSubs = activeServer.subtitles.map((ext, extIdx) => ({
+        id: 1000 + extIdx,
+        originalId: ext.id || `ext-${extIdx}`,
+        label: ext.label || (ext.lang === 'por' || ext.lang === 'pt' ? 'Português [CC]' : (ext.lang || `Legenda Externa ${extIdx + 1}`)),
+        lang: ext.lang || 'pt',
+        url: ext.url,
+        isExternal: true,
+      }));
+      setSubtitleTracks(extSubs);
+      subtitleTracksRef.current = extSubs;
+    } else {
+      setSubtitleTracks([]);
+      subtitleTracksRef.current = [];
+    }
 
     // Destruir instância anterior de Hls se existir
     if (hlsRef.current) {
@@ -792,28 +1280,43 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
 
     let hasStartedPlayback = false;
     // Watchdog de carregamento inteligente:
-    // Se há apenas 1 servidor, aguarda 14s (tempo hábil para redes móveis 4G/Wi-Fi estabelecerem conexão com CDNs).
-    // Se há múltiplos servidores, aguarda 9s antes de tentar o próximo.
-    const timeoutDuration = servers && servers.length <= 1 ? 14000 : 9000;
+    // Damos tempo hábil (25s para 1 servidor, 20s para múltiplos) para conexões via túnel/proxy baixarem o manifesto e os primeiros chunks HLS
+    const timeoutDuration = servers && servers.length <= 1 ? 25000 : 20000;
 
-    const watchdogTimer = setTimeout(() => {
+    let watchdogTimer = null;
+
+    const cancelWatchdog = () => {
+      if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
+      }
+    };
+
+    const onPlaybackStarted = () => {
+      if (hasStartedPlayback) return;
+      hasStartedPlayback = true;
+      cancelWatchdog();
+      setIsVideoBuffering(false);
+      setStreamError(null);
+      const firstFrameMs = Date.now() - debugStartedAt;
+      setDebugInfo((prev) => ({ ...prev, firstFrameMs }));
+      console.info(`[Debug] 🎬 Primeiro frame: ${firstFrameMs}ms | Manifesto: ${prev => prev.manifestMs}ms`);
+    };
+
+    watchdogTimer = setTimeout(() => {
       const vid = videoRef.current;
       // Se a reprodução já iniciou, ou o elemento de vídeo já recebeu dados no buffer (readyState >= 2), não interrompe!
-      if (hasStartedPlayback || (vid && (vid.currentTime > 0 || vid.readyState >= 2))) {
+      if (hasStartedPlayback || (vid && (vid.currentTime > 0 || vid.readyState >= 2 || !vid.paused))) {
+        cancelWatchdog();
         return;
       }
       console.warn(`[VideoPlayer] Servidor ${activeServer.providerName} demorou a responder. Alternando...`);
-      handleAutoFallback();
+      handleAutoFallbackRef.current();
     }, timeoutDuration);
 
-    const onPlaybackStarted = () => {
-      hasStartedPlayback = true;
-      clearTimeout(watchdogTimer);
-      setIsVideoBuffering(false);
-      setStreamError(null);
-    };
-
     video.addEventListener('playing', onPlaybackStarted);
+    video.addEventListener('canplay', onPlaybackStarted);
+    video.addEventListener('loadeddata', onPlaybackStarted);
     video.addEventListener('timeupdate', onPlaybackStarted);
 
     let cleanupTextTrackListeners = null;
@@ -853,8 +1356,23 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
             enabled: tr.enabled,
           }));
           setAudioTracks(list);
-          const activeIdx = list.findIndex((t) => t.enabled);
-          if (activeIdx >= 0) setActiveAudioTrack(activeIdx);
+
+          // PRIORIZAÇÃO MÁXIMA ABSOLUTA DE ÁUDIO PT-BR (DUBLADO)
+          if (!userSelectedAudioRef.current) {
+            const ptIdx = raw.findIndex((tr) => isPortugueseAudioTrack(tr));
+            if (ptIdx >= 0) {
+              for (let i = 0; i < raw.length; i++) {
+                raw[i].enabled = (i === ptIdx);
+              }
+              setActiveAudioTrack(ptIdx);
+            } else {
+              const activeIdx = list.findIndex((t) => t.enabled);
+              if (activeIdx >= 0) setActiveAudioTrack(activeIdx);
+            }
+          } else {
+            const activeIdx = list.findIndex((t) => t.enabled);
+            if (activeIdx >= 0) setActiveAudioTrack(activeIdx);
+          }
         }
       };
 
@@ -873,10 +1391,28 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
               ),
               lang: st.language,
             }));
-            setSubtitleTracks(subs);
-            subtitleTracksRef.current = subs;
+
+            // Mesclar com legendas externas de activeServer.subtitles se existirem
+            const externalSubs = (activeServer?.subtitles || []).map((ext, extIdx) => ({
+              id: 1000 + extIdx,
+              originalId: ext.id || `ext-${extIdx}`,
+              label: ext.label || (ext.lang === 'por' || ext.lang === 'pt' ? 'Português [CC]' : (ext.lang || `Legenda Externa ${extIdx + 1}`)),
+              lang: ext.lang || 'pt',
+              url: ext.url,
+              isExternal: true,
+            }));
+
+            const combined = [...subs];
+            for (const ext of externalSubs) {
+              if (!combined.some((c) => c.label.toLowerCase() === ext.label.toLowerCase())) {
+                combined.push(ext);
+              }
+            }
+
+            setSubtitleTracks(combined);
+            subtitleTracksRef.current = combined;
             if (activeSubtitleTrackRef.current >= 0) {
-              applySubtitleMode(activeSubtitleTrackRef.current, subs);
+              applySubtitleMode(activeSubtitleTrackRef.current, combined);
             }
           }
         }
@@ -887,20 +1423,23 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
         let tag = '';
         if (video.videoHeight > 0) {
           const vh = video.videoHeight;
-          tag = vh >= 2160 ? '4K Ultra HD' : vh >= 1440 ? '1440p (2K)' : vh >= 1080 ? '1080p Full HD' : vh >= 720 ? '720p HD' : `${vh}p`;
+          tag = vh >= 2160 ? '4K Ultra HD' : vh >= 1440 ? '1440p 2K' : vh >= 1080 ? '1080p Full HD' : vh >= 720 ? '720p HD' : `${vh}p`;
         }
-        if (!tag || tag === '720p HD') {
+        if (!tag) {
           if (activeServer?.quality?.includes('4K') || activeServer?.providerName?.includes('4K')) {
             tag = '4K Ultra HD';
-          } else if (activeServer?.quality?.includes('1440') || activeServer?.quality?.includes('2K')) {
-            tag = '1440p (2K)';
-          } else if (activeServer?.quality?.includes('1080') || activeServer?.providerName?.includes('1080')) {
+          } else if (activeServer?.quality?.includes('1440') || activeServer?.quality?.includes('2K') || activeServer?.providerName?.includes('1440') || activeServer?.providerName?.includes('2K')) {
+            tag = '1440p 2K';
+          } else if (activeServer?.quality?.includes('720') || activeServer?.providerName?.includes('720')) {
+            tag = '720p HD';
+          } else {
             tag = '1080p Full HD';
           }
         }
-        setCurrentPlayingResolution(tag || 'Alta Velocidade HD');
+        setCurrentPlayingResolution(tag);
         if (lastTime > 0) {
           video.currentTime = lastTime;
+          lastTime = 0;
         }
         video.play().catch(() => setIsPlaying(false));
 
@@ -908,17 +1447,11 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
         updateSafariTextTracks();
       };
 
-      const is4kServer = activeServer?.quality?.includes('4K') || activeServer?.providerName?.includes('4K');
-      const is2kServer = activeServer?.quality?.includes('1440') || activeServer?.quality?.includes('2K');
-      setQualityLevels([
-        { index: -1, key: 'auto', label: 'Automático (Máxima Qualidade)', height: is4kServer ? 2160 : (is2kServer ? 1440 : 1080) },
-        ...(is4kServer ? [{ index: 0, key: '4k', label: '4K Ultra HD', height: 2160 }] : []),
-        ...(is2kServer ? [{ index: is4kServer ? 1 : 0, key: '1440p', label: '1440p (2K)', height: 1440 }] : []),
-        { index: is4kServer ? (is2kServer ? 2 : 1) : (is2kServer ? 1 : 0), key: '1080p', label: '1080p Full HD', height: 1080 },
-        { index: is4kServer ? (is2kServer ? 3 : 2) : (is2kServer ? 2 : 1), key: '720p', label: '720p HD', height: 720 },
-      ]);
+      setQualityLevels([]);
 
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
+      video.addEventListener('resize', handleLoadedMetadata);
+      video.addEventListener('playing', handleLoadedMetadata);
       video.addEventListener('error', handleAutoFallback);
 
       if (video.audioTracks) {
@@ -932,6 +1465,8 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
 
       cleanupTextTrackListeners = () => {
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        video.removeEventListener('resize', handleLoadedMetadata);
+        video.removeEventListener('playing', handleLoadedMetadata);
         video.removeEventListener('error', handleAutoFallback);
         if (video.audioTracks) {
           video.audioTracks.removeEventListener('addtrack', updateSafariAudioTracks);
@@ -946,21 +1481,38 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
-        backBufferLength: 30,
-        maxBufferLength: 15,
-        maxMaxBufferLength: 30,
-        maxBufferSize: 60 * 1000 * 1000,
+        backBufferLength: 90,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 180,
+        maxBufferSize: 350 * 1024 * 1024,
         maxBufferHole: 0.5,
         nudgeOffset: 0.1,
-        nudgeMaxRetry: 5,
+        nudgeMaxRetry: 8,
         startFragPrefetch: true,
         renderTextTracksNatively: true,
         capLevelToPlayerSize: false,
+        manifestLoadingTimeOut: 5000,
+        levelLoadingTimeOut: 5000,
+        fragLoadingTimeOut: 8000,
+        abrEwmaDefaultEstimate: 50000000,
+        abrBandwidthFactor: 0.95,
+        abrBandwidthUpFactor: 0.9,
       });
       hlsRef.current = hls;
 
       hls.loadSource(currentUrl);
       hls.attachMedia(video);
+
+      // Capturar métricas e latência diretamente dos eventos nativos do HLS (zero requisições paralelas, sem erro de CORS)
+      hls.on(Hls.Events.MANIFEST_LOADED, (event, data) => {
+        if (data?.stats?.loading) {
+          const ttfbMs = Math.round(data.stats.loading.first - data.stats.loading.start);
+          setDebugInfo((prev) => ({
+            ...prev,
+            ttfbMs: ttfbMs > 0 ? ttfbMs : 150,
+          }));
+        }
+      });
 
       // Listener nos text tracks nativos do elemento de vídeo para garantir ativação e renderização
       const handleNativeTrackEvent = () => {
@@ -978,7 +1530,12 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       }
 
       hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+        cancelWatchdog();
+        setStreamError(null);
         setIsVideoBuffering(false);
+        const manifestMs = Date.now() - debugStartedAt;
+        console.info(`[Debug] 📋 Manifesto parseado: ${manifestMs}ms após início`);
+        setDebugInfo((prev) => ({ ...prev, manifestMs, verdict: `⏳ Manifesto OK (${manifestMs}ms) — aguardando frames...` }));
         // Extrair níveis de resolução reais e ordenar (maior resolução primeiro)
         if (data.levels && data.levels.length > 0) {
           const sortedLevels = processHlsLevels(data.levels);
@@ -988,12 +1545,37 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
           if (sortedLevels.length > 0) {
             const maxQualityLevel = sortedLevels[0]; // O 1º nível já é garantidamente o de maior resolução/bitrate
             hls.startLevel = maxQualityLevel.index;
+            hls.nextLevel = maxQualityLevel.index;
+            hls.loadLevel = maxQualityLevel.index;
             setCurrentPlayingResolution(maxQualityLevel.label);
+          }
+        }
+
+        // SELEÇÃO E REGISTRO DE ÁUDIO AO PROCESSAR O MANIFESTO HLS
+        if (hls.audioTracks && hls.audioTracks.length > 0) {
+          const tracks = hls.audioTracks.map((tr, idx) => ({
+            id: idx,
+            originalId: tr.id,
+            label: normalizeAudioTrackLabel(tr, idx, hls.audioTracks),
+            lang: tr.lang,
+            name: tr.name,
+          }));
+          setAudioTracks(tracks);
+
+          if (!userSelectedAudioRef.current) {
+            const ptIdx = hls.audioTracks.findIndex((tr) => isPortugueseAudioTrack(tr));
+            if (ptIdx >= 0) {
+              if (hls.audioTrack !== ptIdx) {
+                hls.audioTrack = ptIdx;
+              }
+              setActiveAudioTrack(ptIdx);
+            }
           }
         }
 
         if (lastTime > 0) {
           video.currentTime = lastTime;
+          lastTime = 0;
         }
 
         video.play().catch(() => setIsPlaying(false));
@@ -1007,7 +1589,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
         }
       });
 
-      // Rastrear faixas de áudio e normalizar rótulos (corrige 'Mandingo' / 'man' para 'Inglês (Original)')
+      // Rastrear faixas de áudio e focar ESTRITAMENTE em Português (Dublado)
       hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (event, data) => {
         if (data.audioTracks && data.audioTracks.length > 0) {
           const tracks = data.audioTracks.map((tr, idx) => ({
@@ -1018,7 +1600,21 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
             name: tr.name,
           }));
           setAudioTracks(tracks);
-          setActiveAudioTrack(hls.audioTrack >= 0 ? hls.audioTrack : 0);
+
+          // PRIORIZAÇÃO MÁXIMA ABSOLUTA DE ÁUDIO PT-BR (DUBLADO)
+          if (!userSelectedAudioRef.current) {
+            const ptIdx = data.audioTracks.findIndex((tr) => isPortugueseAudioTrack(tr));
+            if (ptIdx >= 0) {
+              if (hls.audioTrack !== ptIdx) {
+                hls.audioTrack = ptIdx;
+              }
+              setActiveAudioTrack(ptIdx);
+            } else {
+              setActiveAudioTrack(hls.audioTrack >= 0 ? hls.audioTrack : 0);
+            }
+          } else {
+            setActiveAudioTrack(hls.audioTrack >= 0 ? hls.audioTrack : 0);
+          }
         }
       });
 
@@ -1028,7 +1624,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
         }
       });
 
-      // Rastrear legendas e ativar visualização
+      // Rastrear legendas internas e externas e ativar visualização
       hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (event, data) => {
         if (data.subtitleTracks && data.subtitleTracks.length > 0) {
           const subs = data.subtitleTracks.map((st, idx) => ({
@@ -1037,12 +1633,30 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
             label: normalizeSubtitleTrackLabel(st, idx),
             lang: st.lang,
           }));
-          setSubtitleTracks(subs);
-          subtitleTracksRef.current = subs;
+
+          // Mesclar com legendas externas de activeServer.subtitles se existirem
+          const externalSubs = (activeServer?.subtitles || []).map((ext, extIdx) => ({
+            id: 1000 + extIdx,
+            originalId: ext.id || `ext-${extIdx}`,
+            label: ext.label || (ext.lang === 'por' || ext.lang === 'pt' ? 'Português [CC]' : (ext.lang || `Legenda Externa ${extIdx + 1}`)),
+            lang: ext.lang || 'pt',
+            url: ext.url,
+            isExternal: true,
+          }));
+
+          const combined = [...subs];
+          for (const ext of externalSubs) {
+            if (!combined.some((c) => c.label.toLowerCase() === ext.label.toLowerCase())) {
+              combined.push(ext);
+            }
+          }
+
+          setSubtitleTracks(combined);
+          subtitleTracksRef.current = combined;
           if (activeSubtitleTrackRef.current >= 0) {
             hls.subtitleDisplay = true;
             hls.subtitleTrack = activeSubtitleTrackRef.current;
-            applySubtitleMode(activeSubtitleTrackRef.current, subs);
+            applySubtitleMode(activeSubtitleTrackRef.current, combined);
           }
         }
       });
@@ -1079,7 +1693,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
             const m = String(lvl.name).match(/(\d{3,4})p?/);
             if (m) h = parseInt(m[1], 10);
           }
-          const tag = h >= 2160 ? '4K Ultra HD' : h >= 1080 ? '1080p Full HD' : h >= 720 ? '720p HD' : h >= 480 ? '480p' : h >= 360 ? '360p' : (h ? `${h}p` : '');
+          const tag = h >= 2160 ? '4K Ultra HD' : h >= 1440 ? '1440p 2K' : h >= 1080 ? '1080p Full HD' : h >= 720 ? '720p HD' : h >= 480 ? '480p' : h >= 360 ? '360p' : (h ? `${h}p` : '');
           if (tag) {
             setCurrentPlayingResolution(tag);
           }
@@ -1089,8 +1703,8 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       hls.on(Hls.Events.LEVEL_LOADED, () => {
         if (videoRef.current && videoRef.current.videoHeight > 0) {
           const vh = videoRef.current.videoHeight;
-          const tag = vh >= 2160 ? '4K Ultra HD' : vh >= 1080 ? '1080p Full HD' : vh >= 720 ? '720p HD' : `${vh}p`;
-          setCurrentPlayingResolution((prev) => prev || tag);
+          const tag = vh >= 2160 ? '4K Ultra HD' : vh >= 1440 ? '1440p 2K' : vh >= 1080 ? '1080p Full HD' : vh >= 720 ? '720p HD' : `${vh}p`;
+          setCurrentPlayingResolution(tag);
         }
       });
 
@@ -1099,14 +1713,23 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
           console.warn('[VideoPlayer] Erro fatal HLS:', data.type, data.details);
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              // Tentar recuperar erro de rede uma vez, se falhar ir para próximo servidor
-              hls.startLoad();
+              // Se o manifesto for inválido ou não parseável, alternar servidor imediatamente
+              if (
+                data.details === Hls.ErrorDetails.MANIFEST_PARSING_ERROR ||
+                data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+                data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT
+              ) {
+                console.warn('[VideoPlayer] Manifesto HLS inválido ou inacessível. Alternando para servidor reserva...');
+                handleAutoFallbackRef.current();
+              } else {
+                hls.startLoad();
+              }
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
               hls.recoverMediaError();
               break;
             default:
-              handleAutoFallback();
+              handleAutoFallbackRef.current();
               break;
           }
         } else if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
@@ -1124,73 +1747,96 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
         let tag = '';
         if (video.videoHeight > 0) {
           const vh = video.videoHeight;
-          tag = vh >= 2160 ? '4K Ultra HD' : vh >= 1440 ? '1440p (2K)' : vh >= 1080 ? '1080p Full HD' : vh >= 720 ? '720p HD' : `${vh}p`;
+          tag = vh >= 2160 ? '4K Ultra HD' : vh >= 1440 ? '1440p 2K' : vh >= 1080 ? '1080p Full HD' : vh >= 720 ? '720p HD' : `${vh}p`;
         }
-        if (!tag || tag === '720p HD') {
+        if (!tag) {
           if (activeServer?.quality?.includes('4K') || activeServer?.providerName?.includes('4K')) {
             tag = '4K Ultra HD';
-          } else if (activeServer?.quality?.includes('1440') || activeServer?.quality?.includes('2K')) {
-            tag = '1440p (2K)';
-          } else if (activeServer?.quality?.includes('1080') || activeServer?.providerName?.includes('1080')) {
+          } else if (activeServer?.quality?.includes('1440') || activeServer?.quality?.includes('2K') || activeServer?.providerName?.includes('1440') || activeServer?.providerName?.includes('2K')) {
+            tag = '1440p 2K';
+          } else if (activeServer?.quality?.includes('720') || activeServer?.providerName?.includes('720')) {
+            tag = '720p HD';
+          } else {
             tag = '1080p Full HD';
           }
         }
-        setCurrentPlayingResolution(tag || 'Alta Velocidade HD');
-        if (lastTime > 0) video.currentTime = lastTime;
+        setCurrentPlayingResolution(tag);
+        if (lastTime > 0) {
+          video.currentTime = lastTime;
+          lastTime = 0;
+        }
         video.play().catch(() => setIsPlaying(false));
       };
       video.addEventListener('loadedmetadata', handleMetadata);
-      video.addEventListener('error', handleAutoFallback);
+      video.addEventListener('resize', handleMetadata);
+      video.addEventListener('playing', handleMetadata);
+      video.addEventListener('error', () => handleAutoFallbackRef.current());
     } else {
       // Reprodução direta MP4 / WebM
-      const is4kServer = activeServer?.quality?.includes('4K') || activeServer?.providerName?.includes('4K');
-      const is2kServer = activeServer?.quality?.includes('1440') || activeServer?.quality?.includes('2K');
-      setQualityLevels([
-        { index: -1, key: 'auto', label: 'Automático (Máxima Qualidade)', height: is4kServer ? 2160 : (is2kServer ? 1440 : 1080) },
-        ...(is4kServer ? [{ index: 0, key: '4k', label: '4K Ultra HD', height: 2160 }] : []),
-        ...(is2kServer ? [{ index: is4kServer ? 1 : 0, key: '1440p', label: '1440p (2K)', height: 1440 }] : []),
-        { index: is4kServer ? (is2kServer ? 2 : 1) : (is2kServer ? 1 : 0), key: '1080p', label: '1080p Full HD', height: 1080 },
-        { index: is4kServer ? (is2kServer ? 3 : 2) : (is2kServer ? 2 : 1), key: '720p', label: '720p HD', height: 720 },
-      ]);
+      setQualityLevels([]);
 
       video.src = currentUrl;
       video.load();
+      let hasHandledData = false;
       const handleData = () => {
+        if (hasHandledData) return;
+        hasHandledData = true;
         onPlaybackStarted();
         let tag = '';
         if (video.videoHeight > 0) {
           const vh = video.videoHeight;
-          tag = vh >= 2160 ? '4K Ultra HD' : vh >= 1440 ? '1440p (2K)' : vh >= 1080 ? '1080p Full HD' : vh >= 720 ? '720p HD' : `${vh}p`;
+          tag = vh >= 2160 ? '4K Ultra HD' : vh >= 1440 ? '1440p 2K' : vh >= 1080 ? '1080p Full HD' : vh >= 720 ? '720p HD' : `${vh}p`;
         }
-        if (!tag || tag === '720p HD') {
+        if (!tag) {
           if (activeServer?.quality?.includes('4K') || activeServer?.providerName?.includes('4K')) {
             tag = '4K Ultra HD';
-          } else if (activeServer?.quality?.includes('1440') || activeServer?.quality?.includes('2K')) {
-            tag = '1440p (2K)';
-          } else if (activeServer?.quality?.includes('1080') || activeServer?.providerName?.includes('1080')) {
+          } else if (activeServer?.quality?.includes('1440') || activeServer?.quality?.includes('2K') || activeServer?.providerName?.includes('1440') || activeServer?.providerName?.includes('2K')) {
+            tag = '1440p 2K';
+          } else if (activeServer?.quality?.includes('720') || activeServer?.providerName?.includes('720')) {
+            tag = '720p HD';
+          } else {
             tag = '1080p Full HD';
           }
         }
-        setCurrentPlayingResolution(tag || 'Alta Velocidade HD');
-        if (lastTime > 0) video.currentTime = lastTime;
+        setCurrentPlayingResolution(tag);
+        if (lastTime > 0) {
+          video.currentTime = lastTime;
+          lastTime = 0;
+        }
         video.play().catch(() => setIsPlaying(false));
       };
-      video.addEventListener('loadeddata', handleData);
-      video.addEventListener('canplay', handleData);
-      video.addEventListener('error', handleAutoFallback);
+
+      const handleRealtimeResize = () => {
+        if (video.videoHeight > 0) {
+          const vh = video.videoHeight;
+          const realTag = vh >= 2160 ? '4K Ultra HD' : vh >= 1440 ? '1440p 2K' : vh >= 1080 ? '1080p Full HD' : vh >= 720 ? '720p HD' : `${vh}p`;
+          setCurrentPlayingResolution(realTag);
+        }
+      };
+
+      const handleMp4Error = () => handleAutoFallbackRef.current();
+      video.addEventListener('loadeddata', handleData, { once: true });
+      video.addEventListener('canplay', handleData, { once: true });
+      video.addEventListener('resize', handleRealtimeResize);
+      video.addEventListener('playing', handleRealtimeResize);
+      video.addEventListener('error', handleMp4Error);
 
       const prevCleanup = cleanupTextTrackListeners;
       cleanupTextTrackListeners = () => {
         if (prevCleanup) prevCleanup();
         video.removeEventListener('loadeddata', handleData);
         video.removeEventListener('canplay', handleData);
-        video.removeEventListener('error', handleAutoFallback);
+        video.removeEventListener('resize', handleRealtimeResize);
+        video.removeEventListener('playing', handleRealtimeResize);
+        video.removeEventListener('error', handleMp4Error);
       };
     }
 
     return () => {
-      clearTimeout(watchdogTimer);
+      cancelWatchdog();
       video.removeEventListener('playing', onPlaybackStarted);
+      video.removeEventListener('canplay', onPlaybackStarted);
+      video.removeEventListener('loadeddata', onPlaybackStarted);
       video.removeEventListener('timeupdate', onPlaybackStarted);
       if (cleanupTextTrackListeners) {
         cleanupTextTrackListeners();
@@ -1200,7 +1846,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
         hlsRef.current = null;
       }
     };
-  }, [activeServer, handleAutoFallback, applySubtitleMode]);
+  }, [activeServer, applySubtitleMode]);
 
   // Controle de ocultação automática dos controles
   // Fechar todos os modais abertos
@@ -1436,16 +2082,25 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
   // Troca de Servidor Manual
   const handleSelectServer = (idx) => {
     if (idx === activeServerIndex) return;
+    userSelectedServerRef.current = true;
     failedServersRef.current.delete(idx);
     setActiveServerIndex(idx);
     setServerModalOpen(false);
     setSelectedQuality('auto');
-    setCurrentPlayingResolution('');
+    const srv = servers[idx];
+    const initialDeclaredRes =
+      srv?.quality?.includes('4K') || srv?.providerName?.includes('4K') ? '4K Ultra HD' :
+      srv?.quality?.includes('1440') || srv?.quality?.includes('2K') || srv?.providerName?.includes('1440') || srv?.providerName?.includes('2K') ? '1440p 2K' :
+      srv?.quality?.includes('1080') || srv?.providerName?.includes('1080') ? '1080p Full HD' :
+      srv?.quality?.includes('720') || srv?.providerName?.includes('720') ? '720p HD' :
+      '1080p Full HD';
+    setCurrentPlayingResolution(initialDeclaredRes);
     triggerNotification(`Conectando a: ${servers[idx].providerName}`);
   };
 
   // Troca de Faixa de Áudio (Normalizado para Português / Inglês Original com troca suave)
   const handleSelectAudioTrack = (trackIndex) => {
+    userSelectedAudioRef.current = true;
     if (hlsRef.current) {
       try {
         hlsRef.current.audioTrack = trackIndex;
@@ -1479,6 +2134,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
 
   // Troca de Legendas com ativação forçada de modo 'showing' e hls.subtitleDisplay
   const handleSelectSubtitleTrack = (trackId) => {
+    userSelectedSubtitleRef.current = true;
     setActiveSubtitleTrack(trackId);
     activeSubtitleTrackRef.current = trackId;
 
@@ -1486,9 +2142,13 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       if (trackId === -1) {
         hlsRef.current.subtitleDisplay = false;
         hlsRef.current.subtitleTrack = -1;
-      } else {
+      } else if (trackId < 1000) {
         hlsRef.current.subtitleDisplay = true;
         hlsRef.current.subtitleTrack = trackId;
+      } else {
+        // Legenda externa VTT: desliga HLS interno para evitar conflito
+        hlsRef.current.subtitleDisplay = false;
+        hlsRef.current.subtitleTrack = -1;
       }
     }
 
@@ -1496,6 +2156,23 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
     const sel = subtitleTracks.find((s) => s.id === trackId);
     triggerNotification(trackId === -1 ? 'Legendas desativadas' : `Legendas: ${sel?.label || 'Ativada'}`);
   };
+
+  // Auto-ativar legendas em Português se o servidor ativo for em Áudio Original (Inglês)
+  useEffect(() => {
+    if (!isCurrentDub && subtitleTracks.length > 0 && activeSubtitleTrack === -1 && !userSelectedSubtitleRef.current) {
+      const ptSub = subtitleTracks.find(
+        (s) =>
+          s.lang === 'pt-BR' ||
+          s.lang === 'pt' ||
+          s.lang === 'pob' ||
+          (s.label || '').toLowerCase().includes('português') ||
+          (s.label || '').toLowerCase().includes('brasil')
+      );
+      if (ptSub) {
+        handleSelectSubtitleTrack(ptSub.id);
+      }
+    }
+  }, [isCurrentDub, subtitleTracks, activeSubtitleTrack]);
 
   // Troca de Qualidade
   const handleSelectQuality = (key) => {
@@ -1837,15 +2514,61 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       onClick={handlePlayerTap}
       className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center select-none overflow-hidden touch-manipulation"
     >
+      {/* Cinema Ambient Glow (Efeito Exclusivo VIP) */}
+      {ambientGlow && (
+        <div className="absolute inset-0 pointer-events-none scale-105 blur-3xl opacity-35 transition-opacity duration-1000 bg-gradient-to-r from-sky-600/30 via-blue-600/20 to-sky-600/30 -z-10" />
+      )}
+
       {/* Elemento HTML5 Video com Renderizador Próprio ou Embed Iframe */}
-      {activeServer?.isIframe || activeServer?.type === 'iframe' ? (
-        <iframe
-          src={activeServer.url}
-          allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *; clipboard-write *"
-          allowFullScreen
-          className="w-full h-full border-0 bg-black"
-          title={media?.title || 'Player Ao Vivo'}
-        />
+      {isIframeMode ? (
+        <div className="relative w-full h-full bg-black flex flex-col">
+          {/* Barra Superior do Modo Iframe / Embed Player */}
+          <div className="absolute top-0 inset-x-0 z-50 p-4 sm:p-6 bg-gradient-to-b from-black/90 via-black/50 to-transparent flex items-center justify-between pointer-events-auto">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onClose}
+                className="px-3.5 py-2 rounded-full bg-slate-900/90 hover:bg-slate-800 text-white flex items-center gap-2 border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer"
+                title="Voltar ao Catálogo"
+              >
+                <ArrowLeft size={16} className="text-sky-400" />
+                <span className="text-xs font-semibold">{media?.title || 'Voltar'}</span>
+              </button>
+
+              {activeServer?.isLive ? (
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold shadow-lg backdrop-blur-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  AO VIVO
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[10px] font-bold shadow-lg backdrop-blur-sm">
+                  <Film size={12} />
+                  EMBED PLAYER
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {servers.length > 1 && (
+                <button
+                  onClick={() => setServerModalOpen(true)}
+                  className="px-3.5 py-2 rounded-full bg-slate-900/90 hover:bg-slate-800 text-white flex items-center gap-1.5 border border-white/20 shadow-xl backdrop-blur-md text-xs font-semibold cursor-pointer active:scale-95 transition-all"
+                  title="Trocar Servidor"
+                >
+                  <Server size={14} className="text-sky-400" />
+                  <span>Servidores ({servers.length})</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <iframe
+            src={activeServer.url}
+            allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *; clipboard-write *"
+            allowFullScreen
+            className="w-full h-full border-0 bg-black pt-0"
+            title={media?.title || 'Player'}
+          />
+        </div>
       ) : (
         <video
           ref={videoRef}
@@ -1858,7 +2581,15 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
           disableRemotePlayback={false}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleTimeUpdate}
-          onWaiting={() => setIsVideoBuffering(true)}
+          onWaiting={() => {
+            const vid = videoRef.current;
+            if (vid && vid.readyState < 3) {
+              setIsVideoBuffering(true);
+            }
+          }}
+          onCanPlay={() => {
+            setIsVideoBuffering(false);
+          }}
           onPlaying={() => {
             setIsVideoBuffering(false);
             setIsPlaying(true);
@@ -1868,29 +2599,149 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
           onPause={() => setIsPlaying(false)}
           onDoubleClick={toggleFullscreen}
           className="w-full h-full object-contain bg-black"
-        />
+        >
+          {subtitleTracks.filter((s) => s.isExternal || s.url).map((sub, idx) => (
+            <track
+              key={`ext-sub-${sub.id || idx}-${sub.url}`}
+              kind="subtitles"
+              src={sub.url}
+              srcLang={sub.lang || 'pt'}
+              label={sub.label || `Legenda ${idx + 1}`}
+              default={false}
+            />
+          ))}
+        </video>
       )}
 
-      {/* Botão Flutuante de Fechar no Modo Iframe (Sempre Acessível) */}
-      {Boolean(activeServer?.isIframe || activeServer?.type === 'iframe') && (
-        <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
-          <button
-            onClick={onClose}
-            className="px-3.5 py-2 rounded-full bg-slate-900/90 hover:bg-slate-800 text-white flex items-center gap-2 border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer"
-            title="Voltar ao Catálogo"
-          >
-            <ArrowLeft size={16} className="text-sky-400" />
-            <span className="text-xs font-semibold">{media?.title || 'Voltar'}</span>
-          </button>
-          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold shadow-lg backdrop-blur-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-            AO VIVO
-          </span>
+      {/* ════ Painel de Debug de Rede (Botão "Rede" ou Ctrl+D para abrir/fechar) ════ */}
+      {showDebug && (
+        <div className="absolute top-4 right-4 z-[999] w-88 max-w-[calc(100vw-2rem)] bg-slate-950/95 border border-sky-500/40 rounded-2xl p-4 text-xs font-mono backdrop-blur-md shadow-2xl select-text max-h-[85vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <Activity size={16} className="text-sky-400 animate-pulse" />
+              <span className="text-sky-400 font-bold text-sm">Diagnóstico de Rede</span>
+            </div>
+            <button
+              onClick={() => setShowDebug(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Card: De quem é o tráfego? (PC vs Servidor) */}
+          {(() => {
+            const currentStreamUrl = debugInfo.serverUrl || activeServer?.url || '';
+            const isLocalProxy = currentStreamUrl.includes('/api/proxy');
+
+            return (
+              <div className={`mb-3 p-3 rounded-xl border ${
+                isLocalProxy
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                  : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+              }`}>
+                <div className="font-bold flex items-center gap-1.5 mb-1 text-[11px]">
+                  {isLocalProxy ? '⚠️ Rota: PROXY DO SEU PC (/api/proxy)' : '🌐 Rota: CDN DIRETA DO SERVIDOR'}
+                </div>
+                <p className="text-[10px] leading-relaxed text-slate-300">
+                  {isLocalProxy
+                    ? 'Como o site está no seu PC, os vídeos passam pelo seu Node.js e USAM O UPLOAD DA SUA INTERNET RESIDENCIAL. Em streams 4K (25-50 Mbps), seu upload pode engasgar.'
+                    : 'O tráfego de vídeo é baixado DIRETO da nuvem do provedor até o navegador. NÃO gasta o upload do seu PC!'}
+                </p>
+              </div>
+            );
+          })()}
+
+          {/* Veredito */}
+          <div className="mb-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-[11px] leading-snug">
+            <span className="text-slate-400 block text-[9px] uppercase tracking-wider font-semibold mb-0.5">Status Atual</span>
+            {debugInfo.verdict || '⏳ Aguardando dados...'}
+          </div>
+
+          <div className="space-y-1.5 bg-black/40 p-2.5 rounded-xl border border-white/5">
+            {/* TTFB */}
+            <div className="flex justify-between items-center py-0.5">
+              <span className="text-slate-400">TTFB (1º byte do servidor)</span>
+              <span className={debugInfo.ttfbMs === null ? 'text-slate-500' : debugInfo.ttfbMs < 0 ? 'text-yellow-400' : debugInfo.ttfbMs > 5000 ? 'text-rose-400 font-bold' : debugInfo.ttfbMs > 2000 ? 'text-yellow-400' : 'text-emerald-400'}>
+                {debugInfo.ttfbMs === null ? '...' : debugInfo.ttfbMs < 0 ? 'N/A (CORS)' : `${debugInfo.ttfbMs}ms`}
+              </span>
+            </div>
+
+            {/* Manifesto */}
+            <div className="flex justify-between items-center py-0.5">
+              <span className="text-slate-400">Manifesto HLS</span>
+              <span className={debugInfo.manifestMs === null ? 'text-slate-500' : debugInfo.manifestMs > 10000 ? 'text-rose-400 font-bold' : debugInfo.manifestMs > 4000 ? 'text-yellow-400' : 'text-emerald-400'}>
+                {debugInfo.manifestMs === null ? '...' : `${debugInfo.manifestMs}ms`}
+              </span>
+            </div>
+
+            {/* Primeiro frame */}
+            <div className="flex justify-between items-center py-0.5">
+              <span className="text-slate-400">Primeiro frame na tela</span>
+              <span className={debugInfo.firstFrameMs === null ? 'text-slate-500' : debugInfo.firstFrameMs > 15000 ? 'text-rose-400 font-bold' : debugInfo.firstFrameMs > 6000 ? 'text-yellow-400' : 'text-emerald-400 font-bold'}>
+                {debugInfo.firstFrameMs === null ? '...' : `${debugInfo.firstFrameMs}ms`}
+              </span>
+            </div>
+
+            {/* Bandwidth HLS */}
+            <div className="flex justify-between items-center py-0.5">
+              <span className="text-slate-400">Velocidade estimada (HLS)</span>
+              <span className={!debugInfo.bandwidth ? 'text-slate-500' : 'text-sky-400 font-bold'}>
+                {debugInfo.bandwidth || 'N/A'}
+              </span>
+            </div>
+
+            {/* Buffer */}
+            <div className="flex justify-between items-center py-0.5">
+              <span className="text-slate-400">Buffer carregado</span>
+              <span className={!debugInfo.bufferLen ? 'text-slate-500' : parseFloat(debugInfo.bufferLen) < 1 ? 'text-rose-400 font-bold' : parseFloat(debugInfo.bufferLen) < 3 ? 'text-yellow-400' : 'text-emerald-400 font-bold'}>
+                {debugInfo.bufferLen || '...'}
+              </span>
+            </div>
+
+            {/* Frames dropados */}
+            <div className="flex justify-between items-center py-0.5">
+              <span className="text-slate-400">Frames perdidos / total</span>
+              <span className="text-slate-300">{debugInfo.droppedFrames || '...'}</span>
+            </div>
+
+            {/* readyState */}
+            <div className="flex justify-between items-center py-0.5">
+              <span className="text-slate-400">readyState do player</span>
+              <span className="text-slate-300 text-[10px]">{debugInfo.readyState || '...'}</span>
+            </div>
+
+            {/* networkState */}
+            <div className="flex justify-between items-center py-0.5">
+              <span className="text-slate-400">networkState</span>
+              <span className={debugInfo.networkState === 'LOADING' ? 'text-sky-400 animate-pulse' : 'text-slate-300 text-[10px]'}>
+                {debugInfo.networkState || '...'}
+              </span>
+            </div>
+          </div>
+
+          {/* Servidor Ativo */}
+          <div className="mt-3 pt-2 border-t border-white/10">
+            <span className="text-slate-500 block text-[9px] uppercase tracking-wider mb-0.5">Servidor Ativo</span>
+            <span className="text-sky-300 font-semibold block text-[11px] truncate">
+              {activeServer?.providerName || 'Nenhum'}
+            </span>
+          </div>
+
+          {/* URL */}
+          <div className="mt-2 pt-2 border-t border-white/5">
+            <span className="text-slate-500 block text-[9px] uppercase tracking-wider mb-0.5">URL da Fonte</span>
+            <span className="text-slate-400 break-all text-[9px] leading-tight block select-all">
+              {debugInfo.serverUrl || activeServer?.url || '—'}
+            </span>
+          </div>
+
+          <div className="mt-3 text-slate-500 text-[9px] text-center">Atalho: Ctrl+D para abrir/fechar</div>
         </div>
       )}
 
       {/* Indicadores Visuais de Toque Duplo (Avanço / Retrocesso no Celular) */}
-      {!activeServer?.isIframe && tapFeedback && (
+      {!isIframeMode && tapFeedback && (
         <div
           className={`absolute top-1/2 -translate-y-1/2 z-30 pointer-events-none flex flex-col items-center justify-center w-24 h-24 rounded-full bg-sky-500/20 text-sky-400 border border-sky-400/40 backdrop-blur-sm animate-scale-in ${
             tapFeedback.type === 'rewind' ? 'left-8 sm:left-24' : 'right-8 sm:right-24'
@@ -2032,7 +2883,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       )}
 
       {/* Top Controls Overlay com suporte à safe-area e notch */}
-      {!activeServer?.isIframe && (
+      {!isIframeMode && (
         <div
           className={`absolute top-0 left-0 right-0 p-4 sm:p-6 bg-gradient-to-b from-black/95 via-black/60 to-transparent flex items-center justify-between transition-opacity duration-300 z-40 ${
             showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
@@ -2082,11 +2933,100 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
               )}
             </div>
           </div>
+
+          {/* Ferramentas VIP no Topo: Download MP4, Dolby Boost, Ambient Glow & Status VIP */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {/* Botão Iluminação Ambient Glow */}
+            <button
+              type="button"
+              onClick={() => setAmbientGlow(!ambientGlow)}
+              className={`p-2 rounded-full border transition-all cursor-pointer ${
+                ambientGlow
+                  ? 'bg-sky-500/25 border-sky-400 text-sky-300 shadow-md shadow-sky-500/20'
+                  : 'bg-slate-900/80 border-white/10 text-slate-400 hover:text-white'
+              }`}
+              title={ambientGlow ? "Desativar Cinema Ambient Glow" : "Ativar Cinema Ambient Glow (Iluminação Imersiva)"}
+            >
+              <Sparkles size={15} className={ambientGlow ? "text-sky-400" : ""} />
+            </button>
+
+            {/* Botão Dolby Audio Booster (+150%) */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!isVip) {
+                  onOpenSubscription?.();
+                  return;
+                }
+                setDolbyBoost(!dolbyBoost);
+                if (!dolbyBoost && videoRef.current) {
+                  videoRef.current.volume = 1;
+                }
+              }}
+              className={`px-2.5 py-1.5 rounded-full border flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+                dolbyBoost
+                  ? 'bg-purple-500/25 border-purple-400 text-purple-300 shadow-md shadow-purple-500/25'
+                  : 'bg-slate-900/80 border-white/10 text-slate-300 hover:text-white'
+              }`}
+              title={isVip ? (dolbyBoost ? "Dolby Audio Booster Ativo (+150%)" : "Ativar Dolby Sound Booster") : "Dolby Audio Booster (Exclusivo VIP)"}
+            >
+              <Volume2 size={13} className={dolbyBoost ? "text-purple-400" : isVip ? "text-slate-300" : "text-slate-400"} />
+              <span className="hidden sm:inline text-[11px]">{dolbyBoost ? "Dolby +150%" : "Dolby"}</span>
+              {!isVip && (
+                <span className="text-[9px] px-1 rounded bg-amber-400/20 text-amber-300 font-extrabold uppercase">
+                  VIP
+                </span>
+              )}
+            </button>
+
+            {/* Botão Download Offline MP4 */}
+            <button
+              type="button"
+              onClick={() => {
+                if (isVip) {
+                  alert(`Iniciando download MP4 em alta velocidade de "${media?.title}". O vídeo será transferido sem anúncios.`);
+                } else {
+                  onOpenSubscription?.();
+                }
+              }}
+              className={`px-3 py-1.5 rounded-full border flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+                isVip
+                  ? 'bg-amber-500/20 border-amber-400/40 text-amber-300 hover:bg-amber-500/30'
+                  : 'bg-slate-900/80 border-white/10 text-slate-300 hover:text-white'
+              }`}
+              title={isVip ? "Baixar MP4 para assistir offline" : "Download Offline exclusivo para membros VIP"}
+            >
+              <Download size={13} className={isVip ? "text-amber-400" : "text-sky-400"} />
+              <span className="hidden md:inline text-[11px]">Download</span>
+              <span className="text-[9px] px-1 rounded bg-amber-400/20 text-amber-300 font-extrabold uppercase flex items-center gap-0.5">
+                <Crown size={9} className="fill-amber-400" /> VIP
+              </span>
+            </button>
+
+            {/* Badge de Status VIP ou Botão Assinar VIP */}
+            {isVip ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black shadow-lg">
+                <Crown size={13} className="fill-amber-400 text-amber-400" />
+                <span className="hidden sm:inline text-[11px]">VIP Diamante</span>
+                <span className="text-[10px] text-amber-200/80 font-normal hidden lg:inline">· 100% Sem Anúncios</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpenSubscription?.()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-sky-500/20 via-blue-500/20 to-sky-500/20 hover:from-sky-500/30 hover:to-blue-500/30 border border-sky-400/40 backdrop-blur-md text-sky-300 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-md group"
+                title="Assine com MB WAY ou Cripto para remover todos os anúncios e assistir em 4K"
+              >
+                <Crown size={13} className="text-amber-400 fill-amber-400 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px]">Assinar VIP</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {/* Controles Centrais Touch (Play/Pause e Pular 10s) */}
-      {!activeServer?.isIframe && !activeServer?.isLive && (
+      {!isIframeMode && !activeServer?.isLive && (
         <div
           className={`absolute z-20 flex items-center gap-6 sm:gap-10 transition-all duration-200 ${
             showControls && !isVideoBuffering && !isExtracting
@@ -2131,7 +3071,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
       )}
 
       {/* Bottom Controls Bar — Otimizada para Celular e Desktop */}
-      {!activeServer?.isIframe && (
+      {!isIframeMode && (
         <div
           className={`absolute bottom-0 left-0 right-0 px-3 pt-6 pb-4 sm:px-6 sm:pb-6 bg-gradient-to-t from-black/98 via-black/85 to-transparent space-y-2 sm:space-y-3 transition-opacity duration-300 z-30 ${
             showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
@@ -2388,16 +3328,17 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
         />
       )}
 
-      {/* Modal / Bottom Sheet de Seleção de Servidores Kairou */}
+      {/* Modal / Bottom Sheet de Seleção de servidores Kairou */}
       {serverModalOpen && (
         <div
-          className="fixed sm:absolute bottom-0 sm:bottom-20 inset-x-0 sm:inset-x-auto sm:right-8 z-50 w-full sm:w-96 max-w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl bg-[#0f141e]/98 sm:bg-[#0f141e]/95 border-t sm:border border-white/[0.1] p-4 sm:p-5 backdrop-blur-2xl shadow-2xl text-xs max-h-[85vh] sm:max-h-[70vh] flex flex-col animate-slide-up sm:animate-scale-in safe-bottom modal-content"
+          className="fixed sm:absolute bottom-0 sm:bottom-20 inset-x-0 sm:inset-x-auto sm:right-8 z-50 w-full sm:w-96 max-w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl bg-[#0f141e]/98 sm:bg-[#0f141e]/95 border-t sm:border border-white/[0.1] p-4 sm:p-5 backdrop-blur-2xl shadow-2xl text-xs max-h-[85vh] sm:max-h-[72vh] flex flex-col animate-slide-up sm:animate-scale-in safe-bottom modal-content"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Pílula de arrastar no celular */}
           <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto mb-3 sm:hidden shrink-0" />
 
-          <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-800">
+          {/* Cabeçalho do Modal */}
+          <div className="flex items-center justify-between pb-3 mb-2.5 border-b border-slate-800">
             <div>
               <h4 className="font-bold text-white text-sm flex items-center gap-2">
                 <Server size={16} className="text-sky-400" />
@@ -2421,37 +3362,116 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
             </div>
           </div>
 
-          <div className="overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
-            {servers.map((srv, idx) => {
-              const isActive = idx === activeServerIndex;
-              return (
-                <button
-                  key={srv.id || idx}
-                  onClick={() => handleSelectServer(idx)}
-                  className={`w-full text-left p-3 sm:p-2.5 rounded-xl flex items-center justify-between transition-all border cursor-pointer min-h-[44px] ${
-                    isActive
-                      ? 'bg-sky-500/20 text-sky-400 border-sky-400/40 font-semibold'
-                      : 'text-slate-300 bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/80 hover:text-white'
-                  }`}
-                >
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-medium text-xs">{srv.providerName}</span>
-                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                      <span>{srv.quality ? srv.quality.replace(/\b(hls|mp4)\b/gi, '').replace(/\s+/g, ' ').trim() : 'Full HD'}</span>
-                    </div>
-                  </div>
+          {/* Seletor de Idioma das Fontes: Dublado 🇧🇷 vs Original 🇺🇸 */}
+          <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-900/90 rounded-xl mb-3 border border-slate-800/80 shrink-0">
+            <button
+              onClick={() => setServerLangFilter('dub')}
+              className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                serverLangFilter === 'dub'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <span className="text-base leading-none">🇧🇷</span>
+              <span>Dublado</span>
+              {dubServersCount > 0 && <span className="text-[10px] font-mono opacity-80">({dubServersCount})</span>}
+            </button>
 
-                  {isActive ? (
-                    <div className="flex items-center gap-1 text-sky-400 font-bold text-[11px]">
-                      <span>Ativo</span>
-                      <Check size={14} />
+            <button
+              onClick={() => setServerLangFilter('sub')}
+              className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                serverLangFilter === 'sub'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <span className="text-base leading-none">🇺🇸</span>
+              <span>Original</span>
+              {subServersCount > 0 && <span className="text-[10px] font-mono opacity-80">({subServersCount})</span>}
+            </button>
+
+            <button
+              onClick={() => setServerLangFilter('all')}
+              className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                serverLangFilter === 'all'
+                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <span className="text-base leading-none">🌐</span>
+              <span>Todos</span>
+              <span className="text-[10px] font-mono opacity-80">({servers.length})</span>
+            </button>
+          </div>
+
+          {/* Lista de Servidores Filtrados */}
+          <div className="overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+            {filteredServers.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                Nenhum servidor disponível nesta categoria.
+              </div>
+            ) : (
+              filteredServers.map((srv) => {
+                const realIndex = servers.indexOf(srv);
+                const isActive = realIndex === activeServerIndex;
+                const isDub = Boolean(srv.isDub || (srv.providerName || '').includes('[Dublado]'));
+                const is4k = (srv.quality || '').includes('4K');
+                const is2k = (srv.quality || '').includes('1440') || (srv.quality || '').includes('2K');
+                const is1080 = (srv.quality || '').includes('1080');
+
+                return (
+                  <button
+                    key={srv.id || realIndex}
+                    onClick={() => handleSelectServer(realIndex)}
+                    className={`w-full text-left p-3 sm:p-2.5 rounded-xl flex items-center justify-between transition-all border cursor-pointer min-h-[48px] ${
+                      isActive
+                        ? 'bg-sky-500/20 text-white border-sky-400/50 font-semibold shadow-md shadow-sky-500/10'
+                        : 'text-slate-300 bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/80 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex flex-col gap-1 flex-1 pr-2">
+                      <span className="font-semibold text-xs text-white leading-tight">
+                        {srv.providerName}
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                        {isDub ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                            <span>🇧🇷</span> Dublado
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30">
+                            <span>🇺🇸</span> Original (Leg. PT)
+                          </span>
+                        )}
+
+                        <span
+                          className={`px-1.5 py-0.5 rounded font-mono font-semibold ${
+                            is4k
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : is2k
+                              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                              : is1080
+                              ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {srv.quality || 'Full HD'}
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    <ChevronRight size={14} className="text-slate-600" />
-                  )}
-                </button>
-              );
-            })}
+
+                    {isActive ? (
+                      <div className="flex items-center gap-1 text-sky-400 font-bold text-[11px] shrink-0">
+                        <span>Ativo</span>
+                        <Check size={14} />
+                      </div>
+                    ) : (
+                      <ChevronRight size={14} className="text-slate-600 shrink-0" />
+                    )}
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -2500,7 +3520,28 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
                 ))}
               </div>
             ) : (
-              <p className="text-[11px] text-slate-500 italic">Áudio original integrado na transmissão</p>
+              <div className="space-y-1.5">
+                <div className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between bg-sky-500/20 text-sky-400 font-semibold border border-sky-400/30 min-h-[40px]">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold">{isCurrentDub ? 'Português (Dublado)' : 'Áudio Original (Internacional)'}</span>
+                    <span className="text-[10px] text-sky-300/80 font-normal">Áudio oficial integrado na transmissão</span>
+                  </div>
+                  <Check size={14} />
+                </div>
+
+                {alternateAudioServer && (
+                  <button
+                    onClick={() => handleSelectServer(alternateAudioServer.index)}
+                    className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-colors min-h-[40px] cursor-pointer text-slate-300 hover:bg-slate-800/60 bg-slate-900/40 border border-slate-800"
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-xs">{alternateAudioServer.isDub ? 'Português (Dublado)' : 'Áudio Original (com Legendas)'}</span>
+                      <span className="text-[10px] text-slate-500">Alternar transmissão</span>
+                    </div>
+                    <ChevronRight size={14} className="text-slate-500" />
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -2569,66 +3610,113 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            {/* Opção Automática / Adaptativa */}
-            <button
-              onClick={() => handleSelectQuality('auto')}
-              className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-all border cursor-pointer min-h-[44px] ${
-                selectedQuality === 'auto'
-                  ? 'bg-sky-500/20 text-sky-400 border-sky-400/40 font-semibold'
-                  : 'text-slate-300 bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/80 hover:text-white'
-              }`}
-            >
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medium text-xs">Automático (Adaptativo)</span>
-                  {currentPlayingResolution && (
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-sky-400 font-mono">
-                      {currentPlayingResolution}
-                    </span>
-                  )}
-                </div>
-                <span className="text-[10px] text-slate-400">Ajusta conforme a velocidade da conexão</span>
-              </div>
-              {selectedQuality === 'auto' && <Check size={14} className="text-sky-400 shrink-0" />}
-            </button>
-
-            {/* Listar APENAS resoluções reais que existem nesta transmissão */}
-            {qualityLevels.length > 0 ? (
-              qualityLevels.map((lvl) => {
-                const isSelected = selectedQuality === lvl.key;
-                return (
-                  <button
-                    key={lvl.key || lvl.index}
-                    onClick={() => handleSelectQuality(lvl.key)}
-                    className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-all border cursor-pointer min-h-[44px] ${
-                      isSelected
-                        ? 'bg-sky-500/20 text-sky-400 border-sky-400/40 font-semibold'
-                        : 'text-slate-300 bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/80 hover:text-white'
-                    }`}
-                  >
+          <div className="space-y-2">
+            {/* Se for transmissão multi-qualidade HLS adaptativa */}
+            {qualityLevels && qualityLevels.filter((l) => l.key !== 'auto').length > 0 ? (
+              <>
+                {/* Opção Automática / Adaptativa (única e exclusiva) */}
+                <button
+                  onClick={() => handleSelectQuality('auto')}
+                  className={`w-full text-left px-3.5 py-2.5 rounded-xl flex items-center justify-between transition-all border cursor-pointer min-h-[46px] ${
+                    selectedQuality === 'auto'
+                      ? 'bg-sky-500/20 text-sky-400 border-sky-400/40 font-semibold shadow-sm'
+                      : 'text-slate-300 bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/80 hover:text-white'
+                  }`}
+                >
+                  <div className="flex flex-col gap-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-xs">{lvl.label}</span>
-                      {lvl.height >= 1080 && (
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-300 font-bold uppercase tracking-wider">
-                          Full HD
+                      <span className="font-medium text-xs">Automático (Adaptativo)</span>
+                      {currentPlayingResolution && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-sky-400 font-mono font-semibold whitespace-nowrap shrink-0 border border-slate-700/60">
+                          {currentPlayingResolution}
                         </span>
                       )}
                     </div>
-                    {isSelected && <Check size={14} className="text-sky-400 shrink-0" />}
-                  </button>
-                );
-              })
-            ) : (
-              /* Transmissão direta em resolução contínua */
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-300 space-y-1">
-                <div className="flex items-center justify-between text-white font-medium">
-                  <span>Resolução Nativa</span>
-                  <span className="text-sky-400 font-bold">{currentPlayingResolution || 'HD'}</span>
+                    <span className="text-[10px] text-slate-400">Ajusta automaticamente à velocidade da sua internet</span>
+                  </div>
+                  {selectedQuality === 'auto' && <Check size={16} className="text-sky-400 shrink-0 ml-2" />}
+                </button>
+
+                {/* Resoluções específicas disponíveis */}
+                <div className="pt-1 space-y-1.5">
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-1">
+                    Travar Resolução
+                  </span>
+                  {qualityLevels
+                    .filter((lvl) => lvl.key !== 'auto')
+                    .map((lvl) => {
+                      const isSelected = selectedQuality === lvl.key;
+                      let badgeText = '';
+                      let badgeCls = '';
+                      if (lvl.height >= 2160) {
+                        badgeText = '4K UHD';
+                        badgeCls = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+                      } else if (lvl.height >= 1440) {
+                        badgeText = '2K QHD';
+                        badgeCls = 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+                      } else if (lvl.height >= 1080) {
+                        badgeText = 'Full HD';
+                        badgeCls = 'bg-sky-500/20 text-sky-300 border-sky-400/30';
+                      } else if (lvl.height >= 720) {
+                        badgeText = 'HD';
+                        badgeCls = 'bg-slate-700/60 text-slate-300 border-slate-600/40';
+                      }
+
+                      return (
+                        <button
+                          key={lvl.key || lvl.index}
+                          onClick={() => handleSelectQuality(lvl.key)}
+                          className={`w-full text-left px-3.5 py-2.5 rounded-xl flex items-center justify-between transition-all border cursor-pointer min-h-[44px] ${
+                            isSelected
+                              ? 'bg-sky-500/20 text-sky-400 border-sky-400/40 font-semibold'
+                              : 'text-slate-300 bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/80 hover:text-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-medium text-xs truncate">{lvl.label}</span>
+                            {badgeText && (
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold uppercase tracking-wider whitespace-nowrap shrink-0 ${badgeCls}`}>
+                                {badgeText}
+                              </span>
+                            )}
+                          </div>
+                          {isSelected && <Check size={16} className="text-sky-400 shrink-0 ml-2" />}
+                        </button>
+                      );
+                    })}
                 </div>
-                <p className="text-[10px] text-slate-400">
-                  Transmitido em alta taxa de bits direta sem compressão adaptativa.
-                </p>
+              </>
+            ) : (
+              /* Transmissão direta em resolução nativa sem compressão adaptativa */
+              <div className="space-y-2">
+                <div className="p-3.5 rounded-xl bg-sky-500/10 border border-sky-400/30 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white flex items-center gap-2">
+                      <span>Resolução Máxima Nativa</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-sky-500/25 text-sky-300 font-bold font-mono uppercase tracking-wider whitespace-nowrap border border-sky-400/30">
+                        {currentPlayingResolution || (activeServer?.quality ? activeServer.quality.replace(/\b(hls|mp4)\b/gi, '').trim() : '1080p Full HD')}
+                      </span>
+                    </span>
+                    <Check size={16} className="text-sky-400 shrink-0" />
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Esta fonte transmite em fluxo direto de estúdio com taxa de bits máxima e fidelidade visual original, sem oscilações de resolução.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setQualityModalOpen(false);
+                    setServerModalOpen(true);
+                  }}
+                  className="w-full py-2.5 px-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white text-left font-medium text-xs border border-slate-800 flex items-center justify-between transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Server size={14} className="text-sky-400 shrink-0" />
+                    <span>Escolher outro Servidor de Vídeo</span>
+                  </div>
+                  <ChevronRight size={14} className="text-slate-500" />
+                </button>
               </div>
             )}
           </div>
@@ -2636,6 +3724,7 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
           {/* Dica para alternar para servidor 1080p se a transmissão atual for inferior a 1080p */}
           {(!qualityLevels.some((l) => l.height >= 1080) &&
             currentPlayingResolution !== '1080p Full HD' &&
+            currentPlayingResolution !== '1440p 2K' &&
             currentPlayingResolution !== '4K Ultra HD') && (
             <div className="mt-3 pt-2.5 border-t border-slate-800 flex flex-col gap-1.5">
               <div className="flex items-center gap-1.5 text-amber-400 text-[11px] font-medium">
@@ -2952,3 +4041,4 @@ export default function VideoPlayer({ media, episode, initialTime = 0, autoCast 
     </div>
   );
 }
+

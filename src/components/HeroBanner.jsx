@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Plus, Check, Info, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { prefetchMediaStreams } from '../services/extractor';
 
 export default function HeroBanner({
   featuredItems,
+  user,
   onPlay,
   onOpenDetails,
   onToggleWatchlist,
@@ -11,6 +13,19 @@ export default function HeroBanner({
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const currentItem = featuredItems?.[currentIndex] || featuredItems?.[0];
+
+  // Prefetch do item em destaque ativo na Hero Banner
+  useEffect(() => {
+    if (!currentItem?.tmdbId && !currentItem?.id) return;
+    const isTv = currentItem.type === 'series' || currentItem.type === 'tv' || currentItem.type === 'anime';
+    prefetchMediaStreams({
+      tmdbId: currentItem.tmdbId || currentItem.id,
+      type: isTv ? 'series' : 'movie',
+      season: 1,
+      episode: 1,
+      title: currentItem.title,
+    });
+  }, [currentItem]);
 
   useEffect(() => {
     if (!featuredItems || featuredItems.length <= 1) return;
@@ -100,10 +115,20 @@ export default function HeroBanner({
                 const isSeries = currentItem.type === 'series' || currentItem.type === 'tv' || currentItem.type === 'anime';
                 onPlay(currentItem, isSeries ? { ep: 1, season: 1, title: 'Episódio 1' } : null);
               }}
-              className="inline-flex items-center justify-center gap-2 px-6 sm:px-7 py-3 sm:py-3.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold text-sm sm:text-base transition-all shadow-md hover:scale-[1.02] active:scale-[0.98]"
+              onMouseEnter={() => {
+                const isSeries = currentItem.type === 'series' || currentItem.type === 'tv' || currentItem.type === 'anime';
+                prefetchMediaStreams({
+                  tmdbId: currentItem.tmdbId || currentItem.id,
+                  type: isSeries ? 'series' : 'movie',
+                  season: 1,
+                  episode: 1,
+                  title: currentItem.title,
+                });
+              }}
+              className="inline-flex items-center justify-center gap-2 px-6 sm:px-7 py-3 sm:py-3.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold text-sm sm:text-base transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Play size={18} className="fill-slate-950 ml-0.5" />
-              Assistir Agora
+              {user ? 'Assistir Agora' : 'Entrar para Assistir'}
             </button>
 
             {/* Watchlist Button */}

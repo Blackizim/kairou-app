@@ -1,4 +1,4 @@
-// Catálogo Completo kairou - Streaming de Alta Fidelidade
+// Catálogo Completo Kairou - Streaming de Alta Fidelidade
 // Otimizado com posters de alta resolução e metadados detalhados
 
 export const FEATURED_HEROES = [
