@@ -142,40 +142,118 @@ function detectQuality(url = '', name = '', title = '', explicitQuality = null) 
 
 const TMDB_READ_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4MjljMjk3OTUwZTYxZTBjNzE3OGI1ZmQ5YzllNmZhMCIsIm5iZiI6MTc1MTgyNDMyMC40NTcsInN1YiI6IjY4NmFiN2MwZDQ4OWE5YzMyYTUzZmFjNCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.IBBf0y2Nv9mzgXSpswQC2MsezfsDKAkhtKTC3211BpY';
 
-// Resolução de IMDb ID via TMDB com fallback inteligente de tipo
-async function resolveImdbId(tmdbId, isSeries) {
-  if (!tmdbId || isNaN(Number(tmdbId))) return null;
+// ─────────────────────────────────────────────────────────────────────────────
+// VALIDAÇÃO ESTRITA DE TÍTULO PARA PROVEDORES DE STREAMING
+// Evita que provedores de busca frouxa/fuzzy (ex: FrostStream) injetem filmes
+// completamente diferentes ou homônimos errados nos primeiros lugares
+// ─────────────────────────────────────────────────────────────────────────────
+function cleanTitle(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/🎬|📺|🌀|🖥️|⚡|🇧🇷|🇺🇸|🇯🇵|🧩|🌊|💎|🍿/g, ' ')
+    .replace(/\b(19\d\d|20\d\d)\b/g, '')
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractMovieNameFromStream(text) {
+  if (!text || typeof text !== 'string') return '';
+  const firstLine = text.split('\n')[0];
+  const cleaned = cleanTitle(firstLine);
+  return cleaned
+    .replace(/\b(filme|serie|temporada|episodio|dublado|legendado|nacional|servidor|fonte|opcao|audio)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isTitleMatch(extractedStreamTitle, targetTitles = []) {
+  if (!extractedStreamTitle || typeof extractedStreamTitle !== 'string') return true;
+  const streamClean = extractMovieNameFromStream(extractedStreamTitle);
+  if (!streamClean) return true;
+
+  const validTargets = (Array.isArray(targetTitles) ? targetTitles : [])
+    .map(t => cleanTitle(t))
+    .filter(Boolean);
+  if (validTargets.length === 0) return true;
+
+  const stripArticles = (s) => s.replace(/\b(o|a|os|as|um|uma|the|de|do|da|dos|das|se|e)\b/g, '').replace(/\s+/g, ' ').trim();
+  const streamStripped = stripArticles(streamClean);
+  const streamWords = streamStripped.split(/\s+/).filter(w => w.length > 1);
+
+  for (const rawTarget of validTargets) {
+    const target = cleanTitle(rawTarget);
+    if (!target) continue;
+    if (streamClean === target) return true;
+    const targetStripped = stripArticles(target);
+    if (streamStripped === targetStripped) return true;
+
+    const targetWords = targetStripped.split(/\s+/).filter(w => w.length > 1);
+    if (targetWords.length === 0) continue;
+
+    if (targetWords.length === 1) {
+      if (streamWords.length === 1 && streamWords[0] === targetWords[0]) return true;
+      continue;
+    }
+
+    const matchingCount = targetWords.filter(w => streamWords.includes(w)).length;
+    if (matchingCount / targetWords.length >= 0.7) return true;
+  }
+
+  return false;
+}
+
+const tmdbMetaCache = new Map();
+
+// Resolução de IMDb ID e Metadados via TMDB
+async function resolveTmdbMeta(tmdbId, isSeries) {
+  if (!tmdbId || isNaN(Number(tmdbId))) return { imdbId: null, titles: [] };
   const primaryType = isSeries ? 'tv' : 'movie';
   const fallbackType = isSeries ? 'movie' : 'tv';
   const cacheKey = `${primaryType}-${tmdbId}`;
-  if (imdbIdCache.has(cacheKey)) {
-    return imdbIdCache.get(cacheKey);
+  if (tmdbMetaCache.has(cacheKey)) {
+    return tmdbMetaCache.get(cacheKey);
   }
+
   try {
     let res = await fetchWithTimeout(
-      `https://api.themoviedb.org/3/${primaryType}/${tmdbId}/external_ids`,
+      `https://api.themoviedb.org/3/${primaryType}/${tmdbId}?language=pt-BR&append_to_response=external_ids`,
       { headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` } },
       3000
     );
     let data = res && res.ok ? await res.json() : null;
-    let imdbId = data?.imdb_id || null;
+    let imdbId = data?.imdb_id || data?.external_ids?.imdb_id || null;
+    let ptTitle = data?.title || data?.name || null;
+    let origTitle = data?.original_title || data?.original_name || null;
 
-    if (!imdbId) {
+    if (!imdbId && !ptTitle) {
       res = await fetchWithTimeout(
-        `https://api.themoviedb.org/3/${fallbackType}/${tmdbId}/external_ids`,
+        `https://api.themoviedb.org/3/${fallbackType}/${tmdbId}?language=pt-BR&append_to_response=external_ids`,
         { headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` } },
         3000
       );
       data = res && res.ok ? await res.json() : null;
-      imdbId = data?.imdb_id || null;
+      imdbId = data?.imdb_id || data?.external_ids?.imdb_id || null;
+      ptTitle = data?.title || data?.name || null;
+      origTitle = data?.original_title || data?.original_name || null;
     }
 
-    if (imdbId) {
-      imdbIdCache.set(cacheKey, imdbId);
-      return imdbId;
+    const titles = [ptTitle, origTitle].filter(Boolean);
+    const result = { imdbId, titles };
+    if (imdbId || titles.length > 0) {
+      tmdbMetaCache.set(cacheKey, result);
     }
+    return result;
   } catch {}
-  return null;
+  return { imdbId: null, titles: [] };
+}
+
+// Resolução de IMDb ID via TMDB com fallback inteligente de tipo
+async function resolveImdbId(tmdbId, isSeries) {
+  const meta = await resolveTmdbMeta(tmdbId, isSeries);
+  return meta.imdbId;
 }
 
 // Resolução de TMDB ID a partir de IMDb ID
@@ -213,7 +291,7 @@ async function resolveTmdbFromImdb(imdbId) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. BestCine (https://bestcine.dpdns.org) - PRIORIDADE 1 ABSOLUTA (4K HDR & 1080p)
 // ─────────────────────────────────────────────────────────────────────────────
-async function extractBestCine({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+async function extractBestCine({ tmdbId, imdbId, type, season = 1, episode = 1, candidateTitles = [] }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
   const targetId = isSeries
     ? (tmdbId ? `tmdb:${tmdbId}` : null) || imdbId || (await resolveImdbId(tmdbId, isSeries))
@@ -242,11 +320,15 @@ async function extractBestCine({ tmdbId, imdbId, type, season = 1, episode = 1 }
           const s = data.streams[idx];
           if (!s || !s.url || s.infoHash || s.behaviorHints?.p2p) continue;
 
+          const titleText = (s.title || s.description || '');
+          if (candidateTitles.length > 0 && !isTitleMatch(titleText, candidateTitles)) {
+            continue;
+          }
+
           let streamUrl = normalizeStreamUrl(s.url);
           if (!streamUrl) continue;
 
           const isHls = streamUrl.includes('.m3u8') || streamUrl.includes('master.txt');
-          const titleText = (s.title || s.description || '');
           const nameText = (s.name || '');
           const combined = `${titleText} ${nameText}`;
           const metaLower = combined.toLowerCase();
@@ -288,7 +370,7 @@ async function extractBestCine({ tmdbId, imdbId, type, season = 1, episode = 1 }
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. FrostStream (https://froststream.cloutteam.com) - PRIORIDADE 2 (4K HDR & 1080p)
 // ─────────────────────────────────────────────────────────────────────────────
-async function extractFrostStream({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+async function extractFrostStream({ tmdbId, imdbId, type, season = 1, episode = 1, candidateTitles = [] }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
   const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries));
   if (!targetId) return [];
@@ -314,11 +396,16 @@ async function extractFrostStream({ tmdbId, imdbId, type, season = 1, episode = 
         for (let idx = 0; idx < data.streams.length; idx++) {
           const s = data.streams[idx];
           if (!s || !s.url || s.infoHash) continue;
+
+          const titleText = (s.title || s.description || '');
+          if (candidateTitles.length > 0 && !isTitleMatch(titleText, candidateTitles)) {
+            continue;
+          }
+
           let streamUrl = normalizeStreamUrl(s.url);
           if (!streamUrl) continue;
 
           const isHls = streamUrl.includes('.m3u8') || streamUrl.includes('master.txt');
-          const titleText = (s.title || s.description || '');
           const nameText = (s.name || '');
           const combined = `${titleText} ${nameText}`;
           const metaLower = combined.toLowerCase();
@@ -359,7 +446,7 @@ async function extractFrostStream({ tmdbId, imdbId, type, season = 1, episode = 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. Vê Tela (https://addon.thsolucoes.site) - PRIORIDADE 3 (Wasabi S3, cnvods MP4)
 // ─────────────────────────────────────────────────────────────────────────────
-async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode = 1, candidateTitles = [] }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
   const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries));
   if (!targetId) return [];
@@ -385,11 +472,16 @@ async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode = 1 }) 
         for (let idx = 0; idx < data.streams.length; idx++) {
           const s = data.streams[idx];
           if (!s || !s.url || s.infoHash) continue;
+
+          const titleText = (s.title || s.description || '');
+          if (candidateTitles.length > 0 && !isTitleMatch(titleText, candidateTitles)) {
+            continue;
+          }
+
           let streamUrl = normalizeStreamUrl(s.url);
           if (!streamUrl) continue;
 
           const isHls = streamUrl.includes('.m3u8');
-          const titleText = (s.title || s.description || '');
           const nameText = (s.name || '');
           const combined = `${titleText} ${nameText}`;
           const metaLower = combined.toLowerCase();
@@ -424,7 +516,7 @@ async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode = 1 }) 
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. BsCine (https://bscine.alwaysdata.net) - PRIORIDADE 5 (MP4 1080p Dublado)
 // ─────────────────────────────────────────────────────────────────────────────
-async function extractBsCine({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+async function extractBsCine({ tmdbId, imdbId, type, season = 1, episode = 1, candidateTitles = [] }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
   const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries));
   if (!targetId) return [];
@@ -450,11 +542,16 @@ async function extractBsCine({ tmdbId, imdbId, type, season = 1, episode = 1 }) 
         for (let idx = 0; idx < data.streams.length; idx++) {
           const s = data.streams[idx];
           if (!s || !s.url || s.infoHash) continue;
+
+          const titleText = (s.title || s.description || '');
+          if (candidateTitles.length > 0 && !isTitleMatch(titleText, candidateTitles)) {
+            continue;
+          }
+
           let streamUrl = normalizeStreamUrl(s.url);
           if (!streamUrl) continue;
 
           const isHls = streamUrl.includes('.m3u8');
-          const titleText = (s.title || s.description || '');
           const nameText = (s.name || '');
           const metaLower = `${titleText} ${nameText}`.toLowerCase();
           const isDub = metaLower.includes('dublado');
@@ -632,7 +729,7 @@ async function extractOpenSubtitles({ imdbId, type, season = 1, episode = 1 }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 7. Veyra (https://veyra.shardweb.app) - Addon BR Filmes e Séries (HLS / MP4)
 // ─────────────────────────────────────────────────────────────────────────────
-async function extractVeyra({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+async function extractVeyra({ tmdbId, imdbId, type, season = 1, episode = 1, candidateTitles = [] }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
   const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries)) || (tmdbId ? `tmdb:${tmdbId}` : null);
   if (!targetId) return [];
@@ -658,11 +755,16 @@ async function extractVeyra({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
         for (let idx = 0; idx < data.streams.length; idx++) {
           const s = data.streams[idx];
           if (!s || !s.url || s.infoHash) continue;
+
+          const titleText = (s.title || s.description || '');
+          if (candidateTitles.length > 0 && !isTitleMatch(titleText, candidateTitles)) {
+            continue;
+          }
+
           let streamUrl = normalizeStreamUrl(s.url);
           if (!streamUrl) continue;
 
           const isHls = streamUrl.includes('.m3u8') || (s.name || '').includes('HLS');
-          const titleText = (s.title || s.description || '');
           const nameText = (s.name || '');
           const combined = `${titleText} ${nameText}`;
           const metaLower = combined.toLowerCase();
@@ -697,7 +799,7 @@ async function extractVeyra({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 8. King VOD (https://da5f663b4690-kingvod.baby-beamup.club) - HLS Dublado
 // ─────────────────────────────────────────────────────────────────────────────
-async function extractKingVod({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+async function extractKingVod({ tmdbId, imdbId, type, season = 1, episode = 1, candidateTitles = [] }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
   const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries)) || (tmdbId ? `tmdb:${tmdbId}` : null);
   if (!targetId) return [];
@@ -723,11 +825,16 @@ async function extractKingVod({ tmdbId, imdbId, type, season = 1, episode = 1 })
         for (let idx = 0; idx < data.streams.length; idx++) {
           const s = data.streams[idx];
           if (!s || !s.url || s.infoHash) continue;
+
+          const titleText = (s.title || s.description || '');
+          if (candidateTitles.length > 0 && !isTitleMatch(titleText, candidateTitles)) {
+            continue;
+          }
+
           let streamUrl = normalizeStreamUrl(s.url);
           if (!streamUrl) continue;
 
           const isHls = streamUrl.includes('.m3u8');
-          const titleText = (s.title || s.description || '');
           const nameText = (s.name || '');
           const combined = `${titleText} ${nameText}`;
           const isDub = !combined.toLowerCase().includes('legendado');
@@ -758,7 +865,7 @@ async function extractKingVod({ tmdbId, imdbId, type, season = 1, episode = 1 })
 // ─────────────────────────────────────────────────────────────────────────────
 // 9. MagnetFlix (https://magnetflix.flixbr.online) - Reativado (HLS & MP4)
 // ─────────────────────────────────────────────────────────────────────────────
-async function extractMagnetFlix({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+async function extractMagnetFlix({ tmdbId, imdbId, type, season = 1, episode = 1, candidateTitles = [] }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
   const targetId = isSeries
     ? (tmdbId ? `tmdb:${tmdbId}` : null) || imdbId || (await resolveImdbId(tmdbId, isSeries))
@@ -786,11 +893,16 @@ async function extractMagnetFlix({ tmdbId, imdbId, type, season = 1, episode = 1
         for (let idx = 0; idx < data.streams.length; idx++) {
           const s = data.streams[idx];
           if (!s || !s.url || s.infoHash || s.url.startsWith('magnet:')) continue;
+
+          const titleText = (s.title || s.description || '');
+          if (candidateTitles.length > 0 && !isTitleMatch(titleText, candidateTitles)) {
+            continue;
+          }
+
           let streamUrl = normalizeStreamUrl(s.url);
           if (!streamUrl) continue;
 
           const isHls = streamUrl.includes('.m3u8');
-          const titleText = (s.title || s.description || '');
           const nameText = (s.name || '');
           const metaLower = `${titleText} ${nameText}`.toLowerCase();
           const isDub = metaLower.includes('dublado') || metaLower.includes('pt-br') || !metaLower.includes('legendado');
@@ -880,7 +992,7 @@ async function extractPleiadesAnime({ tmdbId, imdbId, type, season = 1, episode 
 // ─────────────────────────────────────────────────────────────────────────────
 // 11. SuperStream (https://da5f663b4690-superstream.baby-beamup.club)
 // ─────────────────────────────────────────────────────────────────────────────
-async function extractSuperStream({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+async function extractSuperStream({ tmdbId, imdbId, type, season = 1, episode = 1, candidateTitles = [] }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
   const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries)) || (tmdbId ? `tmdb:${tmdbId}` : null);
   if (!targetId) return [];
@@ -906,11 +1018,16 @@ async function extractSuperStream({ tmdbId, imdbId, type, season = 1, episode = 
         for (let idx = 0; idx < data.streams.length; idx++) {
           const s = data.streams[idx];
           if (!s || !s.url || s.infoHash) continue;
+
+          const titleText = (s.title || s.description || '');
+          if (candidateTitles.length > 0 && !isTitleMatch(titleText, candidateTitles)) {
+            continue;
+          }
+
           let streamUrl = normalizeStreamUrl(s.url);
           if (!streamUrl) continue;
 
           const isHls = streamUrl.includes('.m3u8');
-          const titleText = (s.title || s.description || '');
           const nameText = (s.name || '');
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
@@ -1123,7 +1240,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  let { tmdbId, type = 'movie', season = 1, episode = 1, imdbId: queryImdbId } = req.query || {};
+  let { tmdbId, type = 'movie', season = 1, episode = 1, imdbId: queryImdbId, title: queryTitle } = req.query || {};
 
   if (typeof tmdbId === 'string' && tmdbId.startsWith('tt')) {
     queryImdbId = tmdbId;
@@ -1155,22 +1272,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (!imdbId && tmdbId) {
-      imdbId = await resolveImdbId(tmdbId, isSeries);
+    let tmdbMeta = { imdbId: null, titles: [] };
+    if (tmdbId) {
+      tmdbMeta = await resolveTmdbMeta(tmdbId, isSeries);
+      if (!imdbId && tmdbMeta.imdbId) {
+        imdbId = tmdbMeta.imdbId;
+      }
     }
+
+    const candidateTitles = [queryTitle, ...(tmdbMeta.titles || [])].filter(Boolean);
 
     // Execução Paralela das Fontes BR Oficiais (Kairou Native como Prioridade 1)
     const [kairouNativeRes, bestRes, frostRes, vetelaRes, bscineRes, veyraRes, kingRes, magnetRes, pleiadesRes, ssRes, subsRes] = await Promise.allSettled([
       extractKairouNative({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractBestCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractFrostStream({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractVeTela({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractBsCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractVeyra({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractKingVod({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractMagnetFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractBestCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode), candidateTitles }),
+      extractFrostStream({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode), candidateTitles }),
+      extractVeTela({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode), candidateTitles }),
+      extractBsCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode), candidateTitles }),
+      extractVeyra({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode), candidateTitles }),
+      extractKingVod({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode), candidateTitles }),
+      extractMagnetFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode), candidateTitles }),
       extractPleiadesAnime({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractSuperStream({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractSuperStream({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode), candidateTitles }),
       extractOpenSubtitles({ imdbId, type, season: Number(season), episode: Number(episode) }),
     ]);
 
