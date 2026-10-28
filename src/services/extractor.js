@@ -251,7 +251,7 @@ export async function extractBestCine({ tmdbId, imdbId, type, season = 1, episod
           const qInfo = detectQuality(streamUrl, nameText, titleText, is4k ? '4K' : null);
 
           streams.push({
-            id: `kairou-best-${idx}-${Date.now()}`,
+            id: `kairou-best-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality}) [Legendado PT-BR]`,
             url: streamUrl,
@@ -322,7 +322,7 @@ export async function extractFrostStream({ tmdbId, imdbId, type, season = 1, epi
           const qInfo = detectQuality(streamUrl, nameText, titleText, is4k ? '4K' : null);
 
           streams.push({
-            id: `kairou-frost-${idx}-${Date.now()}`,
+            id: `kairou-frost-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality}) [Legendado PT-BR]`,
             url: streamUrl,
@@ -389,7 +389,7 @@ export async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode 
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
           streams.push({
-            id: `kairou-vetela-${idx}-${Date.now()}`,
+            id: `kairou-vetela-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality})`,
             url: streamUrl,
@@ -452,7 +452,7 @@ export async function extractBsCine({ tmdbId, imdbId, type, season = 1, episode 
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
           streams.push({
-            id: `kairou-bscine-${idx}-${Date.now()}`,
+            id: `kairou-bscine-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality})`,
             url: streamUrl,
@@ -523,7 +523,7 @@ export async function extractVeyra({ tmdbId, imdbId, type, season = 1, episode =
           const qInfo = detectQuality(streamUrl, nameText, titleText, is4k ? '4K' : null);
 
           streams.push({
-            id: `kairou-veyra-${idx}-${Date.now()}`,
+            id: `kairou-veyra-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: 'Veyra',
             providerName: isDub ? `Veyra · Servidor (${qInfo.quality}) [Dublado]` : `Veyra · Servidor (${qInfo.quality}) [Legendado]`,
             url: streamUrl,
@@ -588,7 +588,7 @@ export async function extractKingVod({ tmdbId, imdbId, type, season = 1, episode
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
           streams.push({
-            id: `kairou-king-${idx}-${Date.now()}`,
+            id: `kairou-king-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: 'King VOD',
             providerName: `King VOD · Servidor (${qInfo.quality}) [${isDub ? 'Dublado' : 'Original'}]`,
             url: streamUrl,
@@ -648,7 +648,7 @@ export async function extractMagnetFlix({ tmdbId, imdbId, type, season = 1, epis
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
           streams.push({
-            id: `kairou-mf-${idx}-${Date.now()}`,
+            id: `kairou-mf-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: 'MagnetFlix',
             providerName: `MagnetFlix · Servidor (${qInfo.quality}) [${isDub ? 'Dublado' : 'Legendado'}]`,
             url: streamUrl,
@@ -709,7 +709,7 @@ export async function extractPleiadesAnime({ tmdbId, imdbId, type, season = 1, e
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
           streams.push({
-            id: `kairou-pleiades-${idx}-${Date.now()}`,
+            id: `kairou-pleiades-${idx}`,
             server: 'PleiadesStream',
             providerName: `Pleiades · Anime (${qInfo.quality}) [Dual/Legendado]`,
             url: streamUrl,
@@ -788,7 +788,7 @@ export async function extractKairouNativeClient({ tmdbId, type, season = 1, epis
       const qInfo = detectQuality(fullUrl, labelText, isDub ? 'Dublado' : 'Legendado');
 
       streams.push({
-        id: `kairou-native-${audio}-${idx}-${Date.now()}`,
+        id: `kairou-native-${audio}-${idx}`,
         server: 'Kairou',
         providerName: isDub
           ? `Kairou · ${qInfo.quality} [Dublado]`
@@ -931,6 +931,7 @@ export function formatKairouServers(streams) {
 
       curated.push({
         ...s,
+        id: s.id || `kairou-${qualityLabel.toLowerCase().replace(/[^a-z0-9]/g, '')}-${isDub ? 'dub' : 'sub'}-${idx}`,
         server: s.server || 'Kairou',
         providerName: finalName,
         quality: qualityLabel,
@@ -1048,7 +1049,7 @@ export async function testCandidateServersSpeed(serversList, maxToTest = 4) {
     const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 900);
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
       const isHls = s.isHls || (s.url || '').includes('.m3u8');
       const headers = isHls ? {} : { Range: 'bytes=0-256' };
       const probeUrl = s.url.startsWith('http://') ? `/api/proxy?url=${encodeURIComponent(s.url)}` : s.url;
@@ -1070,9 +1071,9 @@ export async function testCandidateServersSpeed(serversList, maxToTest = 4) {
         } catch {}
         return { idx, alive: true, latency: dt };
       }
-      return { idx, alive: false, latency: 9999 };
+      return { idx, alive: true, latency: 9999 };
     } catch {
-      return { idx, alive: false, latency: 9999 };
+      return { idx, alive: true, latency: 9999 };
     }
   });
 
@@ -1264,7 +1265,10 @@ export async function extractAllServers({
   if (finalStreams.length > 0) {
     streamCache.set(cacheKey, finalStreams);
     onProgress?.(`${finalStreams.length} servidores Kairou prontos!`);
-    onStreamsAvailable?.(finalStreams);
+    if (!hasSentInitialPlayback) {
+      hasSentInitialPlayback = true;
+      onStreamsAvailable?.(finalStreams);
+    }
     return finalStreams;
   }
 

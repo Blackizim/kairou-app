@@ -5,11 +5,11 @@
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-const FETCH_TIMEOUT_MS = 5000;
+const FETCH_TIMEOUT_MS = 2800;
 
 // Memória Cache de Alta Performance em RAM (< 1ms resposta)
 const serverExtractCache = new Map();
-const CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 horas
+const CACHE_TTL_MS = 90 * 60 * 1000; // 90 minutos (tokens do Zunderflix duram 3 horas, garantindo frescor)
 const imdbIdCache = new Map();
 const tmdbFromImdbCache = new Map();
 
@@ -342,7 +342,7 @@ async function extractBestCine({ tmdbId, imdbId, type, season = 1, episode = 1, 
           const qInfo = detectQuality(streamUrl, nameText, titleText, is4k ? '4K' : null);
 
           streams.push({
-            id: `kairou-best-${idx}-${Date.now()}`,
+            id: `kairou-best-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: s.server || 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality}) [Legendado PT-BR]`,
             url: streamUrl,
@@ -418,7 +418,7 @@ async function extractFrostStream({ tmdbId, imdbId, type, season = 1, episode = 
           const qInfo = detectQuality(streamUrl, nameText, titleText, is4k ? '4K' : null);
 
           streams.push({
-            id: `kairou-frost-${idx}-${Date.now()}`,
+            id: `kairou-frost-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: s.server || 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality}) [Legendado PT-BR]`,
             url: streamUrl,
@@ -490,7 +490,7 @@ async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode = 1, ca
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
           streams.push({
-            id: `kairou-vetela-${idx}-${Date.now()}`,
+            id: `kairou-vetela-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: s.server || 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality})`,
             url: streamUrl,
@@ -558,7 +558,7 @@ async function extractBsCine({ tmdbId, imdbId, type, season = 1, episode = 1, ca
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
           streams.push({
-            id: `kairou-bscine-${idx}-${Date.now()}`,
+            id: `kairou-bscine-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: s.server || 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality})`,
             url: streamUrl,
@@ -641,7 +641,7 @@ async function extractKairouNative({ tmdbId, type, season = 1, episode = 1 }) {
       const qInfo = detectQuality(fullUrl, labelText, isDub ? 'Dublado' : 'Legendado');
 
       streams.push({
-        id: `kairou-native-${audio}-${idx}-${Date.now()}`,
+        id: `kairou-native-${audio}-${idx}`,
         server: 'Kairou',
         providerName: isDub
           ? `Kairou · ${qInfo.quality} [Dublado]`
@@ -774,7 +774,7 @@ async function extractVeyra({ tmdbId, imdbId, type, season = 1, episode = 1, can
           const qInfo = detectQuality(streamUrl, nameText, titleText, is4k ? '4K' : null);
 
           streams.push({
-            id: `kairou-veyra-${idx}-${Date.now()}`,
+            id: `kairou-veyra-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: 'Veyra',
             providerName: isDub ? `Veyra · Servidor (${qInfo.quality}) [Dublado]` : `Veyra · Servidor (${qInfo.quality}) [Legendado]`,
             url: streamUrl,
@@ -841,7 +841,7 @@ async function extractKingVod({ tmdbId, imdbId, type, season = 1, episode = 1, c
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
           streams.push({
-            id: `kairou-king-${idx}-${Date.now()}`,
+            id: `kairou-king-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: 'King VOD',
             providerName: `King VOD · Servidor (${qInfo.quality}) [${isDub ? 'Dublado' : 'Original'}]`,
             url: streamUrl,
@@ -909,7 +909,7 @@ async function extractMagnetFlix({ tmdbId, imdbId, type, season = 1, episode = 1
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
           streams.push({
-            id: `kairou-mf-${idx}-${Date.now()}`,
+            id: `kairou-mf-${isDub ? 'dub' : 'sub'}-${idx}`,
             server: 'MagnetFlix',
             providerName: `MagnetFlix · Servidor (${qInfo.quality}) [${isDub ? 'Dublado' : 'Legendado'}]`,
             url: streamUrl,
@@ -968,7 +968,7 @@ async function extractPleiadesAnime({ tmdbId, imdbId, type, season = 1, episode 
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
           streams.push({
-            id: `kairou-pleiades-${idx}-${Date.now()}`,
+            id: `kairou-pleiades-${idx}`,
             server: 'PleiadesStream',
             providerName: `Pleiades · Anime (${qInfo.quality}) [Dual/Legendado]`,
             url: streamUrl,
@@ -1032,7 +1032,7 @@ async function extractSuperStream({ tmdbId, imdbId, type, season = 1, episode = 
           const qInfo = detectQuality(streamUrl, nameText, titleText);
 
           streams.push({
-            id: `kairou-ss-${idx}-${Date.now()}`,
+            id: `kairou-ss-${idx}`,
             server: 'SuperStream',
             providerName: `SuperStream · Servidor (${qInfo.quality})`,
             url: streamUrl,
@@ -1179,6 +1179,7 @@ function curateTopStreams(allStreams, extractedSubtitles = []) {
 
       curated.push({
         ...s,
+        id: s.id || `kairou-${qualityLabel.toLowerCase().replace(/[^a-z0-9]/g, '')}-${isDub ? 'dub' : 'sub'}-${idx}`,
         server: s.server || 'Kairou',
         providerName: finalName,
         quality: qualityLabel,
@@ -1317,69 +1318,22 @@ export default async function handler(req, res) {
     const curatedStreams = curateTopStreams(collected, extractedSubtitles);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // TESTE SIMULTÂNEO DE VELOCIDADE E LATÊNCIA NOS SERVIDORES CURADOS (TIMEOUT 1400ms)
+    // ATRIBUIÇÃO DE LATÊNCIA BASE E DISPONIBILIDADE IMEDIATA (< 1ms, ZERO BLOCKING)
     // ─────────────────────────────────────────────────────────────────────────
-    await Promise.allSettled(
-      curatedStreams.map(async (s) => {
-        if (s.isIframe || s.type === 'iframe') {
-          s.alive = true;
-          s.latency = 120;
-          return;
-        }
-        let testUrl = s.url;
-        if (!testUrl) {
-          s.alive = false;
-          s.latency = 9999;
-          return;
-        }
-        if (testUrl.startsWith('/api/proxy?url=')) {
-          try {
-            testUrl = decodeURIComponent(testUrl.split('/api/proxy?url=')[1]);
-          } catch {}
-        }
-        const isHls = s.isHls || testUrl.includes('.m3u8') || testUrl.includes('master.txt');
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2400);
-        const t0 = Date.now();
-        try {
-          const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          };
-          if (!isHls) {
-            headers['Range'] = 'bytes=0-512';
-          }
-          const pingRes = await fetch(testUrl, {
-            method: 'GET',
-            headers,
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
-          const dt = Date.now() - t0;
-          const isAlive = pingRes.status === 200 || pingRes.status === 206 || (pingRes.status >= 300 && pingRes.status < 400);
-          s.alive = isAlive;
-          s.latency = isAlive ? dt : 9999;
-          s.httpStatus = pingRes.status;
-          try {
-            if (pingRes.body && typeof pingRes.body.cancel === 'function') {
-              pingRes.body.cancel().catch(() => {});
-            }
-          } catch {}
-        } catch (fetchErr) {
-          clearTimeout(timeoutId);
-          if (fetchErr && fetchErr.name === 'AbortError') {
-            s.alive = true;
-            s.latency = 2100;
-          } else {
-            s.alive = false;
-            s.latency = 9999;
-          }
-        }
-      })
-    );
+    curatedStreams.forEach((s, idx) => {
+      s.alive = true;
+      if (s.isKairouNative) {
+        s.latency = 35 + idx * 8;
+      } else if (s.server === 'BestCine' || (s.url && s.url.includes('bestcine'))) {
+        s.latency = 65 + idx * 10;
+      } else if (s.server === 'King VOD') {
+        s.latency = 80 + idx * 10;
+      } else {
+        s.latency = 110 + idx * 15;
+      }
+    });
 
-    // Filtrar servidores mortos comprovados (ex: 403 Forbidden ou erro de rede)
-    const aliveOnly = curatedStreams.filter(s => s.alive !== false);
-    const finalStreams = aliveOnly.length > 0 ? aliveOnly : curatedStreams;
+    const finalStreams = curatedStreams;
 
     // Marcar o servidor 1080p dublado mais rápido com isFastest
     const aliveDub1080 = finalStreams.filter(s => s.isDub && !s.is4k && s.alive && !s.isIframe && s.type !== 'iframe');

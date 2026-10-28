@@ -1165,11 +1165,9 @@ export default function VideoPlayer({
       onProgress: (status) => {
         if (isMounted) setExtractionStatus(status);
       },
-      onStreamsAvailable: async (fastList) => {
+      onStreamsAvailable: (fastList) => {
         if (!isMounted) return;
         if (fastList && fastList.length > 0) {
-          await testCandidateServersSpeed(fastList, 4);
-          if (!isMounted) return;
           setServers((prev) => {
             if (!prev || prev.length === 0) {
               const defIdx = findPreferredDefaultServerIndex(fastList);
@@ -1178,6 +1176,22 @@ export default function VideoPlayer({
               const pingText = sel?.latency && sel.latency < 9000 ? ` (${sel.latency}ms)` : '';
               triggerNotification(`⚡ Servidor Mais Rápido: ${sel?.providerName || ''}${pingText}`);
               setIsExtracting(false);
+
+              // Teste de velocidade em background sem travar o início da reprodução
+              testCandidateServersSpeed(fastList, 4).then((tested) => {
+                if (!isMounted) return;
+                setServers((cur) => {
+                  if (!cur || cur.length === 0) return cur;
+                  return cur.map((item) => {
+                    const match = tested.find((t) => t.id === item.id || t.url === item.url);
+                    if (match && match.latency && match.latency < 9000) {
+                      return { ...item, latency: match.latency, alive: match.alive !== false };
+                    }
+                    return item;
+                  });
+                });
+              }).catch(() => {});
+
               return fastList;
             }
             return prev;
@@ -1185,46 +1199,82 @@ export default function VideoPlayer({
         }
       },
     })
-      .then(async (extractedList) => {
+      .then((extractedList) => {
         if (!isMounted) return;
         if (extractedList && extractedList.length > 0) {
-          await testCandidateServersSpeed(extractedList, 4);
-          if (!isMounted) return;
           setServers((prevServers) => {
-            const currentActive = prevServers && prevServers[activeServerIndex];
-
-            // Se o player já selecionou ou começou a carregar um servidor inicial e ele existe na nova lista completa:
-            // MANTENHA A SELEÇÃO ATIVA para NÃO interromper ou resetar o player no meio do carregamento!
-            if (currentActive) {
-              const matchingIdx = extractedList.findIndex(
-                (s) => (s.url && s.url === currentActive.url) || (s.id && s.id === currentActive.id)
-              );
-              if (matchingIdx >= 0) {
-                if (matchingIdx !== activeServerIndex) {
-                  setActiveServerIndex(matchingIdx);
-                }
-                return extractedList;
-              }
-            }
-
-            if (!userSelectedServerRef.current && !failedServersRef.current.has(activeServerIndex)) {
+            // Se ainda não havia servidores carregados:
+            if (!prevServers || prevServers.length === 0) {
               const defIdx = findPreferredDefaultServerIndex(extractedList);
               setActiveServerIndex(defIdx);
               const sel = extractedList[defIdx] || extractedList[0];
               const pingText = sel?.latency && sel.latency < 9000 ? ` (${sel.latency}ms)` : '';
               triggerNotification(`⚡ Servidor Mais Rápido: ${sel?.providerName || ''}${pingText}`);
+              setIsExtracting(false);
+              return extractedList;
             }
+
+            // Se o player já estava carregando ou reproduzindo um servidor inicial:
+            // MANTÉM O SERVIDOR ATUAL ATIVO para não interromper a reprodução!
+            const currentActive = prevServers[activeServerIndex];
+            if (currentActive) {
+              const cleanCurrentUrl = (currentActive.url || '').split('?')[0];
+              const matchingIdx = extractedList.findIndex(
+                (s) =>
+                  (s.id && s.id === currentActive.id) ||
+                  (s.url && s.url === currentActive.url) ||
+                  (s.url && cleanCurrentUrl && s.url.split('?')[0] === cleanCurrentUrl)
+              );
+
+              if (matchingIdx >= 0) {
+                // Preserva a referência do servidor ativo existente
+                extractedList[matchingIdx] = currentActive;
+                if (matchingIdx !== activeServerIndex) {
+                  setActiveServerIndex(matchingIdx);
+                }
+                return extractedList;
+              }
+
+              // Se o servidor ativo não estiver na lista extraída, mantém ele intacto no topo
+              return [currentActive, ...extractedList.filter((s) => s.url !== currentActive.url)];
+            }
+
             return extractedList;
           });
+
+          // Teste de latência assíncrono em background apenas para atualizar os badges no modal
+          testCandidateServersSpeed(extractedList, 4).then((tested) => {
+            if (!isMounted) return;
+            setServers((cur) => {
+              if (!cur || cur.length === 0) return cur;
+              return cur.map((item) => {
+                const match = tested.find((t) => t.id === item.id || t.url === item.url);
+                if (match && match.latency && match.latency < 9000) {
+                  return { ...item, latency: match.latency, alive: match.alive !== false };
+                }
+                return item;
+              });
+            });
+          }).catch(() => {});
         } else {
-          setStreamError(isSeries ? 'Ainda não temos este episódio disponível' : 'Ainda não temos este filme disponível');
+          setServers((prev) => {
+            if (!prev || prev.length === 0) {
+              setStreamError(isSeries ? 'Ainda não temos este episódio disponível' : 'Ainda não temos este filme disponível');
+            }
+            return prev;
+          });
         }
         setIsExtracting(false);
       })
       .catch((err) => {
         if (!isMounted) return;
         console.error('[VideoPlayer] Erro na extração Kairou:', err);
-        setStreamError(isSeries ? 'Ainda não temos este episódio disponível' : 'Ainda não temos este filme disponível');
+        setServers((prev) => {
+          if (!prev || prev.length === 0) {
+            setStreamError(isSeries ? 'Ainda não temos este episódio disponível' : 'Ainda não temos este filme disponível');
+          }
+          return prev;
+        });
         setIsExtracting(false);
       });
 
@@ -1692,9 +1742,8 @@ export default function VideoPlayer({
     }
 
     let hasStartedPlayback = false;
-    // Watchdog de carregamento inteligente:
-    // Damos tempo hábil (25s para 1 servidor, 20s para múltiplos) para conexões via túnel/proxy baixarem o manifesto e os primeiros chunks HLS
-    const timeoutDuration = servers && servers.length <= 1 ? 20000 : 15000;
+    // Watchdog de carregamento inteligente com tolerância e renovação a cada chunk recebido
+    const timeoutDuration = 25000;
 
     let watchdogTimer = null;
 
@@ -1702,6 +1751,25 @@ export default function VideoPlayer({
       if (watchdogTimer) {
         clearTimeout(watchdogTimer);
         watchdogTimer = null;
+      }
+    };
+
+    const resetWatchdogProgress = () => {
+      if (hasStartedPlayback) return;
+      if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = setTimeout(() => {
+          const vid = videoRef.current;
+          if (
+            hasStartedPlayback ||
+            (vid && (vid.currentTime > 0 || vid.readyState >= 2 || !vid.paused || (vid.buffered && vid.buffered.length > 0 && vid.buffered.end(0) > 0.5)))
+          ) {
+            cancelWatchdog();
+            return;
+          }
+          console.warn(`[VideoPlayer] Servidor ${activeServer?.providerName} demorou a responder. Alternando...`);
+          handleAutoFallbackRef.current();
+        }, 25000);
       }
     };
 
@@ -1726,7 +1794,7 @@ export default function VideoPlayer({
         cancelWatchdog();
         return;
       }
-      console.warn(`[VideoPlayer] Servidor ${activeServer.providerName} demorou a responder. Alternando...`);
+      console.warn(`[VideoPlayer] Servidor ${activeServer?.providerName} demorou a responder. Alternando...`);
       handleAutoFallbackRef.current();
     }, timeoutDuration);
 
@@ -1734,6 +1802,7 @@ export default function VideoPlayer({
     video.addEventListener('canplay', onPlaybackStarted);
     video.addEventListener('loadeddata', onPlaybackStarted);
     video.addEventListener('timeupdate', onPlaybackStarted);
+    video.addEventListener('progress', resetWatchdogProgress);
 
     let cleanupTextTrackListeners = null;
 
@@ -2175,7 +2244,11 @@ export default function VideoPlayer({
         }
       });
 
+      hls.on(Hls.Events.MANIFEST_LOADED, resetWatchdogProgress);
+      hls.on(Hls.Events.FRAG_LOADED, resetWatchdogProgress);
+
       hls.on(Hls.Events.LEVEL_LOADED, () => {
+        resetWatchdogProgress();
         if (videoRef.current && videoRef.current.videoHeight > 0) {
           const vh = videoRef.current.videoHeight;
           const tag = vh >= 2160 ? '4K Ultra HD' : vh >= 1440 ? '1440p 2K' : vh >= 1080 ? '1080p Full HD' : vh >= 720 ? '720p HD' : `${vh}p`;
@@ -2205,7 +2278,7 @@ export default function VideoPlayer({
                       return;
                     }
                     handleAutoFallbackRef.current();
-                  }, 15000);
+                  }, 25000);
                   hls.loadSource(proxiedUrl);
                   hls.startLoad();
                   return;
@@ -2335,7 +2408,7 @@ export default function VideoPlayer({
               return;
             }
             handleAutoFallbackRef.current();
-          }, 15000);
+          }, 25000);
           video.src = proxiedUrl;
           video.load();
           video.play().catch(() => {});
@@ -2366,6 +2439,7 @@ export default function VideoPlayer({
       video.removeEventListener('canplay', onPlaybackStarted);
       video.removeEventListener('loadeddata', onPlaybackStarted);
       video.removeEventListener('timeupdate', onPlaybackStarted);
+      video.removeEventListener('progress', resetWatchdogProgress);
       if (cleanupTextTrackListeners) {
         cleanupTextTrackListeners();
       }
