@@ -115,13 +115,21 @@ export default async function handler(req, res) {
       return res.end(srtToVtt(text));
     }
 
+    const isMediaSegment =
+      targetUrl.includes('.ts') ||
+      targetUrl.includes('.m4s') ||
+      contentType.includes('video/') ||
+      contentType.includes('audio/') ||
+      contentType.includes('mp2t');
+
     const isM3u8 =
-      targetUrl.includes('.m3u8') ||
-      targetUrl.includes('master.txt') ||
-      targetUrl.includes('hls-proxy') ||
-      contentType.includes('mpegurl') ||
-      contentType.includes('application/x-mpegURL') ||
-      contentType.includes('vnd.apple.mpegurl');
+      !isMediaSegment &&
+      (targetUrl.includes('.m3u8') ||
+        targetUrl.includes('master.txt') ||
+        (targetUrl.includes('hls-proxy') && !targetUrl.includes('.ts') && !targetUrl.includes('.m4s')) ||
+        contentType.includes('mpegurl') ||
+        contentType.includes('application/x-mpegURL') ||
+        contentType.includes('vnd.apple.mpegurl'));
 
     // Se for playlist HLS (m3u8 ou master.txt), reescreve segmentos para passar pelo proxy local
     if (isM3u8 && req.method !== 'HEAD') {
