@@ -2367,7 +2367,7 @@ export default function VideoPlayer({
     } else {
       setServerQualityFilter('1080');
     }
-    openServerModal();
+    setServerModalOpen(true);
   }, [activeServer, closeAllModals]);
 
   const isAnyModalOpen =
