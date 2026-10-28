@@ -263,7 +263,7 @@ async function extractBestCine({ tmdbId, imdbId, type, season = 1, episode = 1 }
 
           streams.push({
             id: `kairou-best-${idx}-${Date.now()}`,
-            server: 'Kairou',
+            server: s.server || 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality}) [Legendado PT-BR]`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
@@ -424,67 +424,90 @@ async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode = 1 }) 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. MagnetFlix (https://magnetflix.flixbr.online) - PRIORIDADE 4 (HLS Dublado)
+// 4. WarezCDN (https://warezcdn.sbs) - Servidor BR Dublado (1080p)
 // ─────────────────────────────────────────────────────────────────────────────
-async function extractMagnetFlix({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
-  return []; // Desativado (servidor magnetflix fora do ar com HTTP 525)
+async function extractWarezCDN({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries));
-  if (!targetId) return [];
+  const id = tmdbId || imdbId;
+  if (!id) return [];
 
-  const path = isSeries
-    ? `series/${targetId}:${season}:${episode}.json`
-    : `movie/${targetId}.json`;
+  const embedUrl = isSeries
+    ? `https://warezcdn.sbs/serie/${id}/${season}/${episode}`
+    : `https://warezcdn.sbs/filme/${id}`;
 
-  const url = `https://magnetflix.flixbr.online/stream/${path}`;
-  const streams = [];
+  return [{
+    id: `warezcdn-${id}-${season}-${episode}`,
+    server: 'WarezCDN',
+    providerName: 'WarezCDN · Servidor BR (1080p) [Dublado]',
+    url: embedUrl,
+    type: 'iframe',
+    isIframe: true,
+    quality: '1080p Full HD',
+    rank: 3,
+    is4k: false,
+    priority: 6,
+    isDub: true,
+    isDual: true,
+    subtitles: [],
+  }];
+}
 
-  try {
-    const res = await fetchWithTimeout(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json, text/plain, */*',
-      }
-    }, 4500);
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. VidRU / VidSrc RU (https://vidsrc2.ru) - Servidor VidSrc Multi-Áudio (1080p)
+// ─────────────────────────────────────────────────────────────────────────────
+async function extractVidRU({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const id = tmdbId || imdbId;
+  if (!id) return [];
 
-    if (res && res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.streams)) {
-        for (let idx = 0; idx < data.streams.length; idx++) {
-          const s = data.streams[idx];
-          if (!s || !s.url || s.infoHash || s.url.startsWith('magnet:')) continue;
-          let streamUrl = normalizeStreamUrl(s.url);
-          if (!streamUrl) continue;
+  const embedUrl = isSeries
+    ? `https://vidsrc2.ru/embed/tv/${id}/${season}/${episode}`
+    : `https://vidsrc2.ru/embed/movie/${id}`;
 
-          const isHls = streamUrl.includes('.m3u8');
-          const titleText = (s.title || s.description || '');
-          const nameText = (s.name || '');
-          const metaLower = `${titleText} ${nameText}`.toLowerCase();
-          const isDub = metaLower.includes('dublado') || metaLower.includes('pt-br') || metaLower.includes('dub');
-          const qInfo = detectQuality(streamUrl, nameText, titleText);
+  return [{
+    id: `vidru-${id}-${season}-${episode}`,
+    server: 'VidRU',
+    providerName: 'VidRU · Servidor VidSrc (1080p) [Multi-Áudio]',
+    url: embedUrl,
+    type: 'iframe',
+    isIframe: true,
+    quality: '1080p Full HD',
+    rank: 3,
+    is4k: false,
+    priority: 7,
+    isDub: false,
+    isDual: true,
+    subtitles: [],
+  }];
+}
 
-          streams.push({
-            id: `kairou-mf-${idx}-${Date.now()}`,
-            server: 'Kairou',
-            providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality})`,
-            url: streamUrl,
-            type: isHls ? 'hls' : 'mp4',
-            quality: qInfo.quality,
-            rank: qInfo.rank,
-            isHls,
-            priority: isDub ? 3 : 5,
-            isDub,
-            isMagnetFlix: true,
-            subtitles: s.subtitles || [],
-          });
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('[extractMagnetFlix] Erro:', e?.message);
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. VidLink (https://vidlink.pro) - Servidor Pro Legendado / HD (1080p)
+// ─────────────────────────────────────────────────────────────────────────────
+async function extractVidLink({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const id = tmdbId;
+  if (!id) return [];
 
-  return streams;
+  const embedUrl = isSeries
+    ? `https://vidlink.pro/tv/${id}/${season}/${episode}`
+    : `https://vidlink.pro/movie/${id}`;
+
+  return [{
+    id: `vidlink-${id}-${season}-${episode}`,
+    server: 'VidLink',
+    providerName: 'VidLink · Servidor Pro (1080p) [Legendado]',
+    url: embedUrl,
+    type: 'iframe',
+    isIframe: true,
+    quality: '1080p Full HD',
+    rank: 3,
+    is4k: false,
+    priority: 8,
+    isDub: false,
+    isDual: true,
+    subtitles: [],
+  }];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -727,13 +750,15 @@ export default async function handler(req, res) {
     }
 
     // Execução Paralela das Fontes BR Oficiais
-    const [bestRes, frostRes, vetelaRes, magnetRes, bscineRes, fenixRes, subsRes] = await Promise.allSettled([
+    const [bestRes, frostRes, vetelaRes, bscineRes, fenixRes, warezRes, vidruRes, vidlinkRes, subsRes] = await Promise.allSettled([
       extractBestCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractFrostStream({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractVeTela({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractMagnetFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractBsCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractFenixFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractWarezCDN({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractVidRU({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractVidLink({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractOpenSubtitles({ imdbId, type, season: Number(season), episode: Number(episode) }),
     ]);
 
@@ -741,7 +766,9 @@ export default async function handler(req, res) {
     if (bestRes.status === 'fulfilled' && Array.isArray(bestRes.value)) collected.push(...bestRes.value);
     if (frostRes.status === 'fulfilled' && Array.isArray(frostRes.value)) collected.push(...frostRes.value);
     if (vetelaRes.status === 'fulfilled' && Array.isArray(vetelaRes.value)) collected.push(...vetelaRes.value);
-    if (magnetRes.status === 'fulfilled' && Array.isArray(magnetRes.value)) collected.push(...magnetRes.value);
+    if (warezRes.status === 'fulfilled' && Array.isArray(warezRes.value)) collected.push(...warezRes.value);
+    if (vidruRes.status === 'fulfilled' && Array.isArray(vidruRes.value)) collected.push(...vidruRes.value);
+    if (vidlinkRes.status === 'fulfilled' && Array.isArray(vidlinkRes.value)) collected.push(...vidlinkRes.value);
     if (bscineRes.status === 'fulfilled' && Array.isArray(bscineRes.value)) collected.push(...bscineRes.value);
     if (fenixRes.status === 'fulfilled' && Array.isArray(fenixRes.value)) collected.push(...fenixRes.value);
 
@@ -751,7 +778,9 @@ export default async function handler(req, res) {
     const seenUrls = new Set();
     const uniqueStreams = [];
     for (const s of collected) {
-      if (!s.url || s.isEmbed || s.type === 'iframe') continue;
+      if (!s || !s.url) continue;
+      const isApprovedIframe = Boolean(s.isIframe || s.type === 'iframe');
+      if (!isApprovedIframe && (s.isEmbed || s.type === 'iframe')) continue;
       const key = `${s.url}::${s.isDub ? 'dub' : 'sub'}`;
       if (!seenUrls.has(key)) {
         seenUrls.add(key);
@@ -804,6 +833,11 @@ export default async function handler(req, res) {
     const probeTargets = uniqueStreams.slice(0, 14);
     await Promise.allSettled(
       probeTargets.map(async (s) => {
+        if (s.isIframe || s.type === 'iframe') {
+          s.alive = true;
+          s.latency = 120;
+          return;
+        }
         let testUrl = s.url;
         if (!testUrl) {
           s.alive = false;
@@ -934,7 +968,13 @@ export default async function handler(req, res) {
       else if ((s.quality || '').includes('480')) badge = '480p';
 
       let finalName = '';
-      if (isDub) {
+      if (s.server === 'WarezCDN') {
+        finalName = 'WarezCDN · Servidor BR (1080p) [Dublado]';
+      } else if (s.server === 'VidRU') {
+        finalName = 'VidRU · Servidor VidSrc (1080p) [Multi-Áudio]';
+      } else if (s.server === 'VidLink') {
+        finalName = 'VidLink · Servidor Pro (1080p) [Legendado]';
+      } else if (isDub) {
         if (is4k) {
           dub4kCounter++;
           finalName = dub4kCounter === 1

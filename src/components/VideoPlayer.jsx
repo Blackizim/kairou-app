@@ -715,7 +715,11 @@ export default function VideoPlayer({
 
   // O modo iframe é exclusivo para canais de TV ao vivo quando não há stream HLS direto. Filmes e séries utilizam APENAS o player nativo.
   const isLiveMedia = Boolean(media?.type === 'live' || media?.isLive);
-  const isIframeMode = Boolean(isLiveMedia && (activeServer?.isIframe || activeServer?.type === 'iframe'));
+  const isIframeMode = Boolean(
+    activeServer?.isIframe ||
+    activeServer?.type === 'iframe' ||
+    (isLiveMedia && (activeServer?.isIframe || activeServer?.type === 'iframe'))
+  );
 
   const userSelectedAudioRef = useRef(false);
   const userSelectedSubtitleRef = useRef(false);
@@ -3082,7 +3086,7 @@ export default function VideoPlayer({
               ) : (
                 <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[10px] font-bold shadow-lg backdrop-blur-sm">
                   <Film size={12} />
-                  EMBED PLAYER
+                  {activeServer?.server || 'EMBED PLAYER'}
                 </span>
               )}
             </div>

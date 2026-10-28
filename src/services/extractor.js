@@ -341,64 +341,90 @@ export async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. Extrator MagnetFlix (https://magnetflix.flixbr.online) - HLS Dublado
+// 4. Extrator WarezCDN (https://warezcdn.sbs) - Servidor BR Dublado (1080p)
 // ─────────────────────────────────────────────────────────────────────────────
-export async function extractMagnetFlix({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
-  return []; // Desativado (servidor magnetflix fora do ar com HTTP 525)
+export async function extractWarezCDN({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  let targetId = imdbId;
-  if (!targetId || !String(targetId).startsWith('tt')) {
-    try {
-      targetId = await fetchMediaExternalIds(tmdbId, isSeries ? 'tv' : 'movie');
-    } catch {}
-  }
-  if (!targetId) return [];
+  const id = tmdbId || imdbId;
+  if (!id) return [];
 
-  const path = isSeries
-    ? `series/${targetId}:${season}:${episode}.json`
-    : `movie/${targetId}.json`;
+  const embedUrl = isSeries
+    ? `https://warezcdn.sbs/serie/${id}/${season}/${episode}`
+    : `https://warezcdn.sbs/filme/${id}`;
 
-  const url = `https://magnetflix.flixbr.online/stream/${path}`;
-  const streams = [];
+  return [{
+    id: `warezcdn-${id}-${season}-${episode}`,
+    server: 'WarezCDN',
+    providerName: 'WarezCDN · Servidor BR (1080p) [Dublado]',
+    url: embedUrl,
+    type: 'iframe',
+    isIframe: true,
+    quality: '1080p Full HD',
+    rank: 3,
+    is4k: false,
+    priority: 6,
+    isDub: true,
+    isDual: true,
+    subtitles: [],
+  }];
+}
 
-  try {
-    const res = await fetchWithTimeout(url, {}, 4500);
-    if (res && res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.streams)) {
-        for (let idx = 0; idx < data.streams.length; idx++) {
-          const s = data.streams[idx];
-          if (!s || !s.url || s.infoHash || s.url.startsWith('magnet:')) continue;
-          let streamUrl = normalizeStreamUrl(s.url);
-          if (!streamUrl) continue;
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. Extrator VidRU / VidSrc RU (https://vidsrc2.ru) - Servidor VidSrc Multi-Áudio (1080p)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function extractVidRU({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const id = tmdbId || imdbId;
+  if (!id) return [];
 
-          const isHls = streamUrl.includes('.m3u8');
-          const titleText = (s.title || s.description || '');
-          const nameText = (s.name || '');
-          const metaLower = `${titleText} ${nameText}`.toLowerCase();
-          const isDub = metaLower.includes('dublado') || metaLower.includes('pt-br') || metaLower.includes('dub');
-          const qInfo = detectQuality(streamUrl, nameText, titleText);
+  const embedUrl = isSeries
+    ? `https://vidsrc2.ru/embed/tv/${id}/${season}/${episode}`
+    : `https://vidsrc2.ru/embed/movie/${id}`;
 
-          streams.push({
-            id: `kairou-mf-${idx}-${Date.now()}`,
-            server: 'Kairou',
-            providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality})`,
-            url: streamUrl,
-            type: isHls ? 'hls' : 'mp4',
-            quality: qInfo.quality,
-            rank: qInfo.rank,
-            isHls,
-            priority: isDub ? 3 : 5,
-            isDub,
-            isMagnetFlix: true,
-            subtitles: s.subtitles || [],
-          });
-        }
-      }
-    }
-  } catch {}
+  return [{
+    id: `vidru-${id}-${season}-${episode}`,
+    server: 'VidRU',
+    providerName: 'VidRU · Servidor VidSrc (1080p) [Multi-Áudio]',
+    url: embedUrl,
+    type: 'iframe',
+    isIframe: true,
+    quality: '1080p Full HD',
+    rank: 3,
+    is4k: false,
+    priority: 7,
+    isDub: false,
+    isDual: true,
+    subtitles: [],
+  }];
+}
 
-  return streams;
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Extrator VidLink (https://vidlink.pro) - Servidor Pro Legendado / HD (1080p)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function extractVidLink({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const id = tmdbId;
+  if (!id) return [];
+
+  const embedUrl = isSeries
+    ? `https://vidlink.pro/tv/${id}/${season}/${episode}`
+    : `https://vidlink.pro/movie/${id}`;
+
+  return [{
+    id: `vidlink-${id}-${season}-${episode}`,
+    server: 'VidLink',
+    providerName: 'VidLink · Servidor Pro (1080p) [Legendado]',
+    url: embedUrl,
+    type: 'iframe',
+    isIframe: true,
+    quality: '1080p Full HD',
+    rank: 3,
+    is4k: false,
+    priority: 8,
+    isDub: false,
+    isDual: true,
+    subtitles: [],
+  }];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -532,8 +558,10 @@ export function formatKairouServers(streams) {
   const normalized = [];
   for (const s of streams) {
     if (!s) continue;
-    const url = normalizeStreamUrl(s.url || '');
-    if (!url || s.isEmbed || s.type === 'iframe') continue;
+    const isApprovedIframe = Boolean(s.isIframe || s.type === 'iframe');
+    if (!isApprovedIframe && (s.isEmbed || s.type === 'iframe')) continue;
+    const url = isApprovedIframe ? s.url : normalizeStreamUrl(s.url || '');
+    if (!url) continue;
     const key = `${url}::${s.isDub ? 'dub' : 'sub'}`;
     if (!seenUrls.has(key)) {
       seenUrls.add(key);
@@ -634,7 +662,13 @@ export function formatKairouServers(streams) {
     else if ((s.quality || '').includes('480')) badge = '480p';
 
     let finalName = '';
-    if (isDub) {
+    if (s.server === 'WarezCDN') {
+      finalName = 'WarezCDN · Servidor BR (1080p) [Dublado]';
+    } else if (s.server === 'VidRU') {
+      finalName = 'VidRU · Servidor VidSrc (1080p) [Multi-Áudio]';
+    } else if (s.server === 'VidLink') {
+      finalName = 'VidLink · Servidor Pro (1080p) [Legendado]';
+    } else if (isDub) {
       if (is4k) {
         dub4kCounter++;
         finalName = dub4kCounter === 1
@@ -668,7 +702,7 @@ export function formatKairouServers(streams) {
 
     return {
       ...s,
-      server: 'Kairou',
+      server: s.server || 'Kairou',
       providerName: finalName,
       isDub,
       lang: isDub ? 'pt' : 'en',
@@ -890,7 +924,10 @@ export async function extractAllServers({
     if (!Array.isArray(newStreams) || newStreams.length === 0) return;
     let addedCount = 0;
     for (const s of newStreams) {
-      if (s && s.url && !s.isEmbed && s.type !== 'iframe' && !seenUrls.has(s.url)) {
+      if (!s || !s.url) continue;
+      const isApprovedIframe = Boolean(s.isIframe || s.type === 'iframe');
+      if (!isApprovedIframe && (s.isEmbed || s.type === 'iframe')) continue;
+      if (!seenUrls.has(s.url)) {
         seenUrls.add(s.url);
         collectedStreams.push(s);
         addedCount++;
@@ -929,6 +966,15 @@ export async function extractAllServers({
   // 2. BestCine direto no navegador do cliente (IP residencial desbloqueia 4K da Cloudflare)
   tasks.push(
     extractBestCine({ tmdbId, imdbId, type: normalizedType, season, episode })
+      .then(pushStreams)
+      .catch(() => {}),
+    extractWarezCDN({ tmdbId, imdbId, type: normalizedType, season, episode })
+      .then(pushStreams)
+      .catch(() => {}),
+    extractVidRU({ tmdbId, imdbId, type: normalizedType, season, episode })
+      .then(pushStreams)
+      .catch(() => {}),
+    extractVidLink({ tmdbId, imdbId, type: normalizedType, season, episode })
       .then(pushStreams)
       .catch(() => {})
   );
