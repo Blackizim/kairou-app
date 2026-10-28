@@ -43,6 +43,8 @@ import {
   Headphones,
   Maximize2,
   VolumeHigh,
+  Gem,
+  Zap,
 } from 'lucide-react';
 import { extractAllServers, clearStreamCache, testCandidateServersSpeed } from '../services/extractor';
 import { saveWatchProgress } from '../services/supabase';
@@ -2354,6 +2356,20 @@ export default function VideoPlayer({
     setEpisodesModalOpen(false);
   }, []);
 
+  const openServerModal = useCallback(() => {
+    closeAllModals();
+    const is4k = Boolean(activeServer?.is4k || (activeServer?.quality || '').includes('4K') || (activeServer?.providerName || '').includes('4K'));
+    const is720 = Boolean((activeServer?.quality || '').includes('720') || (activeServer?.providerName || '').includes('720'));
+    if (is4k) {
+      setServerQualityFilter('4k');
+    } else if (is720) {
+      setServerQualityFilter('720');
+    } else {
+      setServerQualityFilter('1080');
+    }
+    openServerModal();
+  }, [activeServer, closeAllModals]);
+
   const isAnyModalOpen =
     serverModalOpen ||
     audioSubModalOpen ||
@@ -3120,7 +3136,7 @@ export default function VideoPlayer({
             <div className="flex items-center gap-2">
               {servers.length > 1 && (
                 <button
-                  onClick={() => setServerModalOpen(true)}
+                  onClick={() => openServerModal()}
                   className="px-3.5 py-2 rounded-full bg-slate-900/90 hover:bg-slate-800 text-white flex items-center gap-1.5 border border-white/20 shadow-xl backdrop-blur-md text-xs font-semibold cursor-pointer active:scale-95 transition-all"
                   title="Trocar Servidor"
                 >
@@ -3815,7 +3831,7 @@ export default function VideoPlayer({
                       onClick={(e) => {
                         e.stopPropagation();
                         setAudioMenuOpen(false);
-                        setServerModalOpen(true);
+                        openServerModal();
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                     >
@@ -3968,225 +3984,252 @@ export default function VideoPlayer({
       {/* Modal / Bottom Sheet de Seleção de servidores Kairou */}
       {serverModalOpen && (
         <div
-          className="fixed sm:absolute bottom-0 sm:bottom-20 inset-x-0 sm:inset-x-auto sm:right-8 z-50 w-full sm:w-96 max-w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl bg-[#0f141e]/98 sm:bg-[#0f141e]/95 border-t sm:border border-white/[0.1] p-4 sm:p-5 backdrop-blur-2xl shadow-2xl text-xs max-h-[85vh] sm:max-h-[72vh] flex flex-col animate-slide-up sm:animate-scale-in safe-bottom modal-content"
+          className="fixed sm:absolute bottom-0 sm:bottom-20 inset-x-0 sm:inset-x-auto sm:right-8 z-50 w-full sm:w-[430px] max-w-full rounded-t-3xl sm:rounded-2xl bg-[#0b0e15]/98 sm:bg-[#0b0e15]/95 border-t sm:border border-white/[0.08] p-4 sm:p-5 backdrop-blur-2xl shadow-2xl text-xs max-h-[85vh] sm:max-h-[72vh] flex flex-col animate-slide-up sm:animate-scale-in safe-bottom modal-content"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Pílula de arrastar no celular */}
-          <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto mb-3 sm:hidden shrink-0" />
+          <div className="w-10 h-1 rounded-full bg-slate-700/80 mx-auto mb-3 sm:hidden shrink-0" />
 
           {/* Cabeçalho do Modal */}
-          <div className="flex items-center justify-between pb-3 mb-2.5 border-b border-slate-800">
-            <div>
-              <h4 className="font-bold text-white text-sm flex items-center gap-2">
-                <Server size={16} className="text-sky-400" />
-                Servidores Kairou
-              </h4>
-              <p className="text-[11px] text-slate-400">
-                Rede de Alta Velocidade Kairou
-              </p>
+          <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.08]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-400">
+                <Server size={15} />
+              </div>
+              <div>
+                <h4 className="font-bold text-white text-sm tracking-tight leading-tight">
+                  Servidores de Transmissão
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Conexão direta de alta velocidade
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={handleRetestServersSpeed}
-                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all font-medium cursor-pointer"
-                title="Testar ping e velocidade de todos os servidores"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                title="Testar ping dos servidores"
               >
-                <Activity size={12} className={isSpeedTesting ? 'animate-spin' : ''} />
-                <span>{isSpeedTesting ? 'Testando...' : 'Testar Ping'}</span>
+                <Activity size={14} className={isSpeedTesting ? 'animate-spin text-sky-400' : ''} />
               </button>
               <button
                 onClick={closeAllModals}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
                 title="Fechar"
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
           </div>
 
-          {/* Seletor de Resolução do Servidor: 4K / 1080p / 720p */}
-          <div className="flex items-center gap-1 p-1 bg-slate-900/90 rounded-xl mb-2 border border-slate-800/80 overflow-x-auto no-scrollbar shrink-0">
-            <button
-              onClick={() => setServerQualityFilter('all')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                serverQualityFilter === 'all'
-                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              ✨ Todos ({servers.length})
-            </button>
-
+          {/* Seletor Segmentado de Resolução: 4K / 1080p / 720p / Todos */}
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-1 p-1 bg-white/[0.03] rounded-xl mb-3 border border-white/[0.06] shrink-0">
             {count4kServers > 0 && (
               <button
                 onClick={() => setServerQualityFilter('4k')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   serverQualityFilter === '4k'
-                    ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
-                    : 'text-slate-400 hover:text-amber-300 hover:bg-white/5'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
                 }`}
               >
-                <span>💎 4K UHD</span>
-                <span className="text-[10px] font-mono opacity-80">({count4kServers})</span>
+                <span>💎 4K</span>
               </button>
             )}
 
-            {count1080Servers > 0 && (
-              <button
-                onClick={() => setServerQualityFilter('1080')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                  serverQualityFilter === '1080'
-                    ? 'bg-indigo-500/25 text-indigo-300 border border-indigo-500/50 shadow-sm'
-                    : 'text-slate-400 hover:text-indigo-300 hover:bg-white/5'
-                }`}
-              >
-                <span>⚡ 1080p</span>
-                <span className="text-[10px] font-mono opacity-80">({count1080Servers})</span>
-              </button>
-            )}
+            <button
+              onClick={() => setServerQualityFilter('1080')}
+              className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                serverQualityFilter === '1080'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-400/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+              }`}
+            >
+              <span>⚡ 1080p</span>
+            </button>
 
             {count720Servers > 0 && (
               <button
                 onClick={() => setServerQualityFilter('720')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   serverQualityFilter === '720'
-                    ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 shadow-sm'
-                    : 'text-slate-400 hover:text-emerald-300 hover:bg-white/5'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
                 }`}
               >
                 <span>📱 720p</span>
-                <span className="text-[10px] font-mono opacity-80">({count720Servers})</span>
               </button>
             )}
-          </div>
-
-          {/* Seletor de Idioma das Fontes: Dublado 🇧🇷 vs Original 🇺🇸 */}
-          <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-900/90 rounded-xl mb-3 border border-slate-800/80 shrink-0">
-            <button
-              onClick={() => setServerLangFilter('dub')}
-              className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                serverLangFilter === 'dub'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-              }`}
-            >
-              <span className="text-base leading-none">🇧🇷</span>
-              <span>Dublado</span>
-              {dubServersCount > 0 && <span className="text-[10px] font-mono opacity-80">({dubServersCount})</span>}
-            </button>
 
             <button
-              onClick={() => setServerLangFilter('sub')}
-              className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                serverLangFilter === 'sub'
-                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              onClick={() => setServerQualityFilter('all')}
+              className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                serverQualityFilter === 'all'
+                  ? 'bg-white/15 text-white border border-white/20 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
               }`}
             >
-              <span className="text-base leading-none">🇺🇸</span>
-              <span>Original</span>
-              {subServersCount > 0 && <span className="text-[10px] font-mono opacity-80">({subServersCount})</span>}
-            </button>
-
-            <button
-              onClick={() => setServerLangFilter('all')}
-              className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                serverLangFilter === 'all'
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-              }`}
-            >
-              <span className="text-base leading-none">🌐</span>
-              <span>Todos</span>
-              <span className="text-[10px] font-mono opacity-80">({servers.length})</span>
+              <span>✨ Todos</span>
             </button>
           </div>
 
-          {/* Lista de Servidores Filtrados */}
-          <div className="overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+          {/* Filtro Compacto de Idioma: Dublado vs Original */}
+          <div className="flex items-center justify-between pb-2.5 px-0.5 shrink-0">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Filtro de Áudio
+            </span>
+            <div className="flex items-center gap-1 p-0.5 bg-white/[0.03] rounded-lg border border-white/[0.06]">
+              <button
+                onClick={() => setServerLangFilter('all')}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                  serverLangFilter === 'all'
+                    ? 'bg-white/15 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                onClick={() => setServerLangFilter('dub')}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                  serverLangFilter === 'dub'
+                    ? 'bg-emerald-500/25 text-emerald-300 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🇧🇷 Dublado
+              </button>
+              <button
+                onClick={() => setServerLangFilter('sub')}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                  serverLangFilter === 'sub'
+                    ? 'bg-sky-500/25 text-sky-300 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🇺🇸 Legendado
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de Servidores Curados com Layout Premium */}
+          <div className="overflow-y-auto space-y-2 pr-1 custom-scrollbar">
             {filteredServers.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">
+              <div className="py-10 text-center text-slate-400 text-xs">
                 Nenhum servidor disponível nesta categoria.
               </div>
             ) : (
               filteredServers.map((srv) => {
                 const realIndex = servers.indexOf(srv);
                 const isActive = realIndex === activeServerIndex;
+                const is4k = Boolean(srv.is4k || (srv.quality || '').includes('4K') || (srv.providerName || '').includes('4K'));
                 const isDub = Boolean(srv.isDub || (srv.providerName || '').includes('[Dublado]'));
-                const is4k = (srv.quality || '').includes('4K');
-                const is2k = (srv.quality || '').includes('1440') || (srv.quality || '').includes('2K');
-                const is1080 = (srv.quality || '').includes('1080');
+                const name = srv.providerName || '';
+
+                // Nomes humanizados e limpos, no padrão Kairou
+                let title = 'Kairou Stream';
+                let subtitle = 'Transmissão direta em alta fidelidade';
+
+                if (is4k) {
+                  if (name.includes('Opção 2')) {
+                    title = 'Kairou Ultra 4K (Opção 2)';
+                    subtitle = isDub ? 'Linha secundária 2160p UHD Dublado' : 'Linha secundária 2160p Legendado';
+                  } else if (!isDub) {
+                    title = 'Kairou Ultra 4K · Legendado';
+                    subtitle = 'Áudio Original com legendas em 2160p UHD';
+                  } else {
+                    title = 'Kairou Ultra 4K · Principal';
+                    subtitle = 'Mais estável · Resolução 2160p UHD nativa';
+                  }
+                } else if ((srv.quality || '').includes('1080') || name.includes('1080')) {
+                  if (srv.isFastest) {
+                    title = 'Kairou Express 1080p';
+                    subtitle = 'Mais rápido · Carregamento instantâneo';
+                  } else if (name.includes('Opção 2')) {
+                    title = 'Kairou Estável 1080p';
+                    subtitle = 'Linha alternativa Full HD de alta estabilidade';
+                  } else if (!isDub) {
+                    title = 'Kairou Original 1080p';
+                    subtitle = 'Áudio Original com legendas PT-BR';
+                  } else {
+                    title = 'Kairou Principal 1080p';
+                    subtitle = 'Transmissão Full HD de alta definição';
+                  }
+                } else if ((srv.quality || '').includes('720') || name.includes('720')) {
+                  title = 'Kairou Econômico 720p';
+                  subtitle = 'Otimizado para redes móveis e 4G/5G';
+                } else {
+                  title = name.replace(/\[.*?\]/g, '').trim() || 'Kairou Direct';
+                  subtitle = isDub ? 'Áudio em Português' : 'Áudio Original';
+                }
 
                 return (
                   <button
                     key={srv.id || realIndex}
                     onClick={() => handleSelectServer(realIndex)}
-                    className={`w-full text-left p-3 sm:p-2.5 rounded-xl flex items-center justify-between transition-all border cursor-pointer min-h-[48px] ${
+                    className={`w-full text-left p-3 sm:p-3.5 rounded-2xl flex items-center justify-between transition-all cursor-pointer border ${
                       isActive
-                        ? 'bg-sky-500/20 text-white border-sky-400/50 font-semibold shadow-md shadow-sky-500/10'
-                        : 'text-slate-300 bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/80 hover:text-white'
+                        ? 'bg-sky-500/[0.12] text-white border-sky-400/50 shadow-lg shadow-sky-500/10 ring-1 ring-sky-400/30'
+                        : 'bg-white/[0.02] text-slate-300 border-white/[0.06] hover:bg-white/[0.05] hover:border-white/15 hover:text-white'
                     }`}
                   >
-                    <div className="flex flex-col gap-1 flex-1 pr-2">
-                      <span className="font-semibold text-xs text-white leading-tight">
-                        {srv.providerName}
-                      </span>
-                      <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
-                        {isDub ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
-                            <span>🇧🇷</span> Dublado
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30">
-                            <span>🇺🇸</span> Original (Leg. PT)
-                          </span>
-                        )}
+                    <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
+                        isActive
+                          ? 'bg-sky-500/25 text-sky-300 border-sky-400/40 shadow-sm'
+                          : is4k
+                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                          : 'bg-white/[0.04] text-slate-400 border-white/[0.08]'
+                      }`}>
+                        {is4k ? <Gem size={17} /> : srv.isFastest ? <Zap size={17} /> : <Film size={17} />}
+                      </div>
 
-                        <span
-                          className={`px-1.5 py-0.5 rounded font-mono font-semibold ${
-                            is4k
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                              : is2k
-                              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
-                              : is1080
-                              ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                              : 'bg-slate-800 text-slate-400'
-                          }`}
-                        >
-                          {srv.quality || 'Full HD'}
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-xs text-white truncate">
+                            {title}
+                          </span>
+                          {isDub ? (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 font-semibold shrink-0">
+                              DUB
+                            </span>
+                          ) : (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-300 border border-sky-500/25 font-semibold shrink-0">
+                              LEG
+                            </span>
+                          )}
+                          {srv.isFastest && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-400/30 font-bold shrink-0">
+                              ⚡ Mais Rápido
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-slate-400 truncate mt-0.5">
+                          {subtitle}
                         </span>
-
-                        {srv.latency && srv.latency < 9000 && (
-                          <span
-                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-semibold text-[10px] ${
-                              srv.latency < 500
-                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                : srv.latency < 1000
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                : 'bg-slate-800 text-slate-400 border border-slate-700'
-                            }`}
-                          >
-                            <Activity size={10} />
-                            {srv.latency}ms
-                          </span>
-                        )}
-
-                        {srv.isFastest && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 text-[10px]">
-                            ⚡ Mais Rápido
-                          </span>
-                        )}
                       </div>
                     </div>
 
-                    {isActive ? (
-                      <div className="flex items-center gap-1 text-sky-400 font-bold text-[11px] shrink-0">
-                        <span>Ativo</span>
-                        <Check size={14} />
-                      </div>
-                    ) : (
-                      <ChevronRight size={14} className="text-slate-600 shrink-0" />
-                    )}
+                    <div className="flex items-center gap-2.5 shrink-0 pl-2">
+                      {srv.latency && srv.latency < 9000 && (
+                        <span className="text-[10px] font-mono text-emerald-400/90 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          {srv.latency}ms
+                        </span>
+                      )}
+
+                      {isActive ? (
+                        <div className="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-sky-500/30">
+                          <Check size={13} strokeWidth={3} />
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 rounded-full border border-white/10 flex items-center justify-center text-slate-500 hover:text-white transition-colors shrink-0">
+                          <ChevronRight size={13} />
+                        </div>
+                      )}
+                    </div>
                   </button>
                 );
               })
@@ -4198,7 +4241,7 @@ export default function VideoPlayer({
       {/* Modal / Bottom Sheet de Áudio & Legendas */}
       {audioSubModalOpen && (
         <div
-          className="fixed sm:absolute bottom-0 sm:bottom-20 inset-x-0 sm:inset-x-auto sm:right-8 z-50 w-full sm:w-96 max-w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl bg-[#0f141e]/98 sm:bg-[#0f141e]/95 border-t sm:border border-white/[0.1] p-4 sm:p-5 backdrop-blur-2xl shadow-2xl text-xs max-h-[85vh] sm:max-h-[72vh] overflow-y-auto animate-slide-up sm:animate-scale-in safe-bottom modal-content custom-scrollbar"
+          className="fixed sm:absolute bottom-0 sm:bottom-20 inset-x-0 sm:inset-x-auto sm:right-8 z-50 w-full sm:w-96 max-w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl bg-[#0b0e15]/98 sm:bg-[#0b0e15]/95 border-t sm:border border-white/[0.08] p-4 sm:p-5 backdrop-blur-2xl shadow-2xl text-xs max-h-[85vh] sm:max-h-[72vh] overflow-y-auto animate-slide-up sm:animate-scale-in safe-bottom modal-content custom-scrollbar"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Pílula de arrastar no celular */}
@@ -4658,7 +4701,7 @@ export default function VideoPlayer({
           </div>
 
           {/* Seletor Rápido de Resolução do Servidor (4K / 1080p / 720p) */}
-          <div className="mb-3 p-2.5 bg-slate-900/90 rounded-2xl border border-slate-800">
+          <div className="mb-3 p-2.5 bg-white/[0.02] rounded-2xl border border-white/[0.06]">
             <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase px-1 mb-2 select-none flex items-center justify-between">
               <span>Resoluções de Servidor Disponíveis</span>
               <span className="text-[9px] text-sky-400 font-normal">Mais Estável</span>
@@ -4868,7 +4911,7 @@ export default function VideoPlayer({
                 <button
                   onClick={() => {
                     setQualityModalOpen(false);
-                    setServerModalOpen(true);
+                    openServerModal();
                   }}
                   className="w-full py-2.5 px-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white text-left font-medium text-xs border border-slate-800 flex items-center justify-between transition-colors cursor-pointer"
                 >
@@ -4898,7 +4941,7 @@ export default function VideoPlayer({
               <button
                 onClick={() => {
                   setQualityModalOpen(false);
-                  setServerModalOpen(true);
+                  openServerModal();
                 }}
                 className="mt-1 w-full py-2 px-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-400 text-center font-semibold text-[11px] border border-sky-400/20 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
               >
