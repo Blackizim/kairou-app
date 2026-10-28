@@ -8,19 +8,54 @@ export default function HeroBanner({
   onPlay,
   onOpenDetails,
   onToggleWatchlist,
-  isInWatchlist
+  isInWatchlist,
+  isPaused = false,
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [activeSlot, setActiveSlot] = useState('a');
   const [artA, setArtA] = useState('');
   const [artB, setArtB] = useState('');
   const [copyAnimKey, setCopyAnimKey] = useState(0);
+  const [logoFailed, setLogoFailed] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+  const [tabVisible, setTabVisible] = useState(typeof document !== 'undefined' ? !document.hidden : true);
+
+  const heroRef = useRef(null);
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
 
   const items = featuredItems || [];
   const count = items.length;
   const currentItem = items[currentIndex] || items[0];
 
-  // Initialize and update crossfade backdrop
+  // Reseta estado de falha da logo ao trocar de destaque
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [currentIndex]);
+
+  // Observer para checar se o banner está visível na tela
+  useEffect(() => {
+    if (!heroRef.current || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(heroRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Monitora visibilidade da aba do navegador
+  useEffect(() => {
+    const handleVisChange = () => {
+      setTabVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisChange);
+    return () => document.removeEventListener('visibilitychange', handleVisChange);
+  }, []);
+
+  // Inicializa e atualiza transição de arte de fundo (crossfade)
   useEffect(() => {
     if (!currentItem) return;
     const url = currentItem.backdrop || currentItem.poster;
@@ -31,7 +66,7 @@ export default function HeroBanner({
     }
   }, [currentIndex, currentItem, activeSlot]);
 
-  // Transition to next slide
+  // Transição para próximo slide
   const goToSlide = (index) => {
     if (count <= 0) return;
     const nextIdx = (index + count) % count;
@@ -49,7 +84,33 @@ export default function HeroBanner({
     setCopyAnimKey((k) => k + 1);
   };
 
-  // Prefetch active item streams
+  // Suporte a gesto de deslizar (swipe) em dispositivos móveis
+  const handleTouchStart = (e) => {
+    if (!e.touches || e.touches.length === 0) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const deltaX = endX - touchStartX.current;
+    const deltaY = endY - touchStartY.current;
+
+    // Detecta arrasto horizontal significativo (> 40px e mais horizontal que vertical)
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+      if (deltaX < 0) {
+        goToSlide(currentIndex + 1);
+      } else {
+        goToSlide(currentIndex - 1);
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
+  // Pré-carrega streams do item em exibição
   useEffect(() => {
     if (!currentItem?.tmdbId && !currentItem?.id) return;
     const isTv = currentItem.type === 'series' || currentItem.type === 'tv' || currentItem.type === 'anime';
@@ -62,14 +123,21 @@ export default function HeroBanner({
     });
   }, [currentItem]);
 
-  // Autoplay rotation every 10 seconds
+  // Rotação automática a cada ~11 segundos (pausa quando modais/busca/aba oculta estão ativos ou reduz movimento)
   useEffect(() => {
     if (count <= 1) return;
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+
+    if (isPaused || !tabVisible || !isVisible || prefersReducedMotion) return;
+
     const timer = setInterval(() => {
       goToSlide(currentIndex + 1);
-    }, 10000);
+    }, 11000);
+
     return () => clearInterval(timer);
-  }, [currentIndex, count]);
+  }, [currentIndex, count, isPaused, tabVisible, isVisible]);
 
   if (!currentItem) return null;
 
@@ -77,8 +145,15 @@ export default function HeroBanner({
   const isSeries = currentItem.type === 'series' || currentItem.type === 'tv' || currentItem.type === 'anime';
 
   return (
-    <section className="hero" id="hero" aria-label="Destaques">
-      {/* Dual Art Layers with crossfade and subtle drift */}
+    <section
+      ref={heroRef}
+      className="hero"
+      id="hero"
+      aria-label="Destaques"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Camadas duplas de arte com crossfade suave */}
       <div
         className={`hero-art hero-art-a ${activeSlot === 'a' ? 'active' : ''}`}
         style={{ backgroundImage: `url("${artA || currentItem.backdrop}")` }}
@@ -91,14 +166,24 @@ export default function HeroBanner({
 
       <div className="hero-inner page-width">
         <div className="hero-copy enter" key={copyAnimKey}>
-          {/* Title Slot */}
+          {/* Title Slot: Logo oficial em PNG raster do TMDB com fallback para texto h1 */}
           <div className="hero-title-slot">
-            <h1 id="hero-title" aria-label={currentItem.title}>
-              {currentItem.title}
-            </h1>
+            {currentItem.logo && !logoFailed ? (
+              <img
+                src={currentItem.logo}
+                alt={currentItem.title}
+                className="hero-logo-img"
+                onError={() => setLogoFailed(true)}
+                loading="eager"
+              />
+            ) : (
+              <h1 id="hero-title" aria-label={currentItem.title}>
+                {currentItem.title}
+              </h1>
+            )}
           </div>
 
-          {/* Metadata Badges */}
+          {/* Badges de Metadados */}
           <div className="hero-meta" id="hero-meta">
             {currentItem.matchScore && (
               <span className="score">{currentItem.matchScore}%</span>
@@ -119,12 +204,12 @@ export default function HeroBanner({
             </span>
           </div>
 
-          {/* Description */}
+          {/* Sinopse */}
           <p className="hero-description" id="hero-description">
             {currentItem.synopsis || currentItem.overview || 'Veja os detalhes deste título disponível no catálogo.'}
           </p>
 
-          {/* Action Buttons */}
+          {/* Botões de Ação */}
           <div className="hero-buttons">
             <button
               className="button-primary"
@@ -170,7 +255,7 @@ export default function HeroBanner({
           </div>
         </div>
 
-        {/* Hero Controls (Counter, Dots, Next button) */}
+        {/* Controles do Carrossel (Contador numérico, Indicadores de ponto, Próximo) */}
         {count > 1 && (
           <div className="hero-controls">
             <span className="hero-counter" id="hero-counter">

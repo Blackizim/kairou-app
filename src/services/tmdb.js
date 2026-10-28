@@ -103,6 +103,45 @@ async function tmdbFetch(endpoint, params = {}) {
   }
 }
 
+export function chooseLogo(logos) {
+  if (!Array.isArray(logos) || logos.length === 0) return null;
+
+  // Ignora arquivos SVG e exige file_path válido
+  const rasterLogos = logos.filter(
+    (l) => l && l.file_path && !l.file_path.toLowerCase().endsWith('.svg')
+  );
+
+  if (rasterLogos.length === 0) return null;
+
+  // Ordem de preferência: 1. Português, 2. Inglês, 3. Sem idioma/nulo, 4. Outros
+  const ptLogos = rasterLogos.filter((l) => l.iso_639_1 === 'pt');
+  const enLogos = rasterLogos.filter((l) => l.iso_639_1 === 'en');
+  const nullLogos = rasterLogos.filter(
+    (l) => !l.iso_639_1 || l.iso_639_1 === 'null' || l.iso_639_1 === 'xx'
+  );
+
+  const sortByRating = (list) =>
+    [...list].sort(
+      (a, b) =>
+        (b.vote_average || 0) - (a.vote_average || 0) ||
+        (b.vote_count || 0) - (a.vote_count || 0)
+    );
+
+  let chosen = null;
+  if (ptLogos.length > 0) {
+    chosen = sortByRating(ptLogos)[0];
+  } else if (enLogos.length > 0) {
+    chosen = sortByRating(enLogos)[0];
+  } else if (nullLogos.length > 0) {
+    chosen = sortByRating(nullLogos)[0];
+  } else {
+    chosen = sortByRating(rasterLogos)[0];
+  }
+
+  if (!chosen?.file_path) return null;
+  return `${IMAGE_BASE_W500}${chosen.file_path}`;
+}
+
 export function formatMedia(item, explicitType = null) {
   if (!item) return null;
 
@@ -133,7 +172,7 @@ export function formatMedia(item, explicitType = null) {
   const year = releaseDate ? releaseDate.substring(0, 4) : '2025';
 
   const rawRating = item.vote_average || 7.6;
-  const matchScore = Math.min(99, Math.max(85, Math.round(rawRating * 10)));
+  const matchScore = Math.min(100, Math.max(10, Math.round(rawRating * 10)));
 
   return {
     id: `${type}-${item.id}`,
@@ -141,6 +180,7 @@ export function formatMedia(item, explicitType = null) {
     imdbId: item.imdb_id || item.external_ids?.imdb_id || null,
     type,
     title: item.title || item.name || item.original_title || item.original_name || 'Sem Título',
+    logo: item.logo || chooseLogo(item.images?.logos) || null,
     tagline: item.tagline || '',
     synopsis: item.overview || 'Sinopse oficial disponível em breve para esta produção.',
     year,
@@ -264,14 +304,16 @@ export async function fetchMediaDetails(tmdbId, type = 'movie') {
   let fallbackEndpoint = isSeries ? `/movie/${tmdbId}` : `/tv/${tmdbId}`;
 
   let data = await tmdbFetch(primaryEndpoint, {
-    append_to_response: 'credits,videos,similar,external_ids',
+    append_to_response: 'images,credits,videos,similar,external_ids',
+    include_image_language: 'pt,en,null',
   });
 
   let resolvedType = isSeries ? 'series' : 'movie';
   // Fallback transparente se o item for na verdade um filme ou uma série com ID invertido no catálogo
   if (!data) {
     data = await tmdbFetch(fallbackEndpoint, {
-      append_to_response: 'credits,videos,similar,external_ids',
+      append_to_response: 'images,credits,videos,similar,external_ids',
+      include_image_language: 'pt,en,null',
     });
     if (data) {
       resolvedType = isSeries ? 'movie' : 'series';
@@ -293,6 +335,7 @@ export async function fetchMediaDetails(tmdbId, type = 'movie') {
   const formatted = formatMedia(data, resolvedType);
   formatted.type = resolvedType;
   formatted.imdbId = data.external_ids?.imdb_id || data.imdb_id || null;
+  formatted.logo = chooseLogo(data.images?.logos);
 
   // Elenco principal
   if (data.credits?.cast) {
@@ -400,3 +443,110 @@ export async function fetchMediaExternalIds(id, type = 'movie') {
 }
 
 
+
+// 4 Destaques do Banner Hero do Mês (Popular no BR, com Logos e Detalhes)
+export async function fetchHeroHighlights() {
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const cacheKey = `kairou_heroes_${yearMonth}`;
+
+  // 1. Tenta carregar do cache local do mês atual
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length >= 4) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    // localStorage não disponível
+  }
+
+  // 2. Consulta filmes populares na região Brasil
+  const data = await tmdbFetch('/movie/popular', { region: 'BR' });
+  if (!data?.results) return [];
+
+  const todayStr = now.toISOString().split('T')[0];
+  const candidates = data.results
+    .filter(
+      (m) =>
+        !m.adult &&
+        m.poster_path &&
+        m.backdrop_path &&
+        (!m.release_date || m.release_date <= todayStr)
+    )
+    .slice(0, 4);
+
+  // 3. Busca detalhes completos com logos em paralelo
+  const heroesWithDetails = await Promise.all(
+    candidates.map(async (cand) => {
+      try {
+        const details = await fetchMediaDetails(cand.id, 'movie');
+        if (details) return details;
+      } catch (err) {
+        console.warn(`[TMDB] Falha ao obter detalhes de destaque ${cand.id}:`, err);
+      }
+      return formatMedia(cand, 'movie');
+    })
+  );
+
+  const finalHeroes = heroesWithDetails.filter(Boolean);
+
+  // 4. Salva no cache com a chave do mês
+  if (finalHeroes.length >= 4) {
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(finalHeroes));
+    } catch (e) {
+      // Ignora limites de quota
+    }
+  }
+
+  return finalHeroes;
+}
+
+// Top 10 da Semana (/trending/movie/week)
+export async function fetchWeeklyTrendingMovies() {
+  const data = await tmdbFetch('/trending/movie/week');
+  if (!data?.results) return [];
+  return data.results
+    .filter((i) => !i.adult && i.poster_path && i.backdrop_path)
+    .slice(0, 10)
+    .map((item) => formatMedia(item, 'movie'));
+}
+
+// Agora nos Cinemas (/movie/now_playing?region=BR)
+export async function fetchNowPlaying(region = 'BR') {
+  const data = await tmdbFetch('/movie/now_playing', { region });
+  if (!data?.results) return [];
+  return data.results
+    .filter((i) => !i.adult && i.poster_path && i.backdrop_path)
+    .slice(0, 16)
+    .map((item) => formatMedia(item, 'movie'));
+}
+
+// Séries para Maratonar (/trending/tv/week)
+export async function fetchTrendingTVWeekly() {
+  const data = await tmdbFetch('/trending/tv/week');
+  if (!data?.results) return [];
+  return data.results
+    .filter((i) => !i.adult && i.poster_path && i.backdrop_path)
+    .slice(0, 16)
+    .map((item) => formatMedia(item, 'series'));
+}
+
+// Uma Noite de Terror (/discover/movie?with_genres=27)
+export async function fetchHorrorMovies() {
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const data = await tmdbFetch('/discover/movie', {
+    with_genres: 27,
+    sort_by: 'popularity.desc',
+    'release_date.lte': todayStr,
+  });
+  if (!data?.results) return [];
+  return data.results
+    .filter((i) => !i.adult && i.poster_path && i.backdrop_path)
+    .slice(0, 16)
+    .map((item) => formatMedia(item, 'movie'));
+}

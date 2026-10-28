@@ -28,10 +28,15 @@ import {
 } from './services/supabase';
 
 import {
+  fetchHeroHighlights,
+  fetchWeeklyTrendingMovies,
   fetchTrending,
   fetchTopRatedMovies,
   fetchPopularMovies,
+  fetchNowPlaying,
   fetchPopularTV,
+  fetchTrendingTVWeekly,
+  fetchHorrorMovies,
   fetchByGenre,
   fetchAnimeSeries,
   fetchAnimeMovies,
@@ -48,6 +53,11 @@ export default function App() {
   const [searchLoading, setSearchLoading] = useState(false);
 
   // TMDB Catalogs
+  const [heroHighlights, setHeroHighlights] = useState([]);
+  const [weeklyTrendingMovies, setWeeklyTrendingMovies] = useState([]);
+  const [nowPlayingMovies, setNowPlayingMovies] = useState([]);
+  const [trendingTV, setTrendingTV] = useState([]);
+  const [horrorMovies, setHorrorMovies] = useState([]);
   const [trendingAll, setTrendingAll] = useState([]);
   const [topRated, setTopRated] = useState([]);
   const [popularMovies, setPopularMovies] = useState([]);
@@ -201,23 +211,33 @@ export default function App() {
     async function loadTMDBData() {
       try {
         const [
+          heroes,
           trending,
-          top,
+          weeklyMovies,
           popMovies,
+          nowPlaying,
           popTV,
+          trendTV,
+          topRatedMovies,
           action,
           scifi,
+          horror,
           animation,
           animesTV,
           animesMovies,
           topAnimes
         ] = await Promise.all([
+          fetchHeroHighlights(),
           fetchTrending('all', 'week'),
-          fetchTopRatedMovies(),
+          fetchWeeklyTrendingMovies(),
           fetchPopularMovies(),
+          fetchNowPlaying('BR'),
           fetchPopularTV(),
+          fetchTrendingTVWeekly(),
+          fetchTopRatedMovies(),
           fetchByGenre(28, 'movie'), // Ação
           fetchByGenre(878, 'movie'), // Ficção Científica
+          fetchHorrorMovies(), // Uma Noite de Terror
           fetchByGenre(16, 'movie'), // Animação
           fetchAnimeSeries(), // Séries de Anime
           fetchAnimeMovies(), // Filmes de Anime
@@ -226,12 +246,17 @@ export default function App() {
 
         if (!isMounted) return;
 
+        setHeroHighlights(heroes || []);
         setTrendingAll(trending || []);
-        setTopRated(top || []);
+        setWeeklyTrendingMovies(weeklyMovies || []);
         setPopularMovies(popMovies || []);
+        setNowPlayingMovies(nowPlaying || []);
         setPopularTV(popTV || []);
+        setTrendingTV(trendTV || []);
+        setTopRated(topRatedMovies || []);
         setActionMovies(action || []);
         setScifiMovies(scifi || []);
+        setHorrorMovies(horror || []);
         setAnimationMedia(animation || []);
         setAnimeSeries(animesTV || []);
         setAnimeMovies(animesMovies || []);
@@ -339,20 +364,20 @@ export default function App() {
     setActiveMediaModal(media);
   };
 
-  // Featured Hero titles from live TMDB
+  // Featured Hero titles (4 destaques mensais do TMDB com logos oficiais em PNG)
   const featuredHeroes = useMemo(() => {
     let list = [];
     if (activeTab === 'anime') {
-      list = animeSeries.length > 0 ? animeSeries.slice(0, 5) : [];
+      list = animeSeries.length > 0 ? animeSeries.slice(0, 4) : [];
     } else if (activeTab === 'series') {
-      list = popularTV.slice(0, 4);
+      list = trendingTV.length > 0 ? trendingTV.slice(0, 4) : popularTV.slice(0, 4);
     } else if (activeTab === 'movies') {
-      list = popularMovies.slice(0, 4);
+      list = nowPlayingMovies.length > 0 ? nowPlayingMovies.slice(0, 4) : popularMovies.slice(0, 4);
     } else {
-      list = trendingAll.slice(0, 5);
+      list = heroHighlights.length > 0 ? heroHighlights.slice(0, 4) : trendingAll.slice(0, 4);
     }
     return list;
-  }, [trendingAll, popularTV, popularMovies, animeSeries, activeTab]);
+  }, [heroHighlights, trendingAll, trendingTV, popularTV, nowPlayingMovies, popularMovies, animeSeries, activeTab]);
 
   return (
     <div className="min-h-screen bg-[#0b0e15] text-[#f4f6fb] flex flex-col selection:bg-sky-500/30 selection:text-sky-200">
@@ -427,6 +452,17 @@ export default function App() {
                 onOpenDetails={handleOpenDetails}
                 onToggleWatchlist={toggleWatchlist}
                 isInWatchlist={isInWatchlist}
+                isPaused={
+                  Boolean(
+                    activeVideoPlayer ||
+                    activeMediaModal ||
+                    authModalOpen ||
+                    profileModalOpen ||
+                    supportModalOpen ||
+                    donationModalOpen ||
+                    searchQuery.trim().length > 0
+                  )
+                }
               />
             )}
 
@@ -545,12 +581,12 @@ export default function App() {
                   ) : (
                     /* HOME, SERIES, OR MOVIES TABS */
                     <>
-                      {/* Top 10 Rail */}
-                      {activeTab === 'home' && topRated.length > 0 && (
+                      {/* Top 10 Rail: /trending/movie/week (1 a 10 pela ordem de tendências do TMDB) */}
+                      {activeTab === 'home' && (weeklyTrendingMovies.length > 0 || topRated.length > 0) && (
                         <MediaRow
                           title="Top 10 da Semana no Kairou"
-                          subtitle="Os filmes mais bem avaliados pela crítica e público mundial"
-                          items={topRated}
+                          subtitle="Os filmes mais assistidos e em alta nesta semana"
+                          items={(weeklyTrendingMovies.length > 0 ? weeklyTrendingMovies : topRated).slice(0, 10)}
                           isTop10={true}
                           onPlay={handlePlayMedia}
                           onOpenDetails={handleOpenDetails}
@@ -559,12 +595,12 @@ export default function App() {
                         />
                       )}
 
-                      {/* Trending Rail */}
+                      {/* Em Alta na Semana: /trending/all/week */}
                       {activeTab !== 'movies' && trendingAll.length > 0 && (
                         <MediaRow
                           title="Em Alta na Semana"
                           subtitle="Os títulos mais populares globalmente"
-                          items={trendingAll}
+                          items={trendingAll.slice(0, 16)}
                           aspect="backdrop"
                           onPlay={handlePlayMedia}
                           onOpenDetails={handleOpenDetails}
@@ -573,12 +609,12 @@ export default function App() {
                         />
                       )}
 
-                      {/* Popular Movies Rail */}
-                      {activeTab !== 'series' && popularMovies.length > 0 && (
+                      {/* Agora nos Cinemas: /movie/now_playing?region=BR */}
+                      {activeTab !== 'series' && nowPlayingMovies.length > 0 && (
                         <MediaRow
-                          title="Filmes em Destaque 4K UHD"
-                          subtitle="Sucessos de bilheteria e grandes lançamentos"
-                          items={popularMovies}
+                          title="Agora nos Cinemas"
+                          subtitle="Grandes lançamentos em cartaz nas salas de cinema do Brasil"
+                          items={nowPlayingMovies.slice(0, 16)}
                           aspect="poster"
                           onPlay={handlePlayMedia}
                           onOpenDetails={handleOpenDetails}
@@ -587,12 +623,12 @@ export default function App() {
                         />
                       )}
 
-                      {/* Popular Series Rail */}
-                      {activeTab !== 'movies' && popularTV.length > 0 && (
+                      {/* Séries Para Maratonar: /trending/tv/week */}
+                      {activeTab !== 'movies' && (trendingTV.length > 0 || popularTV.length > 0) && (
                         <MediaRow
                           title="Séries Para Maratonar"
                           subtitle="As produções de TV mais assistidas no momento"
-                          items={popularTV}
+                          items={(trendingTV.length > 0 ? trendingTV : popularTV).slice(0, 16)}
                           aspect="backdrop"
                           onPlay={handlePlayMedia}
                           onOpenDetails={handleOpenDetails}
@@ -601,12 +637,48 @@ export default function App() {
                         />
                       )}
 
-                      {/* Anime Spotlight on Home/Series */}
+                      {/* Halloween Interactive Spotlight: Capas da seção de Terror */}
+                      {activeTab === 'home' && (
+                        <HalloweenSection
+                          onSelectHorror={() => handleSelectFilter({ id: '27', label: 'Terror', genreId: 27, type: 'movie' })}
+                          posters={horrorMovies.length >= 2 ? horrorMovies.slice(0, 2) : actionMovies.slice(0, 2)}
+                        />
+                      )}
+
+                      {/* Uma Noite de Terror: /discover/movie?with_genres=27 */}
+                      {horrorMovies.length > 0 && (
+                        <MediaRow
+                          title="Uma Noite de Terror"
+                          subtitle="Suspense psicológico, sustos e o melhor do cinema de horror"
+                          items={horrorMovies.slice(0, 16)}
+                          aspect="poster"
+                          onPlay={handlePlayMedia}
+                          onOpenDetails={handleOpenDetails}
+                          onToggleWatchlist={toggleWatchlist}
+                          isInWatchlist={isInWatchlist}
+                        />
+                      )}
+
+                      {/* Bem Avaliados: /movie/top_rated */}
+                      {topRated.length > 0 && (
+                        <MediaRow
+                          title="Bem Avaliados"
+                          subtitle="Filmes aclamados pela crítica e pelo público mundial"
+                          items={topRated.slice(0, 16)}
+                          aspect="poster"
+                          onPlay={handlePlayMedia}
+                          onOpenDetails={handleOpenDetails}
+                          onToggleWatchlist={toggleWatchlist}
+                          isInWatchlist={isInWatchlist}
+                        />
+                      )}
+
+                      {/* Universo Anime em Alta */}
                       {activeTab !== 'movies' && animeSeries.length > 0 && (
                         <MediaRow
                           title="Universo Anime em Alta"
                           subtitle="Shonen, Seinen, Isekai e grandes aventuras japonesas"
-                          items={animeSeries}
+                          items={animeSeries.slice(0, 16)}
                           aspect="backdrop"
                           onPlay={handlePlayMedia}
                           onOpenDetails={handleOpenDetails}
@@ -615,12 +687,26 @@ export default function App() {
                         />
                       )}
 
-                      {/* Anime Movies on Movies tab */}
+                      {/* Filmes em Destaque 4K UHD */}
+                      {activeTab !== 'series' && popularMovies.length > 0 && (
+                        <MediaRow
+                          title="Filmes em Destaque 4K UHD"
+                          subtitle="Sucessos de bilheteria e grandes produções cinematográficas"
+                          items={popularMovies.slice(0, 16)}
+                          aspect="poster"
+                          onPlay={handlePlayMedia}
+                          onOpenDetails={handleOpenDetails}
+                          onToggleWatchlist={toggleWatchlist}
+                          isInWatchlist={isInWatchlist}
+                        />
+                      )}
+
+                      {/* Filmes de Anime na Aba Filmes */}
                       {activeTab === 'movies' && animeMovies.length > 0 && (
                         <MediaRow
                           title="Filmes de Anime 4K"
                           subtitle="Grandes produções e longas de anime do cinema"
-                          items={animeMovies}
+                          items={animeMovies.slice(0, 16)}
                           aspect="poster"
                           onPlay={handlePlayMedia}
                           onOpenDetails={handleOpenDetails}
@@ -634,7 +720,7 @@ export default function App() {
                         <MediaRow
                           title="Ficção Científica & Futuro"
                           subtitle="Exploração espacial, realidades alternativas e distopias"
-                          items={scifiMovies}
+                          items={scifiMovies.slice(0, 16)}
                           aspect="poster"
                           onPlay={handlePlayMedia}
                           onOpenDetails={handleOpenDetails}
@@ -648,7 +734,7 @@ export default function App() {
                         <MediaRow
                           title="Ação & Adrenalina"
                           subtitle="Combates e grandes perseguições cinematográficas"
-                          items={actionMovies}
+                          items={actionMovies.slice(0, 16)}
                           aspect="poster"
                           onPlay={handlePlayMedia}
                           onOpenDetails={handleOpenDetails}
@@ -661,8 +747,8 @@ export default function App() {
                       {animationMedia.length > 0 && (
                         <MediaRow
                           title="Grandes Animações"
-                          subtitle="Obras-primas da animação mundial"
-                          items={animationMedia}
+                          subtitle="Obras-primas da animação mundial para todas as idades"
+                          items={animationMedia.slice(0, 16)}
                           aspect="poster"
                           onPlay={handlePlayMedia}
                           onOpenDetails={handleOpenDetails}
