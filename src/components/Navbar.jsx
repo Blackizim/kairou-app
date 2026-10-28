@@ -133,6 +133,13 @@ export default function Navbar({
               Animes
             </button>
             <button
+              onClick={() => handleSelectTab('halloween')}
+              className={`nav-halloween ${activeTab === 'halloween' && !searchQuery ? 'active' : ''}`}
+              title="Especial de Halloween 31 OUT"
+            >
+              🎃 Halloween
+            </button>
+            <button
               onClick={() => handleSelectTab('channels')}
               className={activeTab === 'channels' && !searchQuery ? 'active' : ''}
             >
@@ -323,6 +330,16 @@ export default function Navbar({
             <span>
               Animes
               <small>Histórias para descobrir</small>
+            </span>
+          </button>
+          <button
+            onClick={() => handleSelectTab('halloween')}
+            className={activeTab === 'halloween' && !searchQuery ? 'active' : ''}
+          >
+            <span>🎃</span>
+            <span>
+              Halloween
+              <small>Especial 31 de Outubro</small>
             </span>
           </button>
           <button

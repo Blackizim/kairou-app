@@ -41,12 +41,17 @@ import {
   fetchAnimeSeries,
   fetchAnimeMovies,
   fetchTopAnime,
+  fetchHalloweenRewatch,
+  fetchRecentHorror,
+  fetchClassicHorror,
+  fetchFamilySpooky,
+  fetchHalloweenHeroes,
   searchTMDB,
   GENRE_FILTERS
 } from './services/tmdb';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('home'); // 'home', 'series', 'movies', 'anime', 'watchlist', 'channels'
+  const [activeTab, setActiveTab] = useState('home'); // 'home', 'series', 'movies', 'anime', 'watchlist', 'channels', 'halloween'
   const [selectedFilter, setSelectedFilter] = useState(GENRE_FILTERS[0]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -68,6 +73,11 @@ export default function App() {
   const [animeSeries, setAnimeSeries] = useState([]);
   const [animeMovies, setAnimeMovies] = useState([]);
   const [topAnime, setTopAnime] = useState([]);
+  const [halloweenHeroes, setHalloweenHeroes] = useState([]);
+  const [halloweenRewatch, setHalloweenRewatch] = useState([]);
+  const [recentHorror, setRecentHorror] = useState([]);
+  const [classicHorror, setClassicHorror] = useState([]);
+  const [familySpooky, setFamilySpooky] = useState([]);
   const [genreResults, setGenreResults] = useState([]);
   const [loadingGenre, setLoadingGenre] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -189,6 +199,8 @@ export default function App() {
       document.title = `${activeMediaModal.title || 'Detalhes'} — Assistir no Kairou`;
     } else if (searchQuery.trim()) {
       document.title = `Buscar "${searchQuery}" — Kairou Filmes e Séries`;
+    } else if (activeTab === 'halloween') {
+      document.title = 'Especial Halloween — Clássicos e Filmes Mais Assistidos | Kairou';
     } else if (activeTab === 'movies') {
       document.title = 'Filmes Online Grátis — Assistir Filmes em HD e 4K | Kairou';
     } else if (activeTab === 'series') {
@@ -225,7 +237,12 @@ export default function App() {
           animation,
           animesTV,
           animesMovies,
-          topAnimes
+          topAnimes,
+          hHeroes,
+          hRewatch,
+          hRecent,
+          hClassic,
+          hFamily
         ] = await Promise.all([
           fetchHeroHighlights(),
           fetchTrending('all', 'week'),
@@ -242,6 +259,11 @@ export default function App() {
           fetchAnimeSeries(), // Séries de Anime
           fetchAnimeMovies(), // Filmes de Anime
           fetchTopAnime(), // Animes Mais Bem Avaliados
+          fetchHalloweenHeroes(),
+          fetchHalloweenRewatch(),
+          fetchRecentHorror(),
+          fetchClassicHorror(),
+          fetchFamilySpooky()
         ]);
 
         if (!isMounted) return;
@@ -261,6 +283,11 @@ export default function App() {
         setAnimeSeries(animesTV || []);
         setAnimeMovies(animesMovies || []);
         setTopAnime(topAnimes || []);
+        setHalloweenHeroes(hHeroes || []);
+        setHalloweenRewatch(hRewatch || []);
+        setRecentHorror(hRecent || []);
+        setClassicHorror(hClassic || []);
+        setFamilySpooky(hFamily || []);
       } catch (err) {
         console.error('Erro ao carregar dados TMDB:', err);
       } finally {
@@ -367,7 +394,9 @@ export default function App() {
   // Featured Hero titles (4 destaques mensais do TMDB com logos oficiais em PNG)
   const featuredHeroes = useMemo(() => {
     let list = [];
-    if (activeTab === 'anime') {
+    if (activeTab === 'halloween') {
+      list = halloweenHeroes.length > 0 ? halloweenHeroes : (halloweenRewatch.length > 0 ? halloweenRewatch.slice(0, 4) : horrorMovies.slice(0, 4));
+    } else if (activeTab === 'anime') {
       list = animeSeries.length > 0 ? animeSeries.slice(0, 4) : [];
     } else if (activeTab === 'series') {
       list = trendingTV.length > 0 ? trendingTV.slice(0, 4) : popularTV.slice(0, 4);
@@ -377,7 +406,7 @@ export default function App() {
       list = heroHighlights.length > 0 ? heroHighlights.slice(0, 4) : trendingAll.slice(0, 4);
     }
     return list;
-  }, [heroHighlights, trendingAll, trendingTV, popularTV, nowPlayingMovies, popularMovies, animeSeries, activeTab]);
+  }, [halloweenHeroes, halloweenRewatch, horrorMovies, heroHighlights, trendingAll, trendingTV, popularTV, nowPlayingMovies, popularMovies, animeSeries, activeTab]);
 
   return (
     <div className="min-h-screen bg-[#0b0e15] text-[#f4f6fb] flex flex-col selection:bg-sky-500/30 selection:text-sky-200">
@@ -487,6 +516,37 @@ export default function App() {
               onSelectFilter={handleSelectFilter}
             />
 
+            {/* Header temático para o Especial de Halloween */}
+            {activeTab === 'halloween' && (
+              <div className="page-width pt-6 pb-2">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-950/70 via-amber-950/40 to-[#0e121b] border border-orange-500/25 p-5 md:p-6 backdrop-blur-xl shadow-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="space-y-1.5 z-10">
+                    <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-400 text-[11px] font-bold tracking-wider uppercase">
+                      <span>🎃</span>
+                      <span>Especial Kairou · Sessão 31 de Outubro</span>
+                    </div>
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
+                      Noite de Travessuras e Terror
+                    </h1>
+                    <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+                      Os filmes mais revistos em todo mês das bruxas, novidades apavorantes e clássicos imortais reunidos em alta definição.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('home');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="z-10 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] w-fit"
+                  >
+                    <span>← Voltar ao Início</span>
+                  </button>
+                  <div className="absolute -right-8 -bottom-8 w-56 h-56 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+                </div>
+              </div>
+            )}
+
             {/* Catalog Rails Container */}
             <div className="content-sections pb-20">
               {/* Filtered View if a specific genre or filter is active */}
@@ -511,8 +571,80 @@ export default function App() {
               ) : (
                 /* Complete Rails Experience */
                 <>
-                  {/* ANIME TAB DEDICATED VIEW */}
-                  {activeTab === 'anime' ? (
+                  {/* HALLOWEEN TAB DEDICATED VIEW */}
+                  {activeTab === 'halloween' ? (
+                    <>
+                      {/* 1. Os Mais Revistos Todo Halloween */}
+                      {halloweenRewatch.length > 0 && (
+                        <MediaRow
+                          title="Os Mais Revistos Todo Halloween"
+                          subtitle="As tradições e favoritos que o público sempre revê todo mês de outubro"
+                          items={halloweenRewatch}
+                          aspect="backdrop"
+                          onPlay={handlePlayMedia}
+                          onOpenDetails={handleOpenDetails}
+                          onToggleWatchlist={toggleWatchlist}
+                          isInWatchlist={isInWatchlist}
+                        />
+                      )}
+
+                      {/* 2. Lançamentos & Novos Sucessos de Terror */}
+                      {recentHorror.length > 0 && (
+                        <MediaRow
+                          title="Lançamentos & Novos Sucessos de Terror"
+                          subtitle="As novidades mais perturbadoras e recentes do cinema de terror"
+                          items={recentHorror}
+                          aspect="poster"
+                          onPlay={handlePlayMedia}
+                          onOpenDetails={handleOpenDetails}
+                          onToggleWatchlist={toggleWatchlist}
+                          isInWatchlist={isInWatchlist}
+                        />
+                      )}
+
+                      {/* 3. Clássicos Imortais do Cinema de Terror */}
+                      {classicHorror.length > 0 && (
+                        <MediaRow
+                          title="Clássicos Imortais do Cinema de Terror"
+                          subtitle="Obras-primas consagradas que marcaram a história mundial do horror"
+                          items={classicHorror}
+                          aspect="poster"
+                          onPlay={handlePlayMedia}
+                          onOpenDetails={handleOpenDetails}
+                          onToggleWatchlist={toggleWatchlist}
+                          isInWatchlist={isInWatchlist}
+                        />
+                      )}
+
+                      {/* 4. Halloween Para Assistir em Família */}
+                      {familySpooky.length > 0 && (
+                        <MediaRow
+                          title="Halloween Para Assistir em Família"
+                          subtitle="Animações fantásticas, bruxarias e aventuras sobrenaturais para todas as idades"
+                          items={familySpooky}
+                          aspect="backdrop"
+                          onPlay={handlePlayMedia}
+                          onOpenDetails={handleOpenDetails}
+                          onToggleWatchlist={toggleWatchlist}
+                          isInWatchlist={isInWatchlist}
+                        />
+                      )}
+
+                      {/* 5. Uma Noite de Terror */}
+                      {horrorMovies.length > 0 && (
+                        <MediaRow
+                          title="Uma Noite de Terror"
+                          subtitle="Sustos viscerais, serial killers e entidades malignas para gelar a espinha"
+                          items={horrorMovies}
+                          aspect="poster"
+                          onPlay={handlePlayMedia}
+                          onOpenDetails={handleOpenDetails}
+                          onToggleWatchlist={toggleWatchlist}
+                          isInWatchlist={isInWatchlist}
+                        />
+                      )}
+                    </>
+                  ) : activeTab === 'anime' ? (
                     <>
                       {/* Top 10 Anime */}
                       {topAnime.length > 0 && (
@@ -539,14 +671,6 @@ export default function App() {
                           onOpenDetails={handleOpenDetails}
                           onToggleWatchlist={toggleWatchlist}
                           isInWatchlist={isInWatchlist}
-                        />
-                      )}
-
-                      {/* Halloween Interactive Spotlight (kai4) */}
-                      {activeTab === 'home' && (
-                        <HalloweenSection
-                          onSelectHorror={() => handleSelectFilter({ id: '27', label: 'Terror', genreId: 27, type: 'movie' })}
-                          posters={actionMovies.slice(0, 2)}
                         />
                       )}
 
@@ -640,7 +764,11 @@ export default function App() {
                       {/* Halloween Interactive Spotlight: Capas da seção de Terror */}
                       {activeTab === 'home' && (
                         <HalloweenSection
-                          onSelectHorror={() => handleSelectFilter({ id: '27', label: 'Terror', genreId: 27, type: 'movie' })}
+                          onSelectHorror={() => {
+                            setActiveTab('halloween');
+                            setSelectedFilter(GENRE_FILTERS[0]);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
                           posters={horrorMovies.length >= 2 ? horrorMovies.slice(0, 2) : actionMovies.slice(0, 2)}
                         />
                       )}

@@ -170,6 +170,23 @@ i[class*="fa-"], i.fa-solid, i.fa-regular, i.fa-brands {
   border-radius: 50%;
 }
 
+.desktop-nav button.nav-halloween {
+  color: #fdba74;
+}
+
+.desktop-nav button.nav-halloween:hover {
+  color: #ffedd5;
+}
+
+.desktop-nav button.nav-halloween.active {
+  color: #f97316;
+  font-weight: 600;
+}
+
+.desktop-nav button.nav-halloween.active:after {
+  background: #f97316;
+}
+
 .list-dot {
   display: inline-block;
   width: 5px;

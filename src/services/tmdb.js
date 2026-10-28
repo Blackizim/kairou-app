@@ -550,3 +550,87 @@ export async function fetchHorrorMovies() {
     .slice(0, 16)
     .map((item) => formatMedia(item, 'movie'));
 }
+
+// Especial Halloween: Os Mais Revistos Todo Halloween (Keyword 3335)
+export async function fetchHalloweenRewatch() {
+  const data = await tmdbFetch('/discover/movie', {
+    with_keywords: 3335,
+    sort_by: 'popularity.desc',
+  });
+  if (!data?.results) return [];
+  return data.results
+    .filter((i) => !i.adult && i.poster_path && i.backdrop_path)
+    .slice(0, 20)
+    .map((item) => formatMedia(item, 'movie'));
+}
+
+// Especial Halloween: Lançamentos & Novos Sucessos de Terror (2023 em diante)
+export async function fetchRecentHorror() {
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const data = await tmdbFetch('/discover/movie', {
+    with_genres: 27,
+    sort_by: 'popularity.desc',
+    'primary_release_date.gte': '2023-01-01',
+    'primary_release_date.lte': todayStr,
+  });
+  if (!data?.results) return [];
+  return data.results
+    .filter((i) => !i.adult && i.poster_path && i.backdrop_path)
+    .slice(0, 20)
+    .map((item) => formatMedia(item, 'movie'));
+}
+
+// Especial Halloween: Clássicos Imortais do Cinema de Terror (Avaliados com alto número de votos)
+export async function fetchClassicHorror() {
+  const data = await tmdbFetch('/discover/movie', {
+    with_genres: 27,
+    sort_by: 'vote_count.desc',
+    'vote_count.gte': 1000,
+  });
+  if (!data?.results) return [];
+  return data.results
+    .filter((i) => !i.adult && i.poster_path && i.backdrop_path)
+    .slice(0, 20)
+    .map((item) => formatMedia(item, 'movie'));
+}
+
+// Especial Halloween: Para Assistir em Família (Animações e Fantasia Familiar Spooky)
+export async function fetchFamilySpooky() {
+  const data = await tmdbFetch('/discover/movie', {
+    with_genres: '16,10751',
+    with_keywords: 3335,
+    sort_by: 'popularity.desc',
+  });
+  if (!data?.results) return [];
+  return data.results
+    .filter((i) => !i.adult && i.poster_path && i.backdrop_path)
+    .slice(0, 20)
+    .map((item) => formatMedia(item, 'movie'));
+}
+
+// 4 Destaques do Hero Banner do Especial Halloween com Logos em PNG
+export async function fetchHalloweenHeroes() {
+  const data = await tmdbFetch('/discover/movie', {
+    with_keywords: 3335,
+    sort_by: 'popularity.desc',
+  });
+  if (!data?.results) return [];
+  const candidates = data.results
+    .filter((m) => !m.adult && m.poster_path && m.backdrop_path)
+    .slice(0, 4);
+
+  const heroesWithDetails = await Promise.all(
+    candidates.map(async (cand) => {
+      try {
+        const details = await fetchMediaDetails(cand.id, 'movie');
+        if (details) return details;
+      } catch (err) {
+        console.warn(`[TMDB] Falha ao obter detalhes de destaque halloween ${cand.id}:`, err);
+      }
+      return formatMedia(cand, 'movie');
+    })
+  );
+
+  return heroesWithDetails.filter(Boolean);
+}
