@@ -790,12 +790,12 @@ export function formatKairouServers(streams) {
 
       const getCdnScore = (u) => {
         if (!u) return 10;
-        if (u.includes('wasabisys.com')) return 1;
-        if (u.includes('cnvods.com')) return 2;
-        if (u.includes('bestcine.dpdns.org')) return 3;
-        if (u.includes('froststream.cloutteam.com')) return 4;
-        if (u.includes('shardweb.app')) return 5;
-        if (u.includes('baby-beamup.club')) return 6;
+        if (u.includes('cnvods.com')) return 1;
+        if (u.includes('bestcine.dpdns.org')) return 2;
+        if (u.includes('froststream.cloutteam.com')) return 3;
+        if (u.includes('shardweb.app')) return 4;
+        if (u.includes('baby-beamup.club')) return 5;
+        if (u.includes('wasabisys.com')) return 6;
         if (u.includes('qzz.io')) return 7;
         return 8;
       };

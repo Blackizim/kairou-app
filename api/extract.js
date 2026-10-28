@@ -59,9 +59,7 @@ function normalizeStreamUrl(url) {
   // (Nota: bestcine.dpdns.org NUNCA deve passar pelo proxy da VPS pois a Cloudflare bloqueia IPs de datacenter)
   const isDirectFastHost =
     u.includes('bestcine.dpdns.org') ||
-    u.includes('froststream.cloutteam.com') ||
     u.includes('cnvods.com') ||
-    u.includes('wasabisys.com') ||
     u.includes('vodshuby.com') ||
     u.includes('duckdns.org');
 
@@ -1000,12 +998,12 @@ function curateTopStreams(allStreams, extractedSubtitles = []) {
 
       const getCdnScore = (u) => {
         if (!u) return 10;
-        if (u.includes('wasabisys.com')) return 1;
-        if (u.includes('cnvods.com')) return 2;
-        if (u.includes('bestcine.dpdns.org')) return 3;
-        if (u.includes('froststream.cloutteam.com')) return 4;
-        if (u.includes('shardweb.app')) return 5;
-        if (u.includes('baby-beamup.club')) return 6;
+        if (u.includes('cnvods.com')) return 1;
+        if (u.includes('bestcine.dpdns.org')) return 2;
+        if (u.includes('froststream.cloutteam.com')) return 3;
+        if (u.includes('shardweb.app')) return 4;
+        if (u.includes('baby-beamup.club')) return 5;
+        if (u.includes('wasabisys.com')) return 6;
         if (u.includes('qzz.io')) return 7;
         return 8;
       };
@@ -1232,14 +1230,16 @@ export default async function handler(req, res) {
       })
     );
 
+    // Filtrar servidores mortos comprovados (ex: 403 Forbidden ou erro de rede)
+    const aliveOnly = curatedStreams.filter(s => s.alive !== false);
+    const finalStreams = aliveOnly.length > 0 ? aliveOnly : curatedStreams;
+
     // Marcar o servidor 1080p dublado mais rápido com isFastest
-    const aliveDub1080 = curatedStreams.filter(s => s.isDub && !s.is4k && s.alive && !s.isIframe && s.type !== 'iframe');
+    const aliveDub1080 = finalStreams.filter(s => s.isDub && !s.is4k && s.alive && !s.isIframe && s.type !== 'iframe');
     aliveDub1080.sort((a, b) => (a.latency || 9999) - (b.latency || 9999));
     if (aliveDub1080.length > 0) {
       aliveDub1080[0].isFastest = true;
     }
-
-    const finalStreams = curatedStreams;
 
     const payload = {
       ok: true,

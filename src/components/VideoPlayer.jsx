@@ -647,6 +647,8 @@ export default function VideoPlayer({
   }, [subtitleTracks]);
 
   const activeServer = servers[activeServerIndex] || null;
+  const activeServerUrl = activeServer?.url || null;
+  const activeServerId = activeServer?.id || null;
 
   // Ctrl+D: toggle painel de debug de rede
   useEffect(() => {
@@ -1191,15 +1193,18 @@ export default function VideoPlayer({
           setServers((prevServers) => {
             const currentActive = prevServers && prevServers[activeServerIndex];
 
-            // Se o usuário selecionou manualmente um servidor, mantenha a seleção dele buscando o mesmo ID/URL na nova lista
-            if (userSelectedServerRef.current && currentActive) {
+            // Se o player já selecionou ou começou a carregar um servidor inicial e ele existe na nova lista completa:
+            // MANTENHA A SELEÇÃO ATIVA para NÃO interromper ou resetar o player no meio do carregamento!
+            if (currentActive) {
               const matchingIdx = extractedList.findIndex(
                 (s) => (s.url && s.url === currentActive.url) || (s.id && s.id === currentActive.id)
               );
               if (matchingIdx >= 0) {
-                setActiveServerIndex(matchingIdx);
+                if (matchingIdx !== activeServerIndex) {
+                  setActiveServerIndex(matchingIdx);
+                }
+                return extractedList;
               }
-              return extractedList;
             }
 
             if (!userSelectedServerRef.current && !failedServersRef.current.has(activeServerIndex)) {
@@ -1383,8 +1388,8 @@ export default function VideoPlayer({
   // Função para alternar para o próximo servidor automaticamente em caso de falha
   const handleAutoFallback = useCallback(() => {
     const vid = videoRef.current;
-    // Se o vídeo já começou a reproduzir ativamente, NUNCA aciona erro de fallback
-    if (vid && (vid.currentTime > 0.5 || (!vid.paused && vid.readyState >= 2))) {
+    // Se o vídeo já começou a reproduzir ativamente ou já possui dados no buffer, NUNCA aciona erro de fallback
+    if (vid && (vid.currentTime > 0.5 || (!vid.paused && vid.readyState >= 2) || (vid.buffered && vid.buffered.length > 0 && vid.buffered.end(0) > 0.5))) {
       setStreamError(null);
       return;
     }
@@ -1689,7 +1694,7 @@ export default function VideoPlayer({
     let hasStartedPlayback = false;
     // Watchdog de carregamento inteligente:
     // Damos tempo hábil (25s para 1 servidor, 20s para múltiplos) para conexões via túnel/proxy baixarem o manifesto e os primeiros chunks HLS
-    const timeoutDuration = servers && servers.length <= 1 ? 10000 : 6000;
+    const timeoutDuration = servers && servers.length <= 1 ? 20000 : 15000;
 
     let watchdogTimer = null;
 
@@ -1713,8 +1718,11 @@ export default function VideoPlayer({
 
     watchdogTimer = setTimeout(() => {
       const vid = videoRef.current;
-      // Se a reprodução já iniciou, ou o elemento de vídeo já recebeu dados no buffer (readyState >= 2), não interrompe!
-      if (hasStartedPlayback || (vid && (vid.currentTime > 0 || vid.readyState >= 2 || !vid.paused))) {
+      // Se a reprodução já iniciou ou o buffer já contém dados, não interrompe!
+      if (
+        hasStartedPlayback ||
+        (vid && (vid.currentTime > 0 || vid.readyState >= 2 || !vid.paused || (vid.buffered && vid.buffered.length > 0 && vid.buffered.end(0) > 0.5)))
+      ) {
         cancelWatchdog();
         return;
       }
@@ -1927,9 +1935,15 @@ export default function VideoPlayer({
         startFragPrefetch: true,
         renderTextTracksNatively: true,
         capLevelToPlayerSize: false,
-        manifestLoadingTimeOut: 3500,
-        levelLoadingTimeOut: 3500,
-        fragLoadingTimeOut: 5000,
+        manifestLoadingTimeOut: 12000,
+        manifestLoadingMaxRetry: 3,
+        manifestLoadingRetryDelay: 1000,
+        levelLoadingTimeOut: 12000,
+        levelLoadingMaxRetry: 3,
+        levelLoadingRetryDelay: 1000,
+        fragLoadingTimeOut: 15000,
+        fragLoadingMaxRetry: 4,
+        fragLoadingRetryDelay: 1000,
         abrEwmaDefaultEstimate: 2000000,
         abrBandwidthFactor: 0.95,
         abrBandwidthUpFactor: 0.9,
@@ -2183,6 +2197,15 @@ export default function VideoPlayer({
                 if (currentUrl && !currentUrl.includes('/api/proxy') && !currentUrl.includes('bestcine.dpdns.org')) {
                   console.warn('[VideoPlayer] Manifesto HLS inacessível diretamente (SSL/CORS). Resgatando via /api/proxy...');
                   const proxiedUrl = `/api/proxy?url=${encodeURIComponent(currentUrl)}`;
+                  cancelWatchdog();
+                  watchdogTimer = setTimeout(() => {
+                    const v = videoRef.current;
+                    if (hasStartedPlayback || (v && (v.currentTime > 0 || v.readyState >= 2 || !v.paused || (v.buffered && v.buffered.length > 0 && v.buffered.end(0) > 0.5)))) {
+                      cancelWatchdog();
+                      return;
+                    }
+                    handleAutoFallbackRef.current();
+                  }, 15000);
                   hls.loadSource(proxiedUrl);
                   hls.startLoad();
                   return;
@@ -2304,6 +2327,15 @@ export default function VideoPlayer({
           hasTriedProxy = true;
           console.warn('[VideoPlayer] Falha na reprodução direta (possível certificado SSL inválido ou CORS). Resgatando via /api/proxy:', currentUrl);
           const proxiedUrl = `/api/proxy?url=${encodeURIComponent(currentUrl)}`;
+          cancelWatchdog();
+          watchdogTimer = setTimeout(() => {
+            const v = videoRef.current;
+            if (hasStartedPlayback || (v && (v.currentTime > 0 || v.readyState >= 2 || !v.paused || (v.buffered && v.buffered.length > 0 && v.buffered.end(0) > 0.5)))) {
+              cancelWatchdog();
+              return;
+            }
+            handleAutoFallbackRef.current();
+          }, 15000);
           video.src = proxiedUrl;
           video.load();
           video.play().catch(() => {});
@@ -2342,7 +2374,7 @@ export default function VideoPlayer({
         hlsRef.current = null;
       }
     };
-  }, [activeServer, applySubtitleMode]);
+  }, [activeServerUrl, activeServerId, activeServer?.type, activeServer?.isIframe, applySubtitleMode]);
 
   // Controle de ocultação automática dos controles
   // Fechar todos os modais abertos
