@@ -1,10 +1,15 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 import { defineConfig } from 'vite';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import react from '@vitejs/plugin-react';
 import extractHandler from './api/extract.js';
 import proxyHandler from './api/proxy.js';
 import channelsHandler from './api/channels.js';
 import matchesHandler from './api/matches.js';
-import systemHandler from './api/system.js';
 
 function vercelApiPlugin() {
   const handlerMiddleware = async (req, res, next) => {
@@ -19,8 +24,6 @@ function vercelApiPlugin() {
       handler = channelsHandler;
     } else if (req.url.startsWith('/api/matches')) {
       handler = matchesHandler;
-    } else if (req.url.startsWith('/api/system')) {
-      handler = systemHandler;
     }
 
     if (handler) {
@@ -47,7 +50,7 @@ function vercelApiPlugin() {
         }
       }
 
-      const fakeReq = { query, method: req.method, body };
+      const fakeReq = { query, method: req.method, body, headers: req.headers };
       // Suporte completo a funções serverless no Vite (incluindo streaming, piping e chunking)
       res.status = (code) => {
         res.statusCode = code;
@@ -162,6 +165,11 @@ const proxyConfig = {
 };
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      'lucide-react': path.resolve(__dirname, 'src/components/Icons.jsx')
+    }
+  },
   plugins: [react(), vercelApiPlugin()],
   server: {
     port: 3000,

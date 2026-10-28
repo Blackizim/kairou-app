@@ -11,6 +11,7 @@ import {
   Maximize,
   Minimize,
   Sliders,
+  ClosedCaptioning,
   MessageSquare,
   Check,
   Server,
@@ -32,16 +33,21 @@ import {
   SkipForward,
   Send,
   Activity,
-  Crown,
   Download,
-  Sparkles
+  Sparkles,
+  Clock,
+  Palette,
+  Type,
+  Minus,
+  Plus,
+  Headphones,
+  Maximize2,
+  VolumeHigh,
 } from 'lucide-react';
-import { extractAllServers, clearStreamCache } from '../services/extractor';
+import { extractAllServers, clearStreamCache, testCandidateServersSpeed } from '../services/extractor';
 import { saveWatchProgress } from '../services/supabase';
 import { fetchSeasonEpisodes, fetchMediaDetails, fetchMediaExternalIds } from '../services/tmdb';
 import { resolveChannelStream } from '../services/channelsResolver';
-import { isVipUser } from '../services/vipService';
-import { loadWatchingAds, unloadWatchingAds } from '../services/adConsent';
 
 // Opções de Qualidade Padrão
 const STANDARD_QUALITIES = [
@@ -246,6 +252,29 @@ function isPortugueseAudioTrack(tr) {
   );
 }
 
+// Helper para detecção estrita de áudio Original / Inglês
+function isOriginalAudioTrack(tr, index, allTracks) {
+  if (!tr) return false;
+  const rawLang = String(tr.lang || tr.language || '').toLowerCase().trim();
+  const rawName = String(tr.name || tr.label || '').toLowerCase().trim();
+  if (
+    rawLang.startsWith('en') ||
+    rawLang === 'eng' ||
+    rawName.includes('ingl') ||
+    rawName.includes('orig') ||
+    rawName.includes('english')
+  ) {
+    return true;
+  }
+  if (allTracks && allTracks.length === 2) {
+    const otherTrack = allTracks.find((_, i) => i !== index);
+    if (otherTrack && isPortugueseAudioTrack(otherTrack)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Normalizador de Legendas
 function normalizeSubtitleTrackLabel(st, index) {
   const lang = String(st.lang || '').toLowerCase().trim();
@@ -272,6 +301,210 @@ function normalizeSubtitleTrackLabel(st, index) {
   return `Legenda ${index + 1}`;
 }
 
+// Parser resiliente de legendas WebVTT e SRT com suporte a timecodes variáveis
+function parseSubtitleText(text) {
+  if (!text || typeof text !== 'string') return [];
+  const cleaned = text.replace(/^\uFEFF/, '').replace(/\r\n|\r/g, '\n').trim();
+  const timeRegex = /(?:(\d{1,2}):)?(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(?:(\d{1,2}):)?(\d{2}):(\d{2})[,.](\d{3})/;
+
+  function parseTimeSec(h, m, s, ms) {
+    const hours = h ? parseInt(h, 10) : 0;
+    const minutes = parseInt(m, 10);
+    const seconds = parseInt(s, 10);
+    const millis = parseInt(ms, 10);
+    return hours * 3600 + minutes * 60 + seconds + millis / 1000;
+  }
+
+  const blocks = cleaned.split(/\n\s*\n+/);
+  const cues = [];
+
+  for (const block of blocks) {
+    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) continue;
+
+    let timeIndex = -1;
+    let match = null;
+    for (let i = 0; i < lines.length; i++) {
+      match = lines[i].match(timeRegex);
+      if (match) {
+        timeIndex = i;
+        break;
+      }
+    }
+
+    if (timeIndex === -1 || !match) continue;
+
+    const start = parseTimeSec(match[1], match[2], match[3], match[4]);
+    const end = parseTimeSec(match[5], match[6], match[7], match[8]);
+    const textLines = lines.slice(timeIndex + 1);
+    if (textLines.length === 0) continue;
+
+    const rawText = textLines
+      .join('\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\{\\[^}]+\}/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+
+    if (rawText) {
+      cues.push({ start, end, text: rawText });
+    }
+  }
+
+  return cues.sort((a, b) => a.start - b.start);
+}
+
+// Configurações padrão de estilo das legendas
+const DEFAULT_SUBTITLE_SETTINGS = {
+  size: 'normal',       // 'small' | 'normal' | 'large' | 'xlarge'
+  color: '#ffffff',     // '#ffffff' | '#fde047' | '#38bdf8' | '#4ade80'
+  background: 'shadow', // 'shadow' | 'translucent' | 'solid'
+};
+
+// Overlay Customizado de Legendas de Alta Performance Kairou (60fps, isolado)
+function SubtitleOverlay({ videoRef, cues, offset = 0, style = DEFAULT_SUBTITLE_SETTINGS, showControls = false }) {
+  const [currentText, setCurrentText] = useState('');
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !cues || cues.length === 0) {
+      setCurrentText('');
+      return;
+    }
+
+    let rafId = null;
+    let lastText = '';
+
+    const updateCue = () => {
+      const effectiveTime = (video.currentTime || 0) + (offset || 0);
+      let matchedText = '';
+
+      for (let i = 0; i < cues.length; i++) {
+        const c = cues[i];
+        if (effectiveTime >= c.start && effectiveTime <= c.end) {
+          matchedText = c.text;
+          break;
+        }
+        if (c.start > effectiveTime) {
+          break;
+        }
+      }
+
+      if (matchedText !== lastText) {
+        lastText = matchedText;
+        setCurrentText(matchedText);
+      }
+
+      rafId = requestAnimationFrame(updateCue);
+    };
+
+    rafId = requestAnimationFrame(updateCue);
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [videoRef, cues, offset]);
+
+  if (!currentText) return null;
+
+  const sizeClasses = {
+    small: 'text-sm sm:text-base leading-snug',
+    normal: 'text-base sm:text-xl md:text-2xl leading-snug',
+    large: 'text-lg sm:text-2xl md:text-3xl leading-snug font-semibold',
+    xlarge: 'text-xl sm:text-3xl md:text-4xl leading-snug font-bold',
+  };
+
+  const bgStyles = {
+    shadow: {
+      className: 'bg-transparent px-2 py-0.5',
+      style: {
+        textShadow:
+          '0 2px 4px rgba(0,0,0,0.95), -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 0 10px rgba(0,0,0,0.9)',
+      },
+    },
+    translucent: {
+      className: 'bg-black/65 backdrop-blur-xs rounded-xl px-4 py-1.5 shadow-2xl border border-white/5',
+      style: {
+        textShadow: '0 1px 3px rgba(0,0,0,0.8), -1px -1px 0 #000, 1px -1px 0 #000',
+      },
+    },
+    solid: {
+      className: 'bg-black/95 rounded-lg px-4 py-1.5 shadow-2xl',
+      style: {
+        textShadow: 'none',
+      },
+    },
+  };
+
+  const activeBg = bgStyles[style?.background] || bgStyles.shadow;
+
+  return (
+    <div
+      className={`absolute left-0 right-0 z-20 flex justify-center items-center pointer-events-none px-4 text-center transition-all duration-300 ease-out select-none ${
+        showControls
+          ? 'bottom-20 sm:bottom-24 md:bottom-28'
+          : 'bottom-6 sm:bottom-10 md:bottom-12'
+      }`}
+    >
+      <div
+        className={`max-w-[92%] sm:max-w-[80%] inline-block font-sans tracking-wide transition-all ${
+          sizeClasses[style?.size] || sizeClasses.normal
+        } ${activeBg.className}`}
+        style={{
+          color: style?.color || '#ffffff',
+          ...activeBg.style,
+          whiteSpace: 'pre-line',
+        }}
+      >
+        {currentText}
+      </div>
+    </div>
+  );
+}
+
+// Helper para encontrar o melhor servidor padrão <= 1080p (1080p > 720p > 480p).
+// O 4K permanece na lista de servidores para escolha manual, mas NUNCA roda automaticamente como padrão.
+export function findPreferredDefaultServerIndex(serversList) {
+  if (!serversList || !Array.isArray(serversList) || serversList.length === 0) return 0;
+  const isServer4k = (s) => Boolean(s.is4k || (s.quality || '').includes('4K') || (s.providerName || '').includes('4K'));
+
+  // 1. Procurar Dublado em 1080p Full HD que esteja vivo e com menor latência
+  const dub1080Alive = serversList.findIndex((s) => s.isDub && !isServer4k(s) && s.alive !== false && ((s.quality || '').includes('1080') || (s.providerName || '').includes('1080')));
+  if (dub1080Alive >= 0) return dub1080Alive;
+
+  // 2. Procurar Dublado em 720p HD vivo
+  const dub720Alive = serversList.findIndex((s) => s.isDub && !isServer4k(s) && s.alive !== false && ((s.quality || '').includes('720') || (s.providerName || '').includes('720')));
+  if (dub720Alive >= 0) return dub720Alive;
+
+  // 3. Qualquer Dublado abaixo de 4K vivo
+  const dubAnyNon4kAlive = serversList.findIndex((s) => s.isDub && !isServer4k(s) && s.alive !== false);
+  if (dubAnyNon4kAlive >= 0) return dubAnyNon4kAlive;
+
+  // 4. Qualquer Dublado abaixo de 4K
+  const dubAnyNon4k = serversList.findIndex((s) => s.isDub && !isServer4k(s));
+  if (dubAnyNon4k >= 0) return dubAnyNon4k;
+
+  // 5. Legendado vivo 1080p
+  const sub1080Alive = serversList.findIndex((s) => !isServer4k(s) && s.alive !== false && ((s.quality || '').includes('1080') || (s.providerName || '').includes('1080')));
+  if (sub1080Alive >= 0) return sub1080Alive;
+
+  // 6. Legendado vivo 720p
+  const sub720Alive = serversList.findIndex((s) => !isServer4k(s) && s.alive !== false && ((s.quality || '').includes('720') || (s.providerName || '').includes('720')));
+  if (sub720Alive >= 0) return sub720Alive;
+
+  // 7. Qualquer Legendado não-4k
+  const subAnyNon4k = serversList.findIndex((s) => !isServer4k(s));
+  if (subAnyNon4k >= 0) return subAnyNon4k;
+
+  // 8. Se literalmente só existir 4K disponível, seleciona o primeiro
+  return 0;
+}
+
 export default function VideoPlayer({
   media,
   episode,
@@ -279,23 +512,8 @@ export default function VideoPlayer({
   autoCast = false,
   user,
   profile,
-  onOpenSubscription,
   onClose,
 }) {
-  const isVip = isVipUser(user, profile);
-  const [ambientGlow, setAmbientGlow] = useState(isVip);
-  const [dolbyBoost, setDolbyBoost] = useState(false);
-
-  // Carrega anúncios apenas enquanto assiste (exclusivo para plano gratuito) e descarrega ao fechar
-  useEffect(() => {
-    if (!isVip) {
-      loadWatchingAds(user, profile);
-    }
-    return () => {
-      unloadWatchingAds();
-    };
-  }, [isVip, user, profile]);
-
   const videoRef = useRef(null);
   const playerContainerRef = useRef(null);
   const hlsRef = useRef(null);
@@ -321,8 +539,13 @@ export default function VideoPlayer({
 
   // Modais de Controle
   const [serverModalOpen, setServerModalOpen] = useState(false);
+  const [isSpeedTesting, setIsSpeedTesting] = useState(false);
+
   const [serverLangFilter, setServerLangFilter] = useState('all'); // 'all' | 'dub' | 'sub'
   const [audioSubModalOpen, setAudioSubModalOpen] = useState(false);
+  const [audioMenuOpen, setAudioMenuOpen] = useState(false);
+  const [mobileVolumeOpen, setMobileVolumeOpen] = useState(false);
+  const [aspectMode, setAspectMode] = useState('contain'); // 'contain' | 'cover' | 'fill'
   const [qualityModalOpen, setQualityModalOpen] = useState(false);
   const [castModalOpen, setCastModalOpen] = useState(false);
   const [isCasting, setIsCasting] = useState(false);
@@ -339,6 +562,62 @@ export default function VideoPlayer({
 
   const activeSubtitleTrackRef = useRef(-1);
   const subtitleTracksRef = useRef([]);
+
+  // Cues parseados em memória para o Custom SubtitleOverlay
+  const [activeCues, setActiveCues] = useState([]);
+
+  // Configurações personalizadas de legendas (persistidas no localStorage)
+  const [subtitleSettings, setSubtitleSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kairou_sub_settings');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      size: 'normal',       // 'small' | 'normal' | 'large' | 'xlarge'
+      color: '#ffffff',     // '#ffffff' | '#fde047' | '#38bdf8' | '#4ade80'
+      background: 'shadow', // 'shadow' | 'translucent' | 'solid'
+    };
+  });
+
+  const [subtitleOffset, setSubtitleOffset] = useState(0); // em segundos (+0.5s, -1.0s, etc.)
+  const [subModalTab, setSubModalTab] = useState('tracks'); // 'tracks' | 'sync' | 'style'
+
+  const updateSubtitleSettings = (updates) => {
+    setSubtitleSettings((prev) => {
+      const next = { ...prev, ...updates };
+      try {
+        localStorage.setItem('kairou_sub_settings', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const adjustSubtitleOffset = (delta) => {
+    setSubtitleOffset((prev) => {
+      const next = Math.round((prev + delta) * 10) / 10;
+      triggerNotification(`Sincronia: ${next >= 0 ? '+' : ''}${next.toFixed(1)}s`);
+      return next;
+    });
+  };
+
+  const resetSubtitleOffset = () => {
+    setSubtitleOffset(0);
+    triggerNotification('Sincronia zerada (0.0s)');
+  };
+
+  const resetSubtitleSettings = () => {
+    const defaults = {
+      size: 'normal',
+      color: '#ffffff',
+      background: 'shadow',
+    };
+    setSubtitleSettings(defaults);
+    setSubtitleOffset(0);
+    try {
+      localStorage.setItem('kairou_sub_settings', JSON.stringify(defaults));
+    } catch {}
+    triggerNotification('Configurações de legenda restauradas');
+  };
 
   // Painel de Debug de Rede
   const [showDebug, setShowDebug] = useState(false);
@@ -484,16 +763,16 @@ export default function VideoPlayer({
   }, [servers]);
 
   const subServersCount = useMemo(() => {
-    return (servers || []).filter((s) => !s.isDub && !(s.providerName || '').includes('[Dublado]')).length;
+    return (servers || []).filter((s) => !s.isDub || s.isDual || !(s.providerName || '').includes('[Dublado]')).length;
   }, [servers]);
 
   const filteredServers = useMemo(() => {
     if (!servers || servers.length === 0) return [];
     if (serverLangFilter === 'dub') {
-      return servers.filter((s) => Boolean(s.isDub || (s.providerName || '').includes('[Dublado]')));
+      return servers.filter((s) => Boolean(s.isDub || s.isDual || (s.providerName || '').includes('[Dublado]')));
     }
     if (serverLangFilter === 'sub') {
-      return servers.filter((s) => !s.isDub && !(s.providerName || '').includes('[Dublado]'));
+      return servers.filter((s) => Boolean(!s.isDub || s.isDual || !(s.providerName || '').includes('[Dublado]')));
     }
     return servers;
   }, [servers, serverLangFilter]);
@@ -642,7 +921,7 @@ export default function VideoPlayer({
             const baseName = langNames[l] || l.toUpperCase();
             const label = counts[l] > 1 ? `${baseName} (Opção ${counts[l]})` : baseName;
             formatted.push({
-              id: 1000 + formatted.length,
+              id: `os_${l}_${counts[l]}`,
               originalId: item.id || `sub-${l}-${counts[l]}`,
               lang: l === 'pob' ? 'pt-BR' : (l === 'por' ? 'pt' : (l === 'eng' ? 'en' : l)),
               label,
@@ -685,6 +964,27 @@ export default function VideoPlayer({
     setTimeout(() => setNotification((prev) => (prev === msg ? null : prev)), 4000);
   }, []);
 
+  // Função para retestar a velocidade de todos os servidores sob demanda
+  const handleRetestServersSpeed = useCallback(async () => {
+    if (isSpeedTesting || !servers || servers.length === 0) return;
+    setIsSpeedTesting(true);
+    triggerNotification('Testando velocidade dos servidores...');
+    try {
+      const cloned = [...servers];
+      await testCandidateServersSpeed(cloned, cloned.length);
+      setServers(cloned);
+      const fastest = cloned.reduce((best, cur) => {
+        if (!cur.latency || cur.latency >= 9000) return best;
+        if (!best || cur.latency < best.latency) return cur;
+        return best;
+      }, null);
+      if (fastest) {
+        triggerNotification(`⚡ Melhor servidor: ${fastest.providerName} (${fastest.latency}ms)`);
+      }
+    } catch {}
+    setIsSpeedTesting(false);
+  }, [isSpeedTesting, servers, triggerNotification]);
+
   // Se o usuário iniciou no modo de transmissão (Cast)
   useEffect(() => {
     if (autoCast) {
@@ -699,12 +999,13 @@ export default function VideoPlayer({
 
     if (Math.abs(currentTime - lastSavedTimeRef.current) >= 10 || !isPlaying) {
       lastSavedTimeRef.current = currentTime;
+      const epBanner = currentEpisode?.still_path || currentEpisode?.thumbnail || media.backdrop || media.poster;
       saveWatchProgress({
         mediaId: media.id || media.tmdbId,
         mediaType: isSeries ? 'series' : 'movie',
         title: media.title,
         posterPath: media.poster,
-        backdropPath: media.backdrop,
+        backdropPath: epBanner,
         season: currentSeasonNumber,
         episode: currentEpisodeNumber,
         episodeTitle: currentEpisode?.title || '',
@@ -719,12 +1020,13 @@ export default function VideoPlayer({
     return () => {
       const vid = videoRef.current;
       if (vid && vid.currentTime > 5 && vid.duration > 0 && media) {
+        const epBanner = currentEpisode?.still_path || currentEpisode?.thumbnail || media.backdrop || media.poster;
         saveWatchProgress({
           mediaId: media.id || media.tmdbId,
           mediaType: isSeries ? 'series' : 'movie',
           title: media.title,
           posterPath: media.poster,
-          backdropPath: media.backdrop,
+          backdropPath: epBanner,
           season: currentSeasonNumber,
           episode: currentEpisodeNumber,
           episodeTitle: currentEpisode?.title || '',
@@ -829,13 +1131,18 @@ export default function VideoPlayer({
       onProgress: (status) => {
         if (isMounted) setExtractionStatus(status);
       },
-      onStreamsAvailable: (fastList) => {
+      onStreamsAvailable: async (fastList) => {
         if (!isMounted) return;
         if (fastList && fastList.length > 0) {
+          await testCandidateServersSpeed(fastList, 4);
+          if (!isMounted) return;
           setServers((prev) => {
             if (!prev || prev.length === 0) {
-              setActiveServerIndex(0);
-              triggerNotification(`Conectado: ${fastList[0].providerName}`);
+              const defIdx = findPreferredDefaultServerIndex(fastList);
+              setActiveServerIndex(defIdx);
+              const sel = fastList[defIdx] || fastList[0];
+              const pingText = sel?.latency && sel.latency < 9000 ? ` (${sel.latency}ms)` : '';
+              triggerNotification(`⚡ Servidor Mais Rápido: ${sel?.providerName || ''}${pingText}`);
               setIsExtracting(false);
               return fastList;
             }
@@ -844,9 +1151,11 @@ export default function VideoPlayer({
         }
       },
     })
-      .then((extractedList) => {
+      .then(async (extractedList) => {
         if (!isMounted) return;
         if (extractedList && extractedList.length > 0) {
+          await testCandidateServersSpeed(extractedList, 4);
+          if (!isMounted) return;
           setServers((prevServers) => {
             const currentActive = prevServers && prevServers[activeServerIndex];
 
@@ -861,16 +1170,12 @@ export default function VideoPlayer({
               return extractedList;
             }
 
-            const currentRank = currentActive?.rank ?? 4;
-            const newBestRank = extractedList[0]?.rank ?? 4;
-            // Se a lista completa trouxe resolução superior (ex: 1080p ou 4K superando 720p)
-            // mas apenas se o usuário NÃO selecionou um servidor e o servidor 0 ainda não tiver falhado!
-            if (!userSelectedServerRef.current && !failedServersRef.current.has(0) && newBestRank < currentRank) {
-              setActiveServerIndex(0);
-              triggerNotification(`Qualidade máxima disponível: ${extractedList[0].providerName}`);
-            } else if (!currentActive && !failedServersRef.current.has(0)) {
-              setActiveServerIndex(0);
-              triggerNotification(`Conectado: ${extractedList[0].providerName}`);
+            if (!userSelectedServerRef.current && !failedServersRef.current.has(activeServerIndex)) {
+              const defIdx = findPreferredDefaultServerIndex(extractedList);
+              setActiveServerIndex(defIdx);
+              const sel = extractedList[defIdx] || extractedList[0];
+              const pingText = sel?.latency && sel.latency < 9000 ? ` (${sel.latency}ms)` : '';
+              triggerNotification(`⚡ Servidor Mais Rápido: ${sel?.providerName || ''}${pingText}`);
             }
             return extractedList;
           });
@@ -917,8 +1222,9 @@ export default function VideoPlayer({
         if (fastList && fastList.length > 0) {
           setServers((prev) => {
             if (!prev || prev.length === 0) {
-              setActiveServerIndex(0);
-              triggerNotification(`Conectado: ${fastList[0].providerName}`);
+              const defIdx = findPreferredDefaultServerIndex(fastList);
+              setActiveServerIndex(defIdx);
+              triggerNotification(`Conectado: ${fastList[defIdx]?.providerName || fastList[0].providerName}`);
               setIsExtracting(false);
               return fastList;
             }
@@ -1169,32 +1475,102 @@ export default function VideoPlayer({
     handleAutoFallbackRef.current = handleAutoFallback;
   }, [handleAutoFallback]);
 
-  // Aplica o modo 'showing' na trilha de legendas ativa e desativa as demais
+  // Carregamento de cues com fetch e parser cliente de altíssima precisão
+  const loadSubtitleCues = useCallback(async (track) => {
+    if (!track || !track.id || track.id === -1 || track.id === 'off') {
+      setActiveCues([]);
+      return;
+    }
+
+    if (track.url) {
+      try {
+        let res = await fetch(track.url);
+        if (!res.ok && !track.url.includes('/api/proxy')) {
+          res = await fetch(`/api/proxy?format=vtt&url=${encodeURIComponent(track.originalUrl || track.url)}`);
+        }
+        if (res.ok) {
+          const text = await res.text();
+          const parsed = parseSubtitleText(text);
+          console.info(`[VideoPlayer] Legenda externa carregada: ${parsed.length} falas sincronizadas.`);
+          setActiveCues(parsed);
+          return;
+        }
+      } catch (err) {
+        console.warn('[VideoPlayer] Falha ao carregar legenda direta, tentando proxy...', err);
+        try {
+          const res = await fetch(`/api/proxy?format=vtt&url=${encodeURIComponent(track.originalUrl || track.url)}`);
+          if (res.ok) {
+            const text = await res.text();
+            const parsed = parseSubtitleText(text);
+            setActiveCues(parsed);
+            return;
+          }
+        } catch {}
+      }
+    }
+
+    // Se for trilha HLS embutida (sem URL externa)
+    const video = videoRef.current;
+    if (video && video.textTracks) {
+      const target = Array.from(video.textTracks).find(
+        (t, idx) =>
+          idx === track.hlsTrackIndex ||
+          t.id === String(track.originalId || track.id) ||
+          (t.label && track.label && t.label.toLowerCase() === track.label.toLowerCase()) ||
+          (t.language && track.lang && t.language.toLowerCase() === track.lang.toLowerCase())
+      );
+
+      if (target) {
+        target.mode = 'hidden';
+        const extractCues = () => {
+          if (target.cues && target.cues.length > 0) {
+            const extracted = Array.from(target.cues).map((c) => ({
+              start: c.startTime,
+              end: c.endTime,
+              text: (c.text || '').replace(/<[^>]+>/g, '').trim(),
+            })).filter((c) => c.text);
+            setActiveCues(extracted);
+          }
+        };
+        extractCues();
+        target.oncuechange = extractCues;
+      }
+    }
+  }, []);
+
+  // Aplica o modo 'hidden' na trilha de legendas ativa (para leitura em memória) e desativa as demais (NUNCA 'showing' para não sobrepor blocos pretos na tela)
   const applySubtitleMode = useCallback((trackId, customTracks = null) => {
     const video = videoRef.current;
+
+    // Desligar renderizador nativo do Hls.js
+    if (hlsRef.current) {
+      hlsRef.current.subtitleDisplay = false;
+      const list = customTracks || subtitleTracksRef.current;
+      const target = list && list.find((s) => s.id === trackId);
+      if (target && typeof target.hlsTrackIndex === 'number') {
+        hlsRef.current.subtitleTrack = target.hlsTrackIndex;
+      } else {
+        hlsRef.current.subtitleTrack = -1;
+      }
+    }
+
     if (!video || !video.textTracks) return;
 
     const list = customTracks || subtitleTracksRef.current;
-    const targetSub = trackId >= 0 && list && list.find((s) => s.id === trackId);
+    const targetSub = trackId && trackId !== -1 && trackId !== 'off' && list && list.find((s) => s.id === trackId);
 
     for (let i = 0; i < video.textTracks.length; i++) {
       const track = video.textTracks[i];
-      if (trackId === -1) {
+      if (!targetSub) {
         track.mode = 'disabled';
       } else {
         const matches =
-          i === trackId ||
-          track.id === String(trackId) ||
-          (targetSub && (
-            (track.label && targetSub.label && track.label.toLowerCase() === targetSub.label.toLowerCase()) ||
-            (track.language && targetSub.lang && track.language.toLowerCase() === targetSub.lang.toLowerCase())
-          ));
+          i === targetSub.hlsTrackIndex ||
+          track.id === String(targetSub.originalId || targetSub.id) ||
+          (track.label && targetSub.label && track.label.toLowerCase() === targetSub.label.toLowerCase());
 
-        if (matches) {
-          track.mode = 'showing';
-        } else {
-          track.mode = 'disabled';
-        }
+        // 'hidden' carrega cues em memória para o nosso Custom SubtitleOverlay sem desenhar blocos pretos nativos
+        track.mode = matches ? 'hidden' : 'disabled';
       }
     }
   }, []);
@@ -1249,9 +1625,9 @@ export default function VideoPlayer({
     // Inicializar legendas externas se o servidor fornecer
     if (activeServer?.subtitles && activeServer.subtitles.length > 0) {
       const extSubs = activeServer.subtitles.map((ext, extIdx) => ({
-        id: 1000 + extIdx,
-        originalId: ext.id || `ext-${extIdx}`,
-        label: ext.label || (ext.lang === 'por' || ext.lang === 'pt' ? 'Português [CC]' : (ext.lang || `Legenda Externa ${extIdx + 1}`)),
+        id: `srv_${extIdx}`,
+        originalId: ext.id || `srv-${extIdx}`,
+        label: ext.label || (ext.lang === 'por' || ext.lang === 'pt' ? 'Português [CC]' : (ext.lang || `Legenda Servidor ${extIdx + 1}`)),
         lang: ext.lang || 'pt',
         url: ext.url,
         isExternal: true,
@@ -1281,7 +1657,7 @@ export default function VideoPlayer({
     let hasStartedPlayback = false;
     // Watchdog de carregamento inteligente:
     // Damos tempo hábil (25s para 1 servidor, 20s para múltiplos) para conexões via túnel/proxy baixarem o manifesto e os primeiros chunks HLS
-    const timeoutDuration = servers && servers.length <= 1 ? 25000 : 20000;
+    const timeoutDuration = servers && servers.length <= 1 ? 10000 : 6000;
 
     let watchdogTimer = null;
 
@@ -1357,17 +1733,30 @@ export default function VideoPlayer({
           }));
           setAudioTracks(list);
 
-          // PRIORIZAÇÃO MÁXIMA ABSOLUTA DE ÁUDIO PT-BR (DUBLADO)
+          // SELEÇÃO INTELIGENTE DE ÁUDIO BASEADA NO SERVIDOR (Dublado vs Original)
           if (!userSelectedAudioRef.current) {
-            const ptIdx = raw.findIndex((tr) => isPortugueseAudioTrack(tr));
-            if (ptIdx >= 0) {
-              for (let i = 0; i < raw.length; i++) {
-                raw[i].enabled = (i === ptIdx);
+            if (activeServer?.isDub === false) {
+              const origIdx = raw.findIndex((tr, idx) => isOriginalAudioTrack(tr, idx, raw));
+              if (origIdx >= 0) {
+                for (let i = 0; i < raw.length; i++) {
+                  raw[i].enabled = (i === origIdx);
+                }
+                setActiveAudioTrack(origIdx);
+              } else {
+                const activeIdx = list.findIndex((t) => t.enabled);
+                if (activeIdx >= 0) setActiveAudioTrack(activeIdx);
               }
-              setActiveAudioTrack(ptIdx);
             } else {
-              const activeIdx = list.findIndex((t) => t.enabled);
-              if (activeIdx >= 0) setActiveAudioTrack(activeIdx);
+              const ptIdx = raw.findIndex((tr) => isPortugueseAudioTrack(tr));
+              if (ptIdx >= 0) {
+                for (let i = 0; i < raw.length; i++) {
+                  raw[i].enabled = (i === ptIdx);
+                }
+                setActiveAudioTrack(ptIdx);
+              } else {
+                const activeIdx = list.findIndex((t) => t.enabled);
+                if (activeIdx >= 0) setActiveAudioTrack(activeIdx);
+              }
             }
           } else {
             const activeIdx = list.findIndex((t) => t.enabled);
@@ -1383,20 +1772,22 @@ export default function VideoPlayer({
           );
           if (raw.length > 0) {
             const subs = raw.map((st, idx) => ({
-              id: idx,
+              id: `safari_${idx}`,
               originalId: st.id || String(idx),
               label: normalizeSubtitleTrackLabel(
                 { name: st.label, lang: st.language },
                 idx
               ),
               lang: st.language,
+              hlsTrackIndex: idx,
+              isInternalHls: true,
             }));
 
             // Mesclar com legendas externas de activeServer.subtitles se existirem
             const externalSubs = (activeServer?.subtitles || []).map((ext, extIdx) => ({
-              id: 1000 + extIdx,
-              originalId: ext.id || `ext-${extIdx}`,
-              label: ext.label || (ext.lang === 'por' || ext.lang === 'pt' ? 'Português [CC]' : (ext.lang || `Legenda Externa ${extIdx + 1}`)),
+              id: `srv_${extIdx}`,
+              originalId: ext.id || `srv-${extIdx}`,
+              label: ext.label || (ext.lang === 'por' || ext.lang === 'pt' ? 'Português [CC]' : (ext.lang || `Legenda Servidor ${extIdx + 1}`)),
               lang: ext.lang || 'pt',
               url: ext.url,
               isExternal: true,
@@ -1452,7 +1843,20 @@ export default function VideoPlayer({
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
       video.addEventListener('resize', handleLoadedMetadata);
       video.addEventListener('playing', handleLoadedMetadata);
-      video.addEventListener('error', handleAutoFallback);
+      let hasTriedAppleProxy = false;
+      const handleAppleError = () => {
+        const currentSrc = video.src || currentUrl;
+        if (!hasTriedAppleProxy && currentUrl && !currentUrl.includes('/api/proxy') && !currentUrl.includes('bestcine.dpdns.org') && (!currentSrc || !currentSrc.includes('/api/proxy'))) {
+          hasTriedAppleProxy = true;
+          console.warn('[VideoPlayer] Apple HLS inacessível diretamente. Resgatando via /api/proxy:', currentUrl);
+          video.src = `/api/proxy?url=${encodeURIComponent(currentUrl)}`;
+          video.load();
+          video.play().catch(() => {});
+          return;
+        }
+        handleAutoFallback();
+      };
+      video.addEventListener('error', handleAppleError);
 
       if (video.audioTracks) {
         video.audioTracks.addEventListener('addtrack', updateSafariAudioTracks);
@@ -1467,7 +1871,7 @@ export default function VideoPlayer({
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         video.removeEventListener('resize', handleLoadedMetadata);
         video.removeEventListener('playing', handleLoadedMetadata);
-        video.removeEventListener('error', handleAutoFallback);
+        video.removeEventListener('error', handleAppleError);
         if (video.audioTracks) {
           video.audioTracks.removeEventListener('addtrack', updateSafariAudioTracks);
           video.audioTracks.removeEventListener('change', updateSafariAudioTracks);
@@ -1482,19 +1886,19 @@ export default function VideoPlayer({
         enableWorker: true,
         lowLatencyMode: false,
         backBufferLength: 90,
-        maxBufferLength: 60,
-        maxMaxBufferLength: 180,
-        maxBufferSize: 350 * 1024 * 1024,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        maxBufferSize: 250 * 1024 * 1024,
         maxBufferHole: 0.5,
         nudgeOffset: 0.1,
         nudgeMaxRetry: 8,
         startFragPrefetch: true,
         renderTextTracksNatively: true,
         capLevelToPlayerSize: false,
-        manifestLoadingTimeOut: 5000,
-        levelLoadingTimeOut: 5000,
-        fragLoadingTimeOut: 8000,
-        abrEwmaDefaultEstimate: 50000000,
+        manifestLoadingTimeOut: 3500,
+        levelLoadingTimeOut: 3500,
+        fragLoadingTimeOut: 5000,
+        abrEwmaDefaultEstimate: 2000000,
         abrBandwidthFactor: 0.95,
         abrBandwidthUpFactor: 0.9,
       });
@@ -1541,13 +1945,17 @@ export default function VideoPlayer({
           const sortedLevels = processHlsLevels(data.levels);
           setQualityLevels(sortedLevels);
 
-          // SEMPRE PRIORIZAR A MÁXIMA QUALIDADE POSSÍVEL (4K Ultra HD > 1440p (2K) > 1080p Full HD > 720p HD):
+          // SEMPRE INICIAR EM 1080p FULL HD (ou 720p se não houver) PARA GARANTIR FLUIDEZ
+          // 4K Ultra HD permanece disponível no menu de qualidades para escolha manual pelo usuário
           if (sortedLevels.length > 0) {
-            const maxQualityLevel = sortedLevels[0]; // O 1º nível já é garantidamente o de maior resolução/bitrate
-            hls.startLevel = maxQualityLevel.index;
-            hls.nextLevel = maxQualityLevel.index;
-            hls.loadLevel = maxQualityLevel.index;
-            setCurrentPlayingResolution(maxQualityLevel.label);
+            let preferredLevel = sortedLevels.find((lvl) => lvl.height <= 1080 && lvl.key !== '4k');
+            if (!preferredLevel) {
+              preferredLevel = sortedLevels[sortedLevels.length - 1] || sortedLevels[0];
+            }
+            hls.startLevel = preferredLevel.index;
+            hls.nextLevel = preferredLevel.index;
+            hls.loadLevel = preferredLevel.index;
+            setCurrentPlayingResolution(preferredLevel.label);
           }
         }
 
@@ -1562,13 +1970,22 @@ export default function VideoPlayer({
           }));
           setAudioTracks(tracks);
 
+          // SELEÇÃO INTELIGENTE DE ÁUDIO BASEADA NO SERVIDOR (Dublado vs Original)
           if (!userSelectedAudioRef.current) {
-            const ptIdx = hls.audioTracks.findIndex((tr) => isPortugueseAudioTrack(tr));
-            if (ptIdx >= 0) {
-              if (hls.audioTrack !== ptIdx) {
-                hls.audioTrack = ptIdx;
+            if (activeServer?.isDub === false) {
+              const origIdx = hls.audioTracks.findIndex((tr, idx) => isOriginalAudioTrack(tr, idx, hls.audioTracks));
+              if (origIdx >= 0) {
+                if (hls.audioTrack !== origIdx) hls.audioTrack = origIdx;
+                setActiveAudioTrack(origIdx);
+              } else {
+                setActiveAudioTrack(hls.audioTrack >= 0 ? hls.audioTrack : 0);
               }
-              setActiveAudioTrack(ptIdx);
+            } else {
+              const ptIdx = hls.audioTracks.findIndex((tr) => isPortugueseAudioTrack(tr));
+              if (ptIdx >= 0) {
+                if (hls.audioTrack !== ptIdx) hls.audioTrack = ptIdx;
+                setActiveAudioTrack(ptIdx);
+              }
             }
           }
         }
@@ -1601,16 +2018,24 @@ export default function VideoPlayer({
           }));
           setAudioTracks(tracks);
 
-          // PRIORIZAÇÃO MÁXIMA ABSOLUTA DE ÁUDIO PT-BR (DUBLADO)
+          // SELEÇÃO INTELIGENTE DE ÁUDIO BASEADA NO SERVIDOR (Dublado vs Original)
           if (!userSelectedAudioRef.current) {
-            const ptIdx = data.audioTracks.findIndex((tr) => isPortugueseAudioTrack(tr));
-            if (ptIdx >= 0) {
-              if (hls.audioTrack !== ptIdx) {
-                hls.audioTrack = ptIdx;
+            if (activeServer?.isDub === false) {
+              const origIdx = data.audioTracks.findIndex((tr, idx) => isOriginalAudioTrack(tr, idx, data.audioTracks));
+              if (origIdx >= 0) {
+                if (hls.audioTrack !== origIdx) hls.audioTrack = origIdx;
+                setActiveAudioTrack(origIdx);
+              } else {
+                setActiveAudioTrack(hls.audioTrack >= 0 ? hls.audioTrack : 0);
               }
-              setActiveAudioTrack(ptIdx);
             } else {
-              setActiveAudioTrack(hls.audioTrack >= 0 ? hls.audioTrack : 0);
+              const ptIdx = data.audioTracks.findIndex((tr) => isPortugueseAudioTrack(tr));
+              if (ptIdx >= 0) {
+                if (hls.audioTrack !== ptIdx) hls.audioTrack = ptIdx;
+                setActiveAudioTrack(ptIdx);
+              } else {
+                setActiveAudioTrack(hls.audioTrack >= 0 ? hls.audioTrack : 0);
+              }
             }
           } else {
             setActiveAudioTrack(hls.audioTrack >= 0 ? hls.audioTrack : 0);
@@ -1624,21 +2049,23 @@ export default function VideoPlayer({
         }
       });
 
-      // Rastrear legendas internas e externas e ativar visualização
+      // Rastrear legendas internas e externas e ativar visualização sem renderizador nativo
       hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (event, data) => {
         if (data.subtitleTracks && data.subtitleTracks.length > 0) {
           const subs = data.subtitleTracks.map((st, idx) => ({
-            id: idx,
+            id: `hls_${idx}`,
             originalId: st.id,
             label: normalizeSubtitleTrackLabel(st, idx),
             lang: st.lang,
+            hlsTrackIndex: idx,
+            isInternalHls: true,
           }));
 
           // Mesclar com legendas externas de activeServer.subtitles se existirem
           const externalSubs = (activeServer?.subtitles || []).map((ext, extIdx) => ({
-            id: 1000 + extIdx,
-            originalId: ext.id || `ext-${extIdx}`,
-            label: ext.label || (ext.lang === 'por' || ext.lang === 'pt' ? 'Português [CC]' : (ext.lang || `Legenda Externa ${extIdx + 1}`)),
+            id: `srv_${extIdx}`,
+            originalId: ext.id || `srv-${extIdx}`,
+            label: ext.label || (ext.lang === 'por' || ext.lang === 'pt' ? 'Português [CC]' : (ext.lang || `Legenda Servidor ${extIdx + 1}`)),
             lang: ext.lang || 'pt',
             url: ext.url,
             isExternal: true,
@@ -1653,29 +2080,31 @@ export default function VideoPlayer({
 
           setSubtitleTracks(combined);
           subtitleTracksRef.current = combined;
-          if (activeSubtitleTrackRef.current >= 0) {
-            hls.subtitleDisplay = true;
-            hls.subtitleTrack = activeSubtitleTrackRef.current;
+          hls.subtitleDisplay = false; // Desliga exibição interna para usar Custom SubtitleOverlay
+          if (activeSubtitleTrackRef.current && activeSubtitleTrackRef.current !== -1) {
             applySubtitleMode(activeSubtitleTrackRef.current, combined);
           }
         }
       });
 
       hls.on(Hls.Events.SUBTITLE_TRACK_LOADED, () => {
-        if (activeSubtitleTrackRef.current >= 0) {
-          hls.subtitleDisplay = true;
+        hls.subtitleDisplay = false;
+        if (activeSubtitleTrackRef.current && activeSubtitleTrackRef.current !== -1) {
           applySubtitleMode(activeSubtitleTrackRef.current);
+          const sel = subtitleTracksRef.current.find((s) => s.id === activeSubtitleTrackRef.current);
+          if (sel) loadSubtitleCues(sel);
         }
       });
 
       hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (event, data) => {
+        hls.subtitleDisplay = false;
         if (typeof data.id === 'number') {
-          setActiveSubtitleTrack(data.id);
-          activeSubtitleTrackRef.current = data.id;
-          if (data.id >= 0) {
-            hls.subtitleDisplay = true;
-          }
-          applySubtitleMode(data.id);
+          const matched = subtitleTracksRef.current.find((s) => s.hlsTrackIndex === data.id);
+          const trackId = matched ? matched.id : `hls_${data.id}`;
+          setActiveSubtitleTrack(trackId);
+          activeSubtitleTrackRef.current = trackId;
+          applySubtitleMode(trackId);
+          if (matched) loadSubtitleCues(matched);
         }
       });
 
@@ -1713,12 +2142,19 @@ export default function VideoPlayer({
           console.warn('[VideoPlayer] Erro fatal HLS:', data.type, data.details);
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              // Se o manifesto for inválido ou não parseável, alternar servidor imediatamente
+              // Se o manifesto for inválido ou inacessível (ex: SSL/CORS), tentar proxy antes de alternar
               if (
                 data.details === Hls.ErrorDetails.MANIFEST_PARSING_ERROR ||
                 data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
                 data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT
               ) {
+                if (currentUrl && !currentUrl.includes('/api/proxy') && !currentUrl.includes('bestcine.dpdns.org')) {
+                  console.warn('[VideoPlayer] Manifesto HLS inacessível diretamente (SSL/CORS). Resgatando via /api/proxy...');
+                  const proxiedUrl = `/api/proxy?url=${encodeURIComponent(currentUrl)}`;
+                  hls.loadSource(proxiedUrl);
+                  hls.startLoad();
+                  return;
+                }
                 console.warn('[VideoPlayer] Manifesto HLS inválido ou inacessível. Alternando para servidor reserva...');
                 handleAutoFallbackRef.current();
               } else {
@@ -1770,7 +2206,20 @@ export default function VideoPlayer({
       video.addEventListener('loadedmetadata', handleMetadata);
       video.addEventListener('resize', handleMetadata);
       video.addEventListener('playing', handleMetadata);
-      video.addEventListener('error', () => handleAutoFallbackRef.current());
+      let hasTriedSafariProxy = false;
+      const handleSafariHlsError = () => {
+        const currentSrc = video.src || currentUrl;
+        if (!hasTriedSafariProxy && currentUrl && !currentUrl.includes('/api/proxy') && (!currentSrc || !currentSrc.includes('/api/proxy'))) {
+          hasTriedSafariProxy = true;
+          console.warn('[VideoPlayer] Safari HLS inacessível diretamente. Resgatando via /api/proxy:', currentUrl);
+          video.src = `/api/proxy?url=${encodeURIComponent(currentUrl)}`;
+          video.load();
+          video.play().catch(() => {});
+          return;
+        }
+        handleAutoFallbackRef.current();
+      };
+      video.addEventListener('error', handleSafariHlsError);
     } else {
       // Reprodução direta MP4 / WebM
       setQualityLevels([]);
@@ -1814,7 +2263,22 @@ export default function VideoPlayer({
         }
       };
 
-      const handleMp4Error = () => handleAutoFallbackRef.current();
+      let hasTriedProxy = false;
+      const handleMp4Error = () => {
+        const currentSrc = video.src || currentUrl;
+        // Se a reprodução direta falhou (ex: net::ERR_CERT_AUTHORITY_INVALID, CORS, SSL autoassinado)
+        // e ainda não tentamos o proxy local, tenta resgatar através de /api/proxy
+        if (!hasTriedProxy && currentUrl && !currentUrl.includes('/api/proxy') && !currentUrl.includes('bestcine.dpdns.org') && (!currentSrc || !currentSrc.includes('/api/proxy'))) {
+          hasTriedProxy = true;
+          console.warn('[VideoPlayer] Falha na reprodução direta (possível certificado SSL inválido ou CORS). Resgatando via /api/proxy:', currentUrl);
+          const proxiedUrl = `/api/proxy?url=${encodeURIComponent(currentUrl)}`;
+          video.src = proxiedUrl;
+          video.load();
+          video.play().catch(() => {});
+          return;
+        }
+        handleAutoFallbackRef.current();
+      };
       video.addEventListener('loadeddata', handleData, { once: true });
       video.addEventListener('canplay', handleData, { once: true });
       video.addEventListener('resize', handleRealtimeResize);
@@ -1853,6 +2317,8 @@ export default function VideoPlayer({
   const closeAllModals = useCallback(() => {
     setServerModalOpen(false);
     setAudioSubModalOpen(false);
+    setAudioMenuOpen(false);
+    setMobileVolumeOpen(false);
     setQualityModalOpen(false);
     setCastModalOpen(false);
     setEpisodesModalOpen(false);
@@ -1864,6 +2330,86 @@ export default function VideoPlayer({
     qualityModalOpen ||
     castModalOpen ||
     episodesModalOpen;
+
+  // Alternar Proporção da Tela (Original, Preencher Tela / Zoom, Esticado)
+  const toggleAspectRatio = () => {
+    setAspectMode((prev) => {
+      if (prev === 'contain') {
+        triggerNotification('Proporção: Preencher Tela (Zoom)');
+        return 'cover';
+      }
+      if (prev === 'cover') {
+        triggerNotification('Proporção: Esticado (16:9)');
+        return 'fill';
+      }
+      triggerNotification('Proporção: Original (Ajustar)');
+      return 'contain';
+    });
+  };
+
+  // Alternar Picture-in-Picture
+  const togglePiP = async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        triggerNotification('Modo PiP desativado');
+      } else if (videoRef.current && document.pictureInPictureEnabled) {
+        await videoRef.current.requestPictureInPicture();
+        triggerNotification('Modo PiP ativado');
+      } else {
+        setCastModalOpen(true);
+      }
+    } catch (err) {
+      console.warn('[VideoPlayer] PiP falhou:', err);
+      setCastModalOpen(true);
+    }
+  };
+
+  // Alternador Rápido de Idioma do Vídeo (Dublado 🇧🇷 vs Legendado 🇺🇸 com Popover do Player)
+  const handleSelectAudioLanguage = (mode) => {
+    setAudioMenuOpen(false);
+    if (mode === 'dub') {
+      if (isCurrentDub) {
+        triggerNotification('Áudio: Já em Dublado (Português)');
+        return;
+      }
+      if (audioTracks && audioTracks.length > 1) {
+        const ptIdx = audioTracks.findIndex((tr) => isPortugueseAudioTrack(tr));
+        if (ptIdx >= 0) {
+          handleSelectAudioTrack(ptIdx);
+          triggerNotification('Áudio: Dublado (Português)');
+          return;
+        }
+      }
+      const dubIdx = servers.findIndex(
+        (s) => s.isDub || (s.providerName || '').toLowerCase().includes('dub')
+      );
+      if (dubIdx >= 0) {
+        handleSelectServer(dubIdx);
+        triggerNotification('Alternando para Servidor Dublado...');
+      }
+    } else {
+      if (!isCurrentDub) {
+        triggerNotification('Áudio: Já em Áudio Original');
+        return;
+      }
+      if (audioTracks && audioTracks.length > 1) {
+        const origIdx = audioTracks.findIndex((tr, idx) => isOriginalAudioTrack(tr, idx, audioTracks));
+        if (origIdx >= 0) {
+          handleSelectAudioTrack(origIdx);
+          triggerNotification('Áudio: Legendado (Original)');
+          return;
+        }
+      }
+      const subIdx = servers.findIndex(
+        (s) => !s.isDub && !(s.providerName || '').toLowerCase().includes('dub')
+      );
+      if (subIdx >= 0) {
+        handleSelectServer(subIdx);
+        triggerNotification('Alternando para Áudio Original (4K / 1080p)...');
+      }
+    }
+  };
 
   // Feedback visual de toque duplo (avanço / retrocesso)
   const [tapFeedback, setTapFeedback] = useState(null); // { type: 'rewind' | 'forward', id: number }
@@ -2132,34 +2678,31 @@ export default function VideoPlayer({
     }
   };
 
-  // Troca de Legendas com ativação forçada de modo 'showing' e hls.subtitleDisplay
-  const handleSelectSubtitleTrack = (trackId) => {
+  // Troca de Legendas com carregamento de cues no Custom SubtitleOverlay
+  const handleSelectSubtitleTrack = useCallback((trackId) => {
     userSelectedSubtitleRef.current = true;
     setActiveSubtitleTrack(trackId);
     activeSubtitleTrackRef.current = trackId;
 
-    if (hlsRef.current) {
-      if (trackId === -1) {
-        hlsRef.current.subtitleDisplay = false;
-        hlsRef.current.subtitleTrack = -1;
-      } else if (trackId < 1000) {
-        hlsRef.current.subtitleDisplay = true;
-        hlsRef.current.subtitleTrack = trackId;
-      } else {
-        // Legenda externa VTT: desliga HLS interno para evitar conflito
-        hlsRef.current.subtitleDisplay = false;
-        hlsRef.current.subtitleTrack = -1;
-      }
+    if (!trackId || trackId === -1 || trackId === 'off') {
+      setActiveCues([]);
+      applySubtitleMode(-1);
+      triggerNotification('Legendas desativadas');
+      return;
     }
 
+    const sel = subtitleTracksRef.current.find((s) => s.id === trackId);
+    if (!sel) return;
+
     applySubtitleMode(trackId);
-    const sel = subtitleTracks.find((s) => s.id === trackId);
-    triggerNotification(trackId === -1 ? 'Legendas desativadas' : `Legendas: ${sel?.label || 'Ativada'}`);
-  };
+    loadSubtitleCues(sel);
+    triggerNotification(`Legenda: ${sel.label}`);
+  }, [applySubtitleMode, loadSubtitleCues, triggerNotification]);
 
   // Auto-ativar legendas em Português se o servidor ativo for em Áudio Original (Inglês)
   useEffect(() => {
-    if (!isCurrentDub && subtitleTracks.length > 0 && activeSubtitleTrack === -1 && !userSelectedSubtitleRef.current) {
+    const isOff = !activeSubtitleTrack || activeSubtitleTrack === -1 || activeSubtitleTrack === 'off';
+    if (!isCurrentDub && subtitleTracks.length > 0 && isOff && !userSelectedSubtitleRef.current) {
       const ptSub = subtitleTracks.find(
         (s) =>
           s.lang === 'pt-BR' ||
@@ -2172,7 +2715,7 @@ export default function VideoPlayer({
         handleSelectSubtitleTrack(ptSub.id);
       }
     }
-  }, [isCurrentDub, subtitleTracks, activeSubtitleTrack]);
+  }, [isCurrentDub, subtitleTracks, activeSubtitleTrack, handleSelectSubtitleTrack]);
 
   // Troca de Qualidade
   const handleSelectQuality = (key) => {
@@ -2514,10 +3057,7 @@ export default function VideoPlayer({
       onClick={handlePlayerTap}
       className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center select-none overflow-hidden touch-manipulation"
     >
-      {/* Cinema Ambient Glow (Efeito Exclusivo VIP) */}
-      {ambientGlow && (
-        <div className="absolute inset-0 pointer-events-none scale-105 blur-3xl opacity-35 transition-opacity duration-1000 bg-gradient-to-r from-sky-600/30 via-blue-600/20 to-sky-600/30 -z-10" />
-      )}
+
 
       {/* Elemento HTML5 Video com Renderizador Próprio ou Embed Iframe */}
       {isIframeMode ? (
@@ -2598,7 +3138,8 @@ export default function VideoPlayer({
           }}
           onPause={() => setIsPlaying(false)}
           onDoubleClick={toggleFullscreen}
-          className="w-full h-full object-contain bg-black"
+          className="w-full h-full bg-black transition-all duration-200"
+          style={{ objectFit: aspectMode }}
         >
           {subtitleTracks.filter((s) => s.isExternal || s.url).map((sub, idx) => (
             <track
@@ -2611,6 +3152,17 @@ export default function VideoPlayer({
             />
           ))}
         </video>
+      )}
+
+      {/* ════ Renderizador de Legendas Customizado Kairou (Cinema Overlay) ════ */}
+      {!isIframeMode && activeCues.length > 0 && (
+        <SubtitleOverlay
+          videoRef={videoRef}
+          cues={activeCues}
+          offset={subtitleOffset}
+          style={subtitleSettings}
+          showControls={showControls}
+        />
       )}
 
       {/* ════ Painel de Debug de Rede (Botão "Rede" ou Ctrl+D para abrir/fechar) ════ */}
@@ -2934,386 +3486,410 @@ export default function VideoPlayer({
             </div>
           </div>
 
-          {/* Ferramentas VIP no Topo: Download MP4, Dolby Boost, Ambient Glow & Status VIP */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            {/* Botão Iluminação Ambient Glow */}
-            <button
-              type="button"
-              onClick={() => setAmbientGlow(!ambientGlow)}
-              className={`p-2 rounded-full border transition-all cursor-pointer ${
-                ambientGlow
-                  ? 'bg-sky-500/25 border-sky-400 text-sky-300 shadow-md shadow-sky-500/20'
-                  : 'bg-slate-900/80 border-white/10 text-slate-400 hover:text-white'
-              }`}
-              title={ambientGlow ? "Desativar Cinema Ambient Glow" : "Ativar Cinema Ambient Glow (Iluminação Imersiva)"}
-            >
-              <Sparkles size={15} className={ambientGlow ? "text-sky-400" : ""} />
-            </button>
 
-            {/* Botão Dolby Audio Booster (+150%) */}
-            <button
-              type="button"
-              onClick={() => {
-                if (!isVip) {
-                  onOpenSubscription?.();
-                  return;
-                }
-                setDolbyBoost(!dolbyBoost);
-                if (!dolbyBoost && videoRef.current) {
-                  videoRef.current.volume = 1;
-                }
-              }}
-              className={`px-2.5 py-1.5 rounded-full border flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
-                dolbyBoost
-                  ? 'bg-purple-500/25 border-purple-400 text-purple-300 shadow-md shadow-purple-500/25'
-                  : 'bg-slate-900/80 border-white/10 text-slate-300 hover:text-white'
-              }`}
-              title={isVip ? (dolbyBoost ? "Dolby Audio Booster Ativo (+150%)" : "Ativar Dolby Sound Booster") : "Dolby Audio Booster (Exclusivo VIP)"}
-            >
-              <Volume2 size={13} className={dolbyBoost ? "text-purple-400" : isVip ? "text-slate-300" : "text-slate-400"} />
-              <span className="hidden sm:inline text-[11px]">{dolbyBoost ? "Dolby +150%" : "Dolby"}</span>
-              {!isVip && (
-                <span className="text-[9px] px-1 rounded bg-amber-400/20 text-amber-300 font-extrabold uppercase">
-                  VIP
-                </span>
-              )}
-            </button>
-
-            {/* Botão Download Offline MP4 */}
-            <button
-              type="button"
-              onClick={() => {
-                if (isVip) {
-                  alert(`Iniciando download MP4 em alta velocidade de "${media?.title}". O vídeo será transferido sem anúncios.`);
-                } else {
-                  onOpenSubscription?.();
-                }
-              }}
-              className={`px-3 py-1.5 rounded-full border flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
-                isVip
-                  ? 'bg-amber-500/20 border-amber-400/40 text-amber-300 hover:bg-amber-500/30'
-                  : 'bg-slate-900/80 border-white/10 text-slate-300 hover:text-white'
-              }`}
-              title={isVip ? "Baixar MP4 para assistir offline" : "Download Offline exclusivo para membros VIP"}
-            >
-              <Download size={13} className={isVip ? "text-amber-400" : "text-sky-400"} />
-              <span className="hidden md:inline text-[11px]">Download</span>
-              <span className="text-[9px] px-1 rounded bg-amber-400/20 text-amber-300 font-extrabold uppercase flex items-center gap-0.5">
-                <Crown size={9} className="fill-amber-400" /> VIP
-              </span>
-            </button>
-
-            {/* Badge de Status VIP ou Botão Assinar VIP */}
-            {isVip ? (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black shadow-lg">
-                <Crown size={13} className="fill-amber-400 text-amber-400" />
-                <span className="hidden sm:inline text-[11px]">VIP Diamante</span>
-                <span className="text-[10px] text-amber-200/80 font-normal hidden lg:inline">· 100% Sem Anúncios</span>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onOpenSubscription?.()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-sky-500/20 via-blue-500/20 to-sky-500/20 hover:from-sky-500/30 hover:to-blue-500/30 border border-sky-400/40 backdrop-blur-md text-sky-300 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-md group"
-                title="Assine com MB WAY ou Cripto para remover todos os anúncios e assistir em 4K"
-              >
-                <Crown size={13} className="text-amber-400 fill-amber-400 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px]">Assinar VIP</span>
-              </button>
-            )}
-          </div>
         </div>
       )}
 
-      {/* Controles Centrais Touch (Play/Pause e Pular 10s) */}
-      {!isIframeMode && !activeServer?.isLive && (
-        <div
-          className={`absolute z-20 flex items-center gap-6 sm:gap-10 transition-all duration-200 ${
-            showControls && !isVideoBuffering && !isExtracting
-              ? 'opacity-100 scale-100'
-              : 'opacity-0 scale-75 pointer-events-none'
-          }`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Botão Pular -10s */}
-          <button
-            onClick={() => skipTime(-10)}
-            className="w-12 h-12 rounded-full bg-black/65 hover:bg-black/85 text-white flex flex-col items-center justify-center border border-white/15 backdrop-blur-md active:scale-90 transition-all cursor-pointer shadow-xl"
-            title="Voltar 10 segundos"
-          >
-            <RotateCcw size={20} />
-            <span className="text-[9px] font-bold text-sky-400 -mt-0.5">10s</span>
-          </button>
-
-          {/* Botão Central de Play/Pause */}
-          <button
-            onClick={togglePlay}
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-sky-400 hover:bg-sky-300 text-slate-950 flex items-center justify-center shadow-2xl active:scale-95 transition-all cursor-pointer"
-            aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
-          >
-            {isPlaying ? (
-              <Pause size={30} className="fill-slate-950" />
-            ) : (
-              <Play size={30} className="fill-slate-950 ml-1" />
-            )}
-          </button>
-
-          {/* Botão Pular +10s */}
-          <button
-            onClick={() => skipTime(10)}
-            className="w-12 h-12 rounded-full bg-black/65 hover:bg-black/85 text-white flex flex-col items-center justify-center border border-white/15 backdrop-blur-md active:scale-90 transition-all cursor-pointer shadow-xl"
-            title="Avançar 10 segundos"
-          >
-            <RotateCw size={20} />
-            <span className="text-[9px] font-bold text-sky-400 -mt-0.5">10s</span>
-          </button>
-        </div>
-      )}
-
-      {/* Bottom Controls Bar — Otimizada para Celular e Desktop */}
+      {/* Bottom Controls Bar — Design Idêntico à Referência Mobile */}
       {!isIframeMode && (
         <div
-          className={`absolute bottom-0 left-0 right-0 px-3 pt-6 pb-4 sm:px-6 sm:pb-6 bg-gradient-to-t from-black/98 via-black/85 to-transparent space-y-2 sm:space-y-3 transition-opacity duration-300 z-30 ${
+          className={`absolute bottom-0 left-0 right-0 px-4 sm:px-8 pt-10 pb-4 sm:pb-6 bg-gradient-to-t from-black via-black/85 to-transparent transition-opacity duration-300 ${
+            audioMenuOpen || mobileVolumeOpen ? 'z-50' : 'z-30'
+          } select-none ${
             showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
           style={{
-            paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-            paddingLeft: 'max(0.75rem, env(safe-area-inset-left))',
-            paddingRight: 'max(0.75rem, env(safe-area-inset-right))',
+            paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))',
+            paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+            paddingRight: 'max(1rem, env(safe-area-inset-right))',
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Linha 1: Barra de Progresso ou Badge de Ao Vivo */}
-          {activeServer?.isLive ? (
-            <div className="flex items-center justify-between py-1 px-1">
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[11px] font-bold">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                  AO VIVO
-                </span>
-                <span className="text-xs text-slate-300 font-medium truncate max-w-[200px] sm:max-w-md">
-                  {activeServer.providerName || media?.title}
-                </span>
-              </div>
-              <span className="text-[11px] font-mono text-sky-400 font-semibold px-2 py-0.5 rounded bg-sky-500/10 border border-sky-400/20">
-                1080p Full HD
-              </span>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 sm:gap-3">
-                {/* Tempo decorrido no Mobile */}
-                <span className="text-[11px] font-mono text-slate-300 tabular-nums shrink-0 sm:hidden">
-                  {formatTime(currentTime)}
-                </span>
+          {/* Linha 1: Controles Centrais (Mobile-first, igual à referência) */}
+          <div className="flex items-center justify-center gap-4 sm:gap-6 mb-4 sm:hidden">
+            {/* Skip Back / Anterior */}
+            <button
+              onClick={isSeries ? handlePrevEpisode : () => skipTime(-30)}
+              disabled={isSeries && !hasPrevEpisode}
+              className="w-10 h-10 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white disabled:opacity-25 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+              title={isSeries ? 'Episódio Anterior' : 'Voltar 30s'}
+            >
+              <SkipBack size={17} />
+            </button>
 
-                {/* Timeline range slider */}
-                <div className="relative flex-1 flex items-center group py-2">
+            {/* Rewind 10s */}
+            <button
+              onClick={() => skipTime(-10)}
+              className="w-10 h-10 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white transition-all active:scale-90 cursor-pointer"
+              title="Voltar 10 segundos"
+            >
+              <RotateCcw size={17} />
+            </button>
+
+            {/* Play / Pause — Grande círculo branco central */}
+            <button
+              onClick={togglePlay}
+              className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-2xl shadow-black/60 transition-transform hover:scale-105 active:scale-90 cursor-pointer"
+              aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
+            >
+              {isPlaying ? (
+                <Pause size={22} className="text-black" style={{ color: '#000' }} />
+              ) : (
+                <Play size={22} className="text-black ml-1" style={{ color: '#000' }} />
+              )}
+            </button>
+
+            {/* Forward 10s */}
+            <button
+              onClick={() => skipTime(10)}
+              className="w-10 h-10 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white transition-all active:scale-90 cursor-pointer"
+              title="Avançar 10 segundos"
+            >
+              <RotateCw size={17} />
+            </button>
+
+            {/* Skip Forward / Próximo */}
+            <button
+              onClick={isSeries ? handleNextEpisode : () => skipTime(30)}
+              disabled={isSeries && !hasNextEpisode}
+              className="w-10 h-10 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white disabled:opacity-25 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+              title={isSeries ? 'Próximo Episódio' : 'Avançar 30s'}
+            >
+              <SkipForward size={17} />
+            </button>
+          </div>
+
+          {/* Linha 2: Barra de Progresso com timestamps (Azul Kairou) */}
+          <div className="flex items-center gap-2.5 w-full mb-3">
+            <span className="text-[11px] font-mono text-white/80 font-medium tabular-nums select-none shrink-0 min-w-[36px] text-left drop-shadow">
+              {formatTime(currentTime)}
+            </span>
+
+            <div className="relative flex-1 flex items-center group" style={{ height: '20px' }}>
+              {/* Track de fundo */}
+              <div className="absolute inset-y-0 left-0 right-0 flex items-center pointer-events-none">
+                <div className="w-full h-[3px] sm:h-1 rounded-full bg-white/20 overflow-hidden">
+                  {/* Barra preenchida Azul Kairou */}
+                  <div
+                    className="h-full rounded-full bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.6)] transition-none"
+                    style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                  />
+                </div>
+              </div>
+              {/* Thumb dot Azul Kairou com brilho */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-3 sm:h-3 rounded-full bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.9)] border border-white/40 pointer-events-none z-10 transition-none"
+                style={{ left: `calc(${(currentTime / (duration || 1)) * 100}% - 7px)` }}
+              />
+              {/* Input invisível para interação */}
+              <input
+                type="range"
+                min="0"
+                max={duration || 100}
+                step="0.1"
+                value={currentTime}
+                onChange={handleSeek}
+                className="absolute inset-0 w-full opacity-0 cursor-pointer z-20"
+                style={{ height: '20px' }}
+              />
+            </div>
+
+            <span className="text-[11px] font-mono text-white/60 font-medium tabular-nums select-none shrink-0 min-w-[36px] text-right drop-shadow">
+              {formatTime(duration)}
+            </span>
+          </div>
+
+          {/* Linha 3: Barra Inferior de Ações (Volume, Monitor, Compress, Fullscreen + Desktop: controles centro) */}
+          <div className="flex items-center justify-between w-full relative">
+
+            {/* Lado Esquerdo (Desktop): Volume Capsule */}
+            <div className="hidden sm:flex items-center">
+              <div className="bg-black border border-neutral-800 rounded-full px-3 py-1.5 flex items-center gap-2.5 shadow-lg">
+                <button
+                  onClick={toggleMute}
+                  className="text-neutral-300 hover:text-white transition-colors cursor-pointer p-0.5"
+                  title={isMuted ? 'Desmutar' : 'Mutar'}
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX size={17} className="text-rose-400" />
+                  ) : (
+                    <Volume2 size={17} />
+                  )}
+                </button>
+                <div className="w-14 sm:w-20 flex items-center">
                   <input
                     type="range"
                     min="0"
-                    max={duration || 100}
-                    step="0.1"
-                    value={currentTime}
-                    onChange={handleSeek}
-                    className="w-full h-1.5 sm:h-1 bg-slate-700/80 rounded-full cursor-pointer accent-sky-400 appearance-none group-hover:h-2 transition-all"
+                    max="1"
+                    step="0.02"
+                    value={isMuted ? 0 : volume}
+                    onChange={handleVolumeChange}
+                    className="kairou-volume-slider w-full h-1 rounded-full cursor-pointer appearance-none"
                     style={{
-                      background: `linear-gradient(to right, #38bdf8 ${(currentTime / (duration || 1)) * 100}%, #334155 ${(currentTime / (duration || 1)) * 100}%)`,
+                      background: `linear-gradient(to right, #1ea1f2 ${(isMuted ? 0 : volume) * 100}%, #3f3f46 ${(isMuted ? 0 : volume) * 100}%)`,
                     }}
                   />
                 </div>
-
-                {/* Tempo total no Mobile */}
-                <span className="text-[11px] font-mono text-slate-400 tabular-nums shrink-0 sm:hidden">
-                  {formatTime(duration)}
-                </span>
               </div>
             </div>
-          )}
 
-          {/* Linha 2: Botões de Ação (Com layout sem vazamento para celular) */}
-          <div className="flex items-center justify-between text-white gap-2">
-            {/* Lado Esquerdo: Play/Pause, Episódios (Série), Volume, Tempo Desktop */}
-            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-              <button
-                onClick={togglePlay}
-                className="text-white hover:text-sky-400 transition-colors p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center cursor-pointer"
-                aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
-              >
-                {isPlaying ? <Pause size={20} /> : <Play size={20} className="fill-white ml-0.5" />}
-              </button>
-
-              {!activeServer?.isLive && (
-                <>
-                  {/* Botões -10s e +10s visíveis apenas em desktop (já estão no centro no mobile) */}
-                  <button
-                    onClick={() => skipTime(-10)}
-                    className="hidden sm:flex text-slate-300 hover:text-white transition-colors p-1.5 cursor-pointer"
-                    title="Voltar 10s"
-                  >
-                    <RotateCcw size={18} />
-                  </button>
-
-                  <button
-                    onClick={() => skipTime(10)}
-                    className="hidden sm:flex text-slate-300 hover:text-white transition-colors p-1.5 cursor-pointer"
-                    title="Avançar 10s"
-                  >
-                    <RotateCw size={18} />
-                  </button>
-                </>
-              )}
-
-              {/* Navegação Rápida entre Episódios */}
-              {isSeries && (
-                <div className="flex items-center gap-0.5 border-l border-slate-700/80 pl-1.5 sm:pl-2">
-                  <button
-                    onClick={handlePrevEpisode}
-                    disabled={!hasPrevEpisode}
-                    className="text-slate-300 hover:text-sky-400 disabled:opacity-25 disabled:hover:text-slate-300 transition-colors p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center cursor-pointer"
-                    title="Episódio Anterior"
-                  >
-                    <SkipBack size={17} />
-                  </button>
-                  <button
-                    onClick={handleNextEpisode}
-                    disabled={!hasNextEpisode}
-                    className="text-slate-300 hover:text-sky-400 disabled:opacity-25 disabled:hover:text-slate-300 transition-colors p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center cursor-pointer"
-                    title="Próximo Episódio"
-                  >
-                    <SkipForward size={17} />
-                  </button>
-                </div>
-              )}
-
-              {/* Volume / Mute */}
-              <div className="flex items-center gap-1.5">
+            {/* Centro (Desktop): Control Capsule */}
+            <div className="hidden sm:flex items-center justify-center">
+              <div className="bg-black border border-neutral-800 rounded-full px-4 sm:px-6 py-1.5 sm:py-2 flex items-center gap-3 sm:gap-5 shadow-2xl backdrop-blur-md">
                 <button
-                  onClick={toggleMute}
-                  className="text-slate-300 hover:text-white transition-colors p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center cursor-pointer"
-                  title={isMuted ? 'Desmutar' : 'Mutar'}
+                  onClick={isSeries ? handlePrevEpisode : () => skipTime(-30)}
+                  disabled={isSeries && !hasPrevEpisode}
+                  className="text-neutral-300 hover:text-white disabled:opacity-25 disabled:hover:text-neutral-300 transition-colors cursor-pointer p-1"
+                  title={isSeries ? 'Episódio Anterior' : 'Voltar 30s'}
                 >
-                  {isMuted || volume === 0 ? <VolumeX size={18} className="text-rose-400" /> : <Volume2 size={18} />}
+                  <SkipBack size={18} />
                 </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={isMuted ? 0 : volume}
-                  onChange={handleVolumeChange}
-                  className="hidden sm:block w-16 sm:w-20 h-1 bg-slate-700 rounded-full accent-sky-400 cursor-pointer"
-                />
+                <button
+                  onClick={() => skipTime(-10)}
+                  className="text-neutral-300 hover:text-white transition-colors cursor-pointer p-1"
+                  title="Voltar 10 segundos"
+                >
+                  <RotateCcw size={18} />
+                </button>
+                <button
+                  onClick={togglePlay}
+                  className="p-[2.5px] rounded-full border-2 border-white flex items-center justify-center cursor-pointer transition-transform hover:scale-105 active:scale-95 shadow-md shadow-sky-500/20"
+                  aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#1ea1f2] flex items-center justify-center">
+                    {isPlaying ? (
+                      <Pause size={15} className="text-white" style={{ color: '#fff' }} />
+                    ) : (
+                      <Play size={15} className="text-white ml-0.5" style={{ color: '#fff' }} />
+                    )}
+                  </div>
+                </button>
+                <button
+                  onClick={() => skipTime(10)}
+                  className="text-neutral-300 hover:text-white transition-colors cursor-pointer p-1"
+                  title="Avançar 10 segundos"
+                >
+                  <RotateCw size={18} />
+                </button>
+                <button
+                  onClick={isSeries ? handleNextEpisode : () => skipTime(30)}
+                  disabled={isSeries && !hasNextEpisode}
+                  className="text-neutral-300 hover:text-white disabled:opacity-25 disabled:hover:text-neutral-300 transition-colors cursor-pointer p-1"
+                  title={isSeries ? 'Próximo Episódio' : 'Avançar 30s'}
+                >
+                  <SkipForward size={18} />
+                </button>
               </div>
-
-              {/* Tempo no Desktop (apenas Filmes / Séries) */}
-              {!activeServer?.isLive && (
-                <span className="text-xs font-mono text-slate-400 tabular-nums hidden sm:inline">
-                  {formatTime(currentTime)} / {formatTime(duration)}
-                </span>
-              )}
             </div>
 
-            {/* Lado Direito: Episódios, Servidores, Legendas, Qualidade, Transmitir, Fullscreen */}
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              {isSeries && (
+            {/* Lado Direito Mobile / Desktop: Idioma + Ações */}
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
+              {/* Botão Idioma Dublado/Legendado — Mobile: texto curto, Desktop: completo */}
+              <div className="relative">
                 <button
-                  onClick={() => {
-                    const next = !episodesModalOpen;
-                    closeAllModals();
-                    setEpisodesModalOpen(next);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAudioMenuOpen(!audioMenuOpen);
                   }}
-                  className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors min-w-[34px] min-h-[34px] justify-center cursor-pointer ${
-                    episodesModalOpen ? 'text-sky-400 bg-slate-800' : 'text-slate-300 hover:text-white'
-                  }`}
-                  title="Mudar Episódio"
+                  className="h-9 px-3 bg-black/70 border border-white/30 hover:border-white/60 hover:bg-black/90 rounded-full flex items-center gap-1.5 text-white font-semibold text-xs cursor-pointer shadow-lg transition-all backdrop-blur-sm active:scale-95"
+                  title="Alterar Idioma do Vídeo"
                 >
-                  <Layers size={17} className="text-sky-400" />
-                  <span className="hidden md:inline">Episódios</span>
+                  <VolumeHigh size={14} className="text-white shrink-0" />
+                  <span className="hidden sm:inline">{isCurrentDub ? 'Dublado' : 'Legendado'}</span>
+                  <span className="sm:hidden">{isCurrentDub ? 'DUB' : 'LEG'}</span>
                 </button>
-              )}
 
-              {!activeServer?.isLive && (
-                <>
-                  <button
-                    onClick={() => {
-                      const next = !serverModalOpen;
-                      closeAllModals();
-                      setServerModalOpen(next);
-                    }}
-                    className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors min-w-[34px] min-h-[34px] justify-center cursor-pointer ${
-                      serverModalOpen ? 'text-sky-400 bg-slate-800' : 'text-slate-300 hover:text-white'
-                    }`}
-                    title="Trocar Servidor Kairou"
+                {/* Popover IDIOMA DO VÍDEO (Caixinha flutuante interativa) */}
+                {audioMenuOpen && (
+                  <div
+                    className="absolute bottom-full left-0 sm:left-auto sm:right-0 mb-3 w-52 sm:w-60 max-w-[calc(100vw-2rem)] bg-[#0d121c] border border-white/15 rounded-2xl p-2 shadow-2xl z-[70] text-left animate-scale-in backdrop-blur-2xl"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <Server size={17} />
-                    <span className="hidden md:inline">Servidores</span>
-                  </button>
+                    <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase px-3 py-1.5 select-none">
+                      IDIOMA DO VÍDEO
+                    </div>
 
-                  <button
-                    onClick={() => {
-                      const next = !audioSubModalOpen;
-                      closeAllModals();
-                      setAudioSubModalOpen(next);
-                    }}
-                    className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors min-w-[34px] min-h-[34px] justify-center cursor-pointer ${
-                      audioSubModalOpen ? 'text-sky-400 bg-slate-800' : 'text-slate-300 hover:text-white'
-                    }`}
-                    title="Áudio e Legendas"
-                  >
-                    <MessageSquare size={17} />
-                    <span className="hidden md:inline">Áudio / Legenda</span>
-                  </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectAudioLanguage('dub');
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
+                        isCurrentDub
+                          ? 'bg-sky-500/20 text-sky-300 font-semibold border border-sky-500/30 shadow-sm'
+                          : 'text-neutral-300 hover:text-white hover:bg-white/5 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Headphones size={14} className={isCurrentDub ? 'text-sky-400' : 'text-neutral-400'} />
+                        <span>Dublado</span>
+                      </div>
+                      {isCurrentDub && <Check size={14} className="text-sky-400 shrink-0" />}
+                    </button>
 
-                  <button
-                    onClick={() => {
-                      const next = !qualityModalOpen;
-                      closeAllModals();
-                      setQualityModalOpen(next);
-                    }}
-                    className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors min-w-[34px] min-h-[34px] justify-center cursor-pointer ${
-                      qualityModalOpen ? 'text-sky-400 bg-slate-800' : 'text-slate-300 hover:text-white'
-                    }`}
-                    title="Qualidade de Reprodução"
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectAudioLanguage('sub');
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer mt-1 ${
+                        !isCurrentDub
+                          ? 'bg-sky-500/20 text-sky-300 font-semibold border border-sky-500/30 shadow-sm'
+                          : 'text-neutral-300 hover:text-white hover:bg-white/5 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <ClosedCaptioning size={14} className={!isCurrentDub ? 'text-sky-400' : 'text-neutral-400'} />
+                        <span>Legendado</span>
+                      </div>
+                      {!isCurrentDub && <Check size={14} className="text-sky-400 shrink-0" />}
+                    </button>
+
+                    <div className="my-1.5 border-t border-white/10" />
+
+                    {/* Opção 1: Legendas */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAudioMenuOpen(false);
+                        setAudioSubModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      <ClosedCaptioning size={14} className="text-sky-400 shrink-0" />
+                      <span>Legendas</span>
+                    </button>
+
+                    {/* Opção 2: Servidores */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAudioMenuOpen(false);
+                        setServerModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      <Server size={14} className="text-sky-400 shrink-0" />
+                      <span>Servidores</span>
+                    </button>
+
+                    {/* Opção 3: Qualidade */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAudioMenuOpen(false);
+                        setQualityModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      <Sliders size={14} className="text-sky-400 shrink-0" />
+                      <span>Qualidade</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Botão de Volume com Scroller Interativo no Mobile */}
+              <div className="relative sm:hidden">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMobileVolumeOpen(!mobileVolumeOpen);
+                    setAudioMenuOpen(false);
+                  }}
+                  className={`w-10 h-10 rounded-full border flex items-center justify-center text-white transition-all active:scale-90 cursor-pointer backdrop-blur-sm ${
+                    mobileVolumeOpen
+                      ? 'bg-sky-500/25 border-sky-400 text-sky-300 shadow-lg shadow-sky-500/20'
+                      : 'bg-black/70 border-white/20 hover:border-white/50'
+                  }`}
+                  title="Ajustar Volume do Áudio"
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX size={17} className="text-rose-400" />
+                  ) : (
+                    <VolumeHigh size={17} />
+                  )}
+                </button>
+
+                {/* Popover Scroller de Volume no Mobile (Ajuste preciso de volume 0-100%) */}
+                {mobileVolumeOpen && (
+                  <div
+                    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 p-3 rounded-2xl bg-[#0d121c]/98 border border-white/15 backdrop-blur-2xl shadow-2xl z-[70] flex items-center gap-2.5 animate-scale-in"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ width: '180px' }}
                   >
-                    <Sliders size={17} />
-                    <span className="hidden md:inline">
-                      {selectedQuality === 'auto'
-                        ? (currentPlayingResolution ? `Auto (${currentPlayingResolution.split(' ')[0]})` : 'Auto')
-                        : selectedQuality.toUpperCase()}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleMute();
+                      }}
+                      className="p-1 rounded-lg text-slate-300 hover:text-white cursor-pointer"
+                      title={isMuted ? 'Desmutar' : 'Mutar'}
+                    >
+                      {isMuted || volume === 0 ? (
+                        <VolumeX size={15} className="text-rose-400" />
+                      ) : (
+                        <VolumeHigh size={15} />
+                      )}
+                    </button>
+
+                    <div className="flex-1 flex items-center">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.02"
+                        value={isMuted ? 0 : volume}
+                        onChange={handleVolumeChange}
+                        className="kairou-volume-slider w-full h-1.5 rounded-full cursor-pointer appearance-none"
+                        style={{
+                          background: `linear-gradient(to right, #1ea1f2 ${(isMuted ? 0 : volume) * 100}%, #3f3f46 ${(isMuted ? 0 : volume) * 100}%)`,
+                        }}
+                      />
+                    </div>
+
+                    <span className="text-[11px] font-mono font-bold text-sky-400 tabular-nums min-w-[28px] text-right select-none">
+                      {isMuted ? '0%' : `${Math.round(volume * 100)}%`}
                     </span>
-                  </button>
-                </>
-              )}
+                  </div>
+                )}
+              </div>
 
-              {/* Botão de Transmissão para TV (Cast) */}
+              {/* Transmitir para TV — abre modal completo de Cast/Smart TV/AirPlay (2º círculo) */}
               <button
-                onClick={() => {
-                  const next = !castModalOpen;
+                onClick={(e) => {
+                  e.stopPropagation();
                   closeAllModals();
-                  setCastModalOpen(next);
+                  setCastModalOpen(true);
                 }}
-                className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all min-w-[34px] min-h-[34px] justify-center cursor-pointer ${
-                  isCasting
-                    ? 'text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 shadow-lg shadow-emerald-500/10'
-                    : castModalOpen
-                    ? 'text-sky-400 bg-slate-800 border border-sky-400/40'
-                    : 'text-sky-400 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 hover:border-sky-400/50 hover:text-white'
-                }`}
-                title="Transmitir para TV (Chromecast, Smart TV, AirPlay)"
+                className="w-10 h-10 rounded-full bg-black/70 border border-white/20 hover:border-white/50 flex items-center justify-center text-white transition-all active:scale-90 cursor-pointer backdrop-blur-sm"
+                title="Transmitir para TV (Smart TV / AirPlay / Chromecast)"
               >
-                <Cast size={17} className={isCasting ? 'animate-pulse text-emerald-400' : 'text-sky-400'} />
-                <span className="hidden md:inline font-bold">
-                  {isCasting ? 'Na TV' : 'Cast'}
-                </span>
+                <Tv size={17} />
               </button>
 
+              {/* Proporção da Tela / Aspect Ratio (3º círculo — setas diagonais ⤢) */}
               <button
-                onClick={toggleFullscreen}
-                className="text-slate-300 hover:text-white transition-colors p-1.5 sm:p-2 min-w-[34px] min-h-[34px] flex items-center justify-center cursor-pointer"
-                title="Tela cheia"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleAspectRatio();
+                }}
+                className="w-10 h-10 rounded-full bg-black/70 border border-white/20 hover:border-white/50 flex items-center justify-center text-white transition-all active:scale-90 cursor-pointer backdrop-blur-sm"
+                title="Proporção da Tela (Original / Preencher / Esticado)"
               >
-                {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+                <Maximize2 size={17} />
+              </button>
+
+              {/* Fullscreen / Tela Cheia (4º círculo — 4 cantos [ ]) */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFullscreen();
+                }}
+                className="w-10 h-10 rounded-full bg-black/70 border border-white/20 hover:border-white/50 flex items-center justify-center text-white transition-all active:scale-90 cursor-pointer backdrop-blur-sm"
+                title={isFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia'}
+              >
+                {isFullscreen ? <Minimize size={17} /> : <Maximize size={17} />}
               </button>
             </div>
           </div>
@@ -3325,6 +3901,17 @@ export default function VideoPlayer({
         <div
           className="fixed inset-0 z-40 bg-black/70 backdrop-blur-xs animate-fade-in"
           onClick={closeAllModals}
+        />
+      )}
+
+      {/* Backdrop leve exclusivo para fechar o menu de áudio ou volume móvel (sem escurecer a tela) */}
+      {(audioMenuOpen || mobileVolumeOpen) && (
+        <div
+          className="fixed inset-0 z-[45]"
+          onClick={() => {
+            setAudioMenuOpen(false);
+            setMobileVolumeOpen(false);
+          }}
         />
       )}
 
@@ -3349,9 +3936,14 @@ export default function VideoPlayer({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 font-mono">
-                {servers.length} servidores
-              </span>
+              <button
+                onClick={handleRetestServersSpeed}
+                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all font-medium cursor-pointer"
+                title="Testar ping e velocidade de todos os servidores"
+              >
+                <Activity size={12} className={isSpeedTesting ? 'animate-spin' : ''} />
+                <span>{isSpeedTesting ? 'Testando...' : 'Testar Ping'}</span>
+              </button>
               <button
                 onClick={closeAllModals}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
@@ -3457,6 +4049,27 @@ export default function VideoPlayer({
                         >
                           {srv.quality || 'Full HD'}
                         </span>
+
+                        {srv.latency && srv.latency < 9000 && (
+                          <span
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-semibold text-[10px] ${
+                              srv.latency < 500
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                : srv.latency < 1000
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}
+                          >
+                            <Activity size={10} />
+                            {srv.latency}ms
+                          </span>
+                        )}
+
+                        {srv.isFastest && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 text-[10px]">
+                            ⚡ Mais Rápido
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -3479,15 +4092,16 @@ export default function VideoPlayer({
       {/* Modal / Bottom Sheet de Áudio & Legendas */}
       {audioSubModalOpen && (
         <div
-          className="fixed sm:absolute bottom-0 sm:bottom-20 inset-x-0 sm:inset-x-auto sm:right-8 z-50 w-full sm:w-80 max-w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl bg-[#0f141e]/98 sm:bg-[#0f141e]/95 border-t sm:border border-white/[0.1] p-4 sm:p-5 backdrop-blur-2xl shadow-2xl text-xs max-h-[85vh] sm:max-h-[70vh] overflow-y-auto animate-slide-up sm:animate-scale-in safe-bottom modal-content"
+          className="fixed sm:absolute bottom-0 sm:bottom-20 inset-x-0 sm:inset-x-auto sm:right-8 z-50 w-full sm:w-96 max-w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl bg-[#0f141e]/98 sm:bg-[#0f141e]/95 border-t sm:border border-white/[0.1] p-4 sm:p-5 backdrop-blur-2xl shadow-2xl text-xs max-h-[85vh] sm:max-h-[72vh] overflow-y-auto animate-slide-up sm:animate-scale-in safe-bottom modal-content custom-scrollbar"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Pílula de arrastar no celular */}
           <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto mb-3 sm:hidden shrink-0" />
 
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+          {/* Cabeçalho do Modal */}
+          <div className="flex items-center justify-between pb-3 mb-2.5 border-b border-slate-800">
             <div className="font-bold text-white text-sm flex items-center gap-2">
-              <MessageSquare size={16} className="text-sky-400" />
+              <ClosedCaptioning size={16} className="text-sky-400" />
               <span>Áudio & Legendas</span>
             </div>
             <button
@@ -3499,84 +4113,411 @@ export default function VideoPlayer({
             </button>
           </div>
 
-          {/* Faixas de Áudio */}
-          <div className="space-y-2 mb-4">
-            <span className="text-slate-400 font-semibold block text-[11px]">Áudio Disponível:</span>
-            {audioTracks.length > 0 ? (
-              <div className="space-y-1">
-                {audioTracks.map((tr) => (
-                  <button
-                    key={tr.id}
-                    onClick={() => handleSelectAudioTrack(tr.id)}
-                    className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-colors min-h-[40px] cursor-pointer ${
-                      activeAudioTrack === tr.id
-                        ? 'bg-sky-500/20 text-sky-400 font-semibold border border-sky-400/30'
-                        : 'text-slate-300 hover:bg-slate-800/60 bg-slate-900/40'
-                    }`}
-                  >
-                    <span>{tr.label}</span>
-                    {activeAudioTrack === tr.id && <Check size={14} />}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                <div className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between bg-sky-500/20 text-sky-400 font-semibold border border-sky-400/30 min-h-[40px]">
-                  <div className="flex flex-col">
-                    <span className="text-xs font-semibold">{isCurrentDub ? 'Português (Dublado)' : 'Áudio Original (Internacional)'}</span>
-                    <span className="text-[10px] text-sky-300/80 font-normal">Áudio oficial integrado na transmissão</span>
-                  </div>
-                  <Check size={14} />
-                </div>
+          {/* Seletor de Abas: Trilhas | Sincronia | Estilo */}
+          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-900/90 rounded-xl mb-3.5 border border-slate-800/80 shrink-0">
+            <button
+              onClick={() => setSubModalTab('tracks')}
+              className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                subModalTab === 'tracks'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <ClosedCaptioning size={13} />
+              <span>Trilhas</span>
+            </button>
 
-                {alternateAudioServer && (
-                  <button
-                    onClick={() => handleSelectServer(alternateAudioServer.index)}
-                    className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-colors min-h-[40px] cursor-pointer text-slate-300 hover:bg-slate-800/60 bg-slate-900/40 border border-slate-800"
-                  >
-                    <div className="flex flex-col">
-                      <span className="text-xs">{alternateAudioServer.isDub ? 'Português (Dublado)' : 'Áudio Original (com Legendas)'}</span>
-                      <span className="text-[10px] text-slate-500">Alternar transmissão</span>
+            <button
+              onClick={() => setSubModalTab('sync')}
+              className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                subModalTab === 'sync'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <Clock size={13} />
+              <span>Sincronia</span>
+              {subtitleOffset !== 0 && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              )}
+            </button>
+
+            <button
+              onClick={() => setSubModalTab('style')}
+              className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                subModalTab === 'style'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <Palette size={13} />
+              <span>Estilo</span>
+            </button>
+          </div>
+
+          {/* ════ ABA 1: TRILHAS DE ÁUDIO E LEGENDAS ════ */}
+          {subModalTab === 'tracks' && (
+            <div className="space-y-4">
+              {/* Banner rápido se tiver legenda ativa */}
+              {activeSubtitleTrack && activeSubtitleTrack !== -1 && activeSubtitleTrack !== 'off' && (
+                <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">Legenda em Exibição</span>
+                    <span className="text-xs text-white font-semibold">
+                      {subtitleTracks.find((s) => s.id === activeSubtitleTrack)?.label || 'Ativada'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setSubModalTab('sync')}
+                      className="px-2 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[11px] font-semibold border border-sky-400/30 transition-colors cursor-pointer"
+                    >
+                      ⏱️ {subtitleOffset !== 0 ? `${subtitleOffset > 0 ? '+' : ''}${subtitleOffset.toFixed(1)}s` : 'Sincronizar'}
+                    </button>
+                    <button
+                      onClick={() => setSubModalTab('style')}
+                      className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition-colors cursor-pointer"
+                    >
+                      🎨 Estilo
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Faixas de Áudio */}
+              <div className="space-y-1.5">
+                <span className="text-slate-400 font-semibold block text-[11px]">Áudio Disponível:</span>
+                {audioTracks.length > 0 ? (
+                  <div className="space-y-1">
+                    {audioTracks.map((tr) => (
+                      <button
+                        key={tr.id}
+                        onClick={() => handleSelectAudioTrack(tr.id)}
+                        className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-colors min-h-[40px] cursor-pointer ${
+                          activeAudioTrack === tr.id
+                            ? 'bg-sky-500/20 text-sky-400 font-semibold border border-sky-400/30'
+                            : 'text-slate-300 hover:bg-slate-800/60 bg-slate-900/40'
+                        }`}
+                      >
+                        <span>{tr.label}</span>
+                        {activeAudioTrack === tr.id && <Check size={14} />}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between bg-sky-500/20 text-sky-400 font-semibold border border-sky-400/30 min-h-[40px]">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold">{isCurrentDub ? 'Português (Dublado)' : 'Áudio Original (Internacional)'}</span>
+                        <span className="text-[10px] text-sky-300/80 font-normal">Áudio oficial integrado na transmissão</span>
+                      </div>
+                      <Check size={14} />
                     </div>
-                    <ChevronRight size={14} className="text-slate-500" />
-                  </button>
+
+                    {alternateAudioServer && (
+                      <button
+                        onClick={() => handleSelectServer(alternateAudioServer.index)}
+                        className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-colors min-h-[40px] cursor-pointer text-slate-300 hover:bg-slate-800/60 bg-slate-900/40 border border-slate-800"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs">{alternateAudioServer.isDub ? 'Português (Dublado)' : 'Áudio Original (com Legendas)'}</span>
+                          <span className="text-[10px] text-slate-500">Alternar transmissão</span>
+                        </div>
+                        <ChevronRight size={14} className="text-slate-500" />
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Faixas de Legendas */}
-          <div className="space-y-2">
-            <span className="text-slate-400 font-semibold block text-[11px]">Legendas:</span>
-            <div className="space-y-1">
-              <button
-                onClick={() => handleSelectSubtitleTrack(-1)}
-                className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-colors min-h-[40px] cursor-pointer ${
-                  activeSubtitleTrack === -1
-                    ? 'bg-sky-500/20 text-sky-400 font-semibold border border-sky-400/30'
-                    : 'text-slate-300 hover:bg-slate-800/60 bg-slate-900/40'
-                }`}
-              >
-                <span>Desativadas</span>
-                {activeSubtitleTrack === -1 && <Check size={14} />}
-              </button>
+              {/* Faixas de Legendas */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-semibold block text-[11px]">Legendas Disponíveis:</span>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    {subtitleTracks.length} {subtitleTracks.length === 1 ? 'opção' : 'opções'}
+                  </span>
+                </div>
 
-              {subtitleTracks.map((sub) => (
-                <button
-                  key={sub.id}
-                  onClick={() => handleSelectSubtitleTrack(sub.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-colors min-h-[40px] cursor-pointer ${
-                    activeSubtitleTrack === sub.id
-                      ? 'bg-sky-500/20 text-sky-400 font-semibold border border-sky-400/30'
-                      : 'text-slate-300 hover:bg-slate-800/60 bg-slate-900/40'
-                  }`}
-                >
-                  <span>{sub.label}</span>
-                  {activeSubtitleTrack === sub.id && <Check size={14} />}
-                </button>
-              ))}
+                <div className="space-y-1">
+                  <button
+                    onClick={() => handleSelectSubtitleTrack(-1)}
+                    className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition-colors min-h-[38px] cursor-pointer ${
+                      !activeSubtitleTrack || activeSubtitleTrack === -1 || activeSubtitleTrack === 'off'
+                        ? 'bg-sky-500/20 text-sky-400 font-semibold border border-sky-400/30'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 bg-slate-900/40'
+                    }`}
+                  >
+                    <span>Desativadas</span>
+                    {(!activeSubtitleTrack || activeSubtitleTrack === -1 || activeSubtitleTrack === 'off') && <Check size={14} />}
+                  </button>
+
+                  {subtitleTracks.map((sub) => {
+                    const isSelected = activeSubtitleTrack === sub.id;
+                    const isPt = sub.lang?.includes('pt') || sub.label.toLowerCase().includes('portugu');
+                    return (
+                      <button
+                        key={sub.id}
+                        onClick={() => handleSelectSubtitleTrack(sub.id)}
+                        className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between transition-colors min-h-[40px] cursor-pointer ${
+                          isSelected
+                            ? 'bg-sky-500/20 text-sky-400 font-semibold border border-sky-400/30'
+                            : 'text-slate-300 hover:bg-slate-800/60 bg-slate-900/40 border border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm leading-none">{isPt ? '🇧🇷' : '🌐'}</span>
+                          <span className="text-xs">{sub.label}</span>
+                        </div>
+                        {isSelected && <Check size={14} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* ════ ABA 2: SINCRONIA / DELAY DO TIMER ════ */}
+          {subModalTab === 'sync' && (
+            <div className="space-y-4">
+              <div className="flex flex-col items-center justify-center p-4 bg-slate-900/90 rounded-2xl border border-sky-500/30 shadow-inner text-center">
+                <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <Clock size={12} />
+                  Sincronizador de Legenda
+                </span>
+
+                <div className="text-4xl font-mono font-black tracking-tight my-1 text-white flex items-baseline gap-1">
+                  <span className={subtitleOffset > 0 ? 'text-amber-400' : subtitleOffset < 0 ? 'text-sky-400' : 'text-emerald-400'}>
+                    {subtitleOffset > 0 ? `+${subtitleOffset.toFixed(1)}` : subtitleOffset.toFixed(1)}
+                  </span>
+                  <span className="text-sm font-sans font-medium text-slate-400">s</span>
+                </div>
+
+                <p className="text-[11px] text-slate-300 mt-1 max-w-[260px] leading-snug">
+                  {subtitleOffset === 0
+                    ? '⏱️ Ponto de tempo original (0.0s)'
+                    : subtitleOffset > 0
+                    ? `⏳ Legenda atrasada em +${subtitleOffset.toFixed(1)}s (aparece mais tarde)`
+                    : `⚡ Legenda adiantada em ${subtitleOffset.toFixed(1)}s (aparece mais cedo)`}
+                </p>
+              </div>
+
+              {/* Botões de ajuste fino e grosso */}
+              <div className="space-y-2">
+                <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Ajuste Rápido:</span>
+                <div className="grid grid-cols-5 gap-1.5">
+                  <button
+                    onClick={() => adjustSubtitleOffset(-1.0)}
+                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-sky-500/40 font-mono font-bold text-xs transition-colors cursor-pointer"
+                    title="Adiantar 1 segundo"
+                  >
+                    -1.0s
+                  </button>
+                  <button
+                    onClick={() => adjustSubtitleOffset(-0.5)}
+                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-sky-500/40 font-mono font-bold text-xs transition-colors cursor-pointer"
+                    title="Adiantar meio segundo"
+                  >
+                    -0.5s
+                  </button>
+                  <button
+                    onClick={() => adjustSubtitleOffset(-0.1)}
+                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-sky-500/40 font-mono font-bold text-xs transition-colors cursor-pointer"
+                    title="Adiantar 1 décimo de segundo"
+                  >
+                    -0.1s
+                  </button>
+                  <button
+                    onClick={() => adjustSubtitleOffset(+0.1)}
+                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-sky-500/40 font-mono font-bold text-xs transition-colors cursor-pointer"
+                    title="Atrasar 1 décimo de segundo"
+                  >
+                    +0.1s
+                  </button>
+                  <button
+                    onClick={() => adjustSubtitleOffset(+0.5)}
+                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-sky-500/40 font-mono font-bold text-xs transition-colors cursor-pointer"
+                    title="Atrasar meio segundo"
+                  >
+                    +0.5s
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => adjustSubtitleOffset(+1.0)}
+                    className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-sky-500/40 font-mono font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    +1.0s (Atrasar)
+                  </button>
+
+                  <button
+                    onClick={resetSubtitleOffset}
+                    className="py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-sky-400 border border-sky-500/30 font-semibold text-xs transition-colors cursor-pointer"
+                  >
+                    Zerar Sincronia
+                  </button>
+                </div>
+              </div>
+
+              {/* Caixa explicativa */}
+              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                <div className="font-semibold text-slate-300">Como funciona o ajuste?</div>
+                <p>
+                  • Se o ator fala <strong>depois</strong> da legenda aparecer: clique em <strong>(+)</strong> para atrasar o texto.
+                </p>
+                <p>
+                  • Se o ator fala <strong>antes</strong> da legenda aparecer: clique em <strong>(-)</strong> para adiantar o texto.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ════ ABA 3: ESTILO VISUAL E PERSONALIZAÇÃO ════ */}
+          {subModalTab === 'style' && (
+            <div className="space-y-4">
+              {/* Pré-visualização ao vivo */}
+              <div className="p-4 rounded-2xl bg-gradient-to-b from-slate-950 to-black border border-slate-800 text-center relative overflow-hidden shadow-inner">
+                <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold absolute top-2 left-3">
+                  Pré-visualização ao Vivo
+                </span>
+                <div className="pt-4 pb-2 flex items-center justify-center min-h-[56px]">
+                  <span
+                    className={`inline-block font-sans select-none tracking-wide transition-all ${
+                      subtitleSettings.size === 'small'
+                        ? 'text-sm'
+                        : subtitleSettings.size === 'large'
+                        ? 'text-lg font-semibold'
+                        : subtitleSettings.size === 'xlarge'
+                        ? 'text-xl font-bold'
+                        : 'text-base'
+                    } ${
+                      subtitleSettings.background === 'solid'
+                        ? 'bg-black/95 px-3 py-1 rounded-lg'
+                        : subtitleSettings.background === 'translucent'
+                        ? 'bg-black/65 px-3 py-1 rounded-xl backdrop-blur-xs border border-white/10'
+                        : 'bg-transparent px-2'
+                    }`}
+                    style={{
+                      color: subtitleSettings.color,
+                      textShadow:
+                        subtitleSettings.background === 'shadow'
+                          ? '0 2px 4px rgba(0,0,0,0.95), -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 0 10px rgba(0,0,0,0.9)'
+                          : subtitleSettings.background === 'translucent'
+                          ? '0 1px 3px rgba(0,0,0,0.8), -1px -1px 0 #000, 1px -1px 0 #000'
+                          : 'none',
+                    }}
+                  >
+                    - Esta é uma fala de exemplo no Kairou.
+                  </span>
+                </div>
+              </div>
+
+              {/* Tamanho da Fonte */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] text-slate-400 font-semibold block">Tamanho do Texto:</span>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { key: 'small', label: 'Pequeno', tip: 'P' },
+                    { key: 'normal', label: 'Normal', tip: 'M' },
+                    { key: 'large', label: 'Grande', tip: 'G' },
+                    { key: 'xlarge', label: 'Gigante', tip: 'GG' },
+                  ].map((sz) => (
+                    <button
+                      key={sz.key}
+                      onClick={() => updateSubtitleSettings({ size: sz.key })}
+                      className={`py-2 px-2 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border ${
+                        subtitleSettings.size === sz.key
+                          ? 'bg-sky-500/20 text-sky-300 border-sky-400/50 font-bold shadow-sm'
+                          : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className="text-xs font-semibold">{sz.label}</span>
+                      <span className="text-[10px] opacity-70 font-mono">{sz.tip}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cor da Legenda */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] text-slate-400 font-semibold block">Cor do Texto:</span>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { color: '#ffffff', label: 'Branco', swatch: 'bg-white' },
+                    { color: '#fde047', label: 'Amarelo', swatch: 'bg-yellow-300' },
+                    { color: '#38bdf8', label: 'Ciano', swatch: 'bg-sky-400' },
+                    { color: '#4ade80', label: 'Verde', swatch: 'bg-emerald-400' },
+                  ].map((c) => (
+                    <button
+                      key={c.color}
+                      onClick={() => updateSubtitleSettings({ color: c.color })}
+                      className={`py-2 px-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                        subtitleSettings.color === c.color
+                          ? 'bg-sky-500/20 text-white border-sky-400/50 font-bold shadow-sm'
+                          : 'bg-slate-900/60 text-slate-300 border-slate-800 hover:text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className={`w-3 h-3 rounded-full ${c.swatch} shrink-0 shadow-xs`} />
+                      <span className="text-xs">{c.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Estilo de Fundo / Contorno */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] text-slate-400 font-semibold block">Estilo de Fundo:</span>
+                <div className="space-y-1.5">
+                  {[
+                    {
+                      key: 'shadow',
+                      title: 'Cinema (Apenas Sombra)',
+                      desc: 'Transparente com contorno de alto contraste. Não esconde o filme.',
+                    },
+                    {
+                      key: 'translucent',
+                      title: 'Translúcido Suave',
+                      desc: 'Fundo preto semitransparente com bordas arredondadas modernas.',
+                    },
+                    {
+                      key: 'solid',
+                      title: 'Caixa Sólida Escura',
+                      desc: 'Fundo preto opaco tradicional de alto contraste.',
+                    },
+                  ].map((bg) => (
+                    <button
+                      key={bg.key}
+                      onClick={() => updateSubtitleSettings({ background: bg.key })}
+                      className={`w-full text-left p-2.5 rounded-xl flex items-center justify-between transition-all border cursor-pointer ${
+                        subtitleSettings.background === bg.key
+                          ? 'bg-sky-500/20 text-white border-sky-400/50 shadow-sm'
+                          : 'bg-slate-900/60 text-slate-300 border-slate-800 hover:text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-semibold">{bg.title}</span>
+                        <span className="text-[10px] text-slate-400">{bg.desc}</span>
+                      </div>
+                      {subtitleSettings.background === bg.key && <Check size={14} className="text-sky-400 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Botão de Restaurar Padrões */}
+              <div className="pt-2">
+                <button
+                  onClick={resetSubtitleSettings}
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <RotateCcw size={13} />
+                  <span>Restaurar Estilo Padrão</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -3859,6 +4800,32 @@ export default function VideoPlayer({
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
                     Ideal para TVs via Miracast, HDMI sem fio ou quando a TV não possui Chromecast.
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            {/* Ação 4: Janela Flutuante (Picture-in-Picture) */}
+            <button
+              onClick={() => {
+                closeAllModals();
+                togglePiP();
+              }}
+              className="w-full p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 text-left transition-all group cursor-pointer"
+            >
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-slate-800 text-slate-300 group-hover:text-white shrink-0 mt-0.5">
+                  <Maximize2 size={18} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-200 group-hover:text-white text-xs">
+                      Assistir em Janela Flutuante (PiP)
+                    </span>
+                    <ChevronRight size={14} className="text-slate-500 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                    Mantém o vídeo tocando em uma mini janela flutuante no celular ou PC enquanto você navega.
                   </p>
                 </div>
               </div>

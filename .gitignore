@@ -51,3 +51,8 @@ ios/App/DerivedData
 .claude/
 .cursor/
 *.tar.gz
+
+brag-output*
+build/
+*.py
+*.spec

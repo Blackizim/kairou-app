@@ -1,6 +1,6 @@
-// Servidor de Streaming Local Cinetuga para PC
-// Executa os provedores Stremio (FrostStream, FenixFlix, Zeus) e o Turbo Proxy HLS/MP4
-// diretamente na sua máquina local, com latência mínima e ZERO dependência de BRFLIX.
+// Servidor de Streaming em Produção Kairou
+// Executa os extratores (FrostStream, FenixFlix, Zeus), o Turbo Proxy HLS/MP4
+// e atende as rotas /api e arquivos estáticos da VPS com latência mínima.
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -15,7 +15,6 @@ import extractHandler from '../api/extract.js';
 import proxyHandler from '../api/proxy.js';
 import channelsHandler from '../api/channels.js';
 import matchesHandler from '../api/matches.js';
-import systemHandler from '../api/system.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,7 +24,7 @@ const DIST_DIR = path.join(ROOT_DIR, 'dist');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
 
-// Configuração de Proxies Reversos de Addons (espelha o vite.config.js para produção local)
+// Configuração de Proxies Reversos de Addons
 const REVERSE_PROXIES = [
   { prefix: '/api-fenixflix', target: 'https://fenixflix.fenixhub.online' },
   { prefix: '/api-clickhost', target: 'https://embed-api.clickhost.xyz' },
@@ -34,7 +33,6 @@ const REVERSE_PROXIES = [
   { prefix: '/api-warez', target: 'https://warezcdn.lat' },
 ];
 
-// Tipos MIME para arquivos estáticos
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
@@ -53,19 +51,11 @@ const MIME_TYPES = {
   '.ts': 'video/mp2t',
 };
 
-// Descobre o IP da rede local (Wi-Fi / Ethernet)
 function getLocalNetworkIp() {
   const nets = os.networkInterfaces();
   for (const name of Object.keys(nets)) {
     for (const net of nets[name] || []) {
       if (net.family === 'IPv4' && !net.internal && !net.address.startsWith('169.254')) {
-        return net.address;
-      }
-    }
-  }
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name] || []) {
-      if (net.family === 'IPv4' && !net.internal) {
         return net.address;
       }
     }
@@ -76,7 +66,6 @@ function getLocalNetworkIp() {
 const server = http.createServer(async (req, res) => {
   if (!req.url) return res.end();
 
-  // Parsing da URL e query params
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = parsedUrl.pathname;
   const search = parsedUrl.search;
@@ -125,7 +114,6 @@ const server = http.createServer(async (req, res) => {
   else if (pathname.startsWith('/api/proxy')) apiHandler = proxyHandler;
   else if (pathname.startsWith('/api/channels')) apiHandler = channelsHandler;
   else if (pathname.startsWith('/api/matches')) apiHandler = matchesHandler;
-  else if (pathname.startsWith('/api/system')) apiHandler = systemHandler;
 
   if (apiHandler) {
     let body = {};
@@ -180,18 +168,17 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Se qualquer rota começar com /api e não foi tratada, retornar 404 JSON (NUNCA index.html!)
+  // Se qualquer rota começar com /api e não foi tratada, retornar 404 JSON
   if (pathname.startsWith('/api') || pathname.startsWith('/api-')) {
     res.statusCode = 404;
     res.setHeader('Content-Type', 'application/json');
     return res.end(JSON.stringify({ ok: false, error: 'Endpoint não encontrado' }));
   }
 
-  // 3. Se a pasta 'dist' existir, serve o frontend compilado
+  // 3. Servir arquivos estáticos do frontend (dist/)
   if (fs.existsSync(DIST_DIR)) {
     let filePath = path.join(DIST_DIR, pathname === '/' ? 'index.html' : pathname);
 
-    // Se arquivo não existe, fallback para SPA (index.html) apenas para rotas normais
     if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
       filePath = path.join(DIST_DIR, 'index.html');
     }
@@ -207,7 +194,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Página informativa se a pasta dist ainda não foi compilada
+  // Fallback se a pasta dist ainda não foi gerada
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.statusCode = 200;
   res.end(`
@@ -215,22 +202,20 @@ const server = http.createServer(async (req, res) => {
     <html lang="pt-BR">
     <head>
       <meta charset="UTF-8">
-      <title>Cinetuga - Servidor Local</title>
+      <title>Kairou Streaming Server</title>
       <style>
-        body { font-family: system-ui, sans-serif; background: #0b0f19; color: #fff; padding: 40px; text-align: center; }
-        .box { max-width: 600px; margin: 40px auto; background: #131b2e; padding: 30px; border-radius: 12px; border: 1px solid #1f293d; }
-        h1 { color: #6366f1; }
-        p { color: #94a3b8; font-size: 16px; line-height: 1.6; }
-        code { background: #0f172a; padding: 4px 8px; border-radius: 6px; color: #38bdf8; }
+        body { font-family: system-ui, sans-serif; background: #07090e; color: #fff; padding: 40px; text-align: center; }
+        .box { max-width: 600px; margin: 40px auto; background: #0f141e; padding: 30px; border-radius: 16px; border: 1px solid #1c2436; }
+        h1 { color: #38bdf8; }
+        p { color: #94a3b8; font-size: 15px; line-height: 1.6; }
+        code { background: #1c2436; padding: 4px 8px; border-radius: 6px; color: #38bdf8; }
       </style>
     </head>
     <body>
       <div class="box">
-        <h1>🚀 Cinetuga PC Streaming Server Online!</h1>
-        <p>O motor de streaming Stremio (Frost, Fenix, Zeus) está rodando localmente com latência ultra-baixa.</p>
-        <p>Para abrir a interface web no navegador, execute em outro terminal:</p>
-        <p><code>npm run dev</code></p>
-        <p>Ou gere a versão de produção com <code>npm run build</code> para servir tudo por este servidor!</p>
+        <h1>✨ Kairou Streaming Server Online</h1>
+        <p>Motor de extração e Turbo Proxy HLS ativo.</p>
+        <p>Execute <code>npm run build</code> para servir a interface gráfica completa.</p>
       </div>
     </body>
     </html>
@@ -240,21 +225,9 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   const lanIp = getLocalNetworkIp();
   console.log('\n' + '='.repeat(60));
-  console.log('   🚀 Cinetuga PC STREAMING SERVER - MOTOR LOCAL NATIVO');
+  console.log('   🚀 KAIROU STREAMING - SERVIDOR DE PRODUÇÃO');
   console.log('='.repeat(60));
-  console.log('  ⚡ Provedores Stremio Nativos (Sem BRFLIX):');
-  console.log('     • FrostStream (4K Ultra HD & 1080p Dublado)');
-  console.log('     • FenixFlix   (1080p Dublado / Legendado)');
-  console.log('     • Zeus        (1080p Dublado / Legendado)');
-  console.log('     • Turbo Proxy (HLS M3U8 & MP4 com Range 206 local)');
-  console.log('');
-  console.log('  🔗 Como assistir:');
-  console.log(`     • No seu PC:        http://localhost:${PORT}`);
-  console.log(`     • Celular/TV/Wi-Fi: http://${lanIp}:${PORT}`);
-  console.log('');
-  console.log('  👥 Compartilhar com amigos fora de casa:');
-  console.log(`     • Inicie o Cloudflare Tunnel: cloudflared tunnel --url http://localhost:${PORT}`);
-  console.log(`     • Ou use Tailscale / ngrok http ${PORT}`);
+  console.log(`  🔗 Porta: ${PORT} (http://localhost:${PORT} / http://${lanIp}:${PORT})`);
+  console.log('  ⚡ Provedores & Turbo Proxy HLS Ativos');
   console.log('='.repeat(60) + '\n');
 });
-

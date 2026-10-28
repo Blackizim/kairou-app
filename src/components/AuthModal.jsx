@@ -88,8 +88,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           </h3>
           <p className="text-xs text-slate-400 mt-1">
             {mode === 'login'
-              ? 'Faça login para assistir aos filmes e sincronizar seu histórico.'
-              : 'Junte-se ao Kairou para assistir aos filmes, salvar progresso e favoritos.'}
+              ? 'Faça login para sincronizar seu histórico e personalizar seu perfil.'
+              : 'Crie sua conta para sincronizar seus favoritos e histórico em qualquer aparelho.'}
           </p>
         </div>
 

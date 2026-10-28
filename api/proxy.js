@@ -1,3 +1,5 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 // High-Performance Streaming & HLS Proxy for Kairou
 // Runs locally on the user's PC to eliminate CORS restrictions and buffer latency
 import { Readable } from 'node:stream';
@@ -5,10 +7,21 @@ import { Readable } from 'node:stream';
 function srtToVtt(srtText) {
   if (!srtText || typeof srtText !== 'string') return 'WEBVTT\n\n';
   let clean = srtText.replace(/^\uFEFF/, '').trim();
-  if (clean.startsWith('WEBVTT')) return clean;
+  if (clean.startsWith('WEBVTT')) {
+    return clean
+      .replace(/<font[^>]*>/gi, '')
+      .replace(/<\/font>/gi, '')
+      .replace(/\{\\[^}]+\}/g, '');
+  }
   clean = clean
     .replace(/\r\n|\r/g, '\n')
-    .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, (_m, p1, p2) => `${p1}.${p2}`);
+    .replace(/(?:(\d{1,2}):)?(\d{2}):(\d{2})[,.](\d{3})/g, (_m, h, m, s, ms) => {
+      const hh = h ? (h.length === 1 ? `0${h}` : h) : '00';
+      return `${hh}:${m}:${s}.${ms}`;
+    })
+    .replace(/<font[^>]*>/gi, '')
+    .replace(/<\/font>/gi, '')
+    .replace(/\{\\[^}]+\}/g, '');
   return `WEBVTT\n\n${clean}`;
 }
 
@@ -40,13 +53,42 @@ export default async function handler(req, res) {
       forwardHeaders['Range'] = req.headers.range;
     }
 
-    const upstreamRes = await fetch(targetUrl, {
-      method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-      headers: forwardHeaders,
-      redirect: 'follow',
-    });
+    let upstreamRes;
+    try {
+      upstreamRes = await fetch(targetUrl, {
+        method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+        headers: forwardHeaders,
+        redirect: 'follow',
+      });
+    } catch (fetchErr) {
+      // Se falhar em HTTPS por certificado autoassinado ou porta bloqueada, tenta HTTP puro
+      if (targetUrl.startsWith('https://')) {
+        const httpUrl = targetUrl.replace(/^https:\/\//i, 'http://');
+        upstreamRes = await fetch(httpUrl, {
+          method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+          headers: forwardHeaders,
+          redirect: 'follow',
+        });
+      } else {
+        throw fetchErr;
+      }
+    }
 
-    const status = upstreamRes.status;
+    let status = upstreamRes.status;
+    if (status >= 400 && targetUrl.startsWith('https://')) {
+      try {
+        const httpUrl = targetUrl.replace(/^https:\/\//i, 'http://');
+        const altRes = await fetch(httpUrl, {
+          method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+          headers: forwardHeaders,
+          redirect: 'follow',
+        });
+        if (altRes.status < 400) {
+          upstreamRes = altRes;
+          status = upstreamRes.status;
+        }
+      } catch {}
+    }
     if (status >= 400) {
       res.statusCode = status;
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');

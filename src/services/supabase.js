@@ -144,6 +144,45 @@ export async function updateUserProfile({ displayName, avatarUrl }) {
   return data;
 }
 
+const LOCAL_PROGRESS_KEY = 'kairou_guest_watch_progress';
+
+function getLocalWatchProgress() {
+  if (typeof window === 'undefined' || !window.localStorage) return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_PROGRESS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalWatchProgress(item) {
+  if (typeof window === 'undefined' || !window.localStorage) return item;
+  try {
+    let list = getLocalWatchProgress();
+    list = list.filter(
+      (p) => !(String(p.media_id) === String(item.media_id) && Number(p.season) === Number(item.season) && Number(p.episode) === Number(item.episode))
+    );
+    list.unshift(item);
+    list = list.slice(0, 20);
+    localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(list));
+    return item;
+  } catch {
+    return item;
+  }
+}
+
+function removeLocalWatchProgress(mediaId, season = 1, episode = 1) {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    let list = getLocalWatchProgress();
+    list = list.filter(
+      (p) => !(String(p.media_id) === String(mediaId) && Number(p.season) === Number(season) && Number(p.episode) === Number(episode))
+    );
+    localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(list));
+  } catch {}
+}
+
 // 6. Salvar Progresso (Continuar Assistindo)
 export async function saveWatchProgress({
   mediaId,
@@ -158,9 +197,6 @@ export async function saveWatchProgress({
   duration = 0,
 }) {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null; // Apenas salva se o usuário estiver logado
-
     if (!mediaId || !title || duration <= 0) return null;
 
     const progressPercent = Math.min(100, Math.round((currentTime / duration) * 100));
@@ -174,13 +210,27 @@ export async function saveWatchProgress({
     // Se assistiu menos de 10 segundos, não precisa salvar ainda
     if (currentTime < 10) return null;
 
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const normalizeImg = (p, size = 'w780') => {
+      if (!p || typeof p !== 'string') return '';
+      const s = p.trim();
+      if (!s || s === 'null' || s === 'undefined') return '';
+      if (s.startsWith('http://') || s.startsWith('https://')) return s;
+      const clean = s.startsWith('/') ? s : '/' + s;
+      return `https://image.tmdb.org/t/p/${size}${clean}`;
+    };
+
+    const normPoster = normalizeImg(posterPath, 'w500');
+    const normBackdrop = normalizeImg(backdropPath, 'w780') || normPoster;
+
     const payload = {
-      user_id: user.id,
+      user_id: user?.id || 'guest',
       media_id: String(mediaId),
       media_type: mediaType || 'movie',
       title: title,
-      poster_path: posterPath || '',
-      backdrop_path: backdropPath || '',
+      poster_path: normPoster,
+      backdrop_path: normBackdrop,
       season: Number(season) || 1,
       episode: Number(episode) || 1,
       episode_title: episodeTitle || '',
@@ -189,6 +239,11 @@ export async function saveWatchProgress({
       progress_percent: progressPercent,
       updated_at: new Date().toISOString(),
     };
+
+    // Salva localmente se for visitante (não logado)
+    if (!user) {
+      return saveLocalWatchProgress(payload);
+    }
 
     const { data, error } = await supabase
       .from('watch_progress')
@@ -210,7 +265,9 @@ export async function saveWatchProgress({
 export async function getWatchProgressList() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
+    if (!user) {
+      return getLocalWatchProgress();
+    }
 
     const { data, error } = await supabase
       .from('watch_progress')
@@ -223,13 +280,15 @@ export async function getWatchProgressList() {
     return data || [];
   } catch (err) {
     console.warn('[Supabase] Erro ao buscar lista de progresso:', err);
-    return [];
+    return getLocalWatchProgress();
   }
 }
 
 // 8. Remover item de Continuar Assistindo
 export async function removeWatchProgress(mediaId, season = 1, episode = 1) {
   try {
+    removeLocalWatchProgress(mediaId, season, episode);
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 

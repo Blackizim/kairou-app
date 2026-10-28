@@ -1,7 +1,7 @@
-import React, { useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
 import MediaCard from './MediaCard';
 import TopTenCard from './TopTenCard';
+import { KaiBack, KaiRight } from './KaiIcons';
 
 export default function MediaRow({
   title,
@@ -14,96 +14,82 @@ export default function MediaRow({
   onToggleWatchlist,
   isInWatchlist
 }) {
-  const rowRef = useRef(null);
+  const railRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
 
-  const checkScroll = () => {
-    if (rowRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = rowRef.current;
-      setCanScrollLeft(scrollLeft > 20);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 20);
-    }
+  const updateScrollState = () => {
+    if (!railRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = railRef.current;
+    setCanScrollLeft(scrollLeft > 6);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 10);
   };
 
+  useEffect(() => {
+    updateScrollState();
+  }, [items]);
+
   const handleScroll = (direction) => {
-    if (rowRef.current) {
-      const { clientWidth } = rowRef.current;
-      const scrollAmount = direction === 'left' ? -clientWidth * 0.75 : clientWidth * 0.75;
-      rowRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-    }
+    if (!railRef.current) return;
+    const scrollAmount = direction * (railRef.current.clientWidth * 0.8);
+    railRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
   };
 
   if (!items || items.length === 0) return null;
 
   return (
-    <section className="relative w-full py-4 sm:py-5 group select-none">
-      {/* Section Header */}
-      <div className="max-w-[1680px] mx-auto px-4 sm:px-8 lg:px-12 flex items-baseline justify-between mb-3">
+    <section className="section page-width">
+      <div className="section-head">
         <div>
-          <h2 className="text-base sm:text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            {title}
-          </h2>
-          {subtitle && (
-            <p className="text-xs text-slate-400 font-medium mt-0.5">{subtitle}</p>
-          )}
+          <h2>{title}</h2>
+          {subtitle && <p>{subtitle}</p>}
+        </div>
+        <div className="section-actions">
+          <button
+            onClick={() => handleScroll(-1)}
+            disabled={!canScrollLeft}
+            aria-label={`Voltar em ${title}`}
+          >
+            <KaiBack size={10} />
+          </button>
+          <button
+            onClick={() => handleScroll(1)}
+            disabled={!canScrollRight}
+            aria-label={`Avançar em ${title}`}
+          >
+            <KaiRight size={10} />
+          </button>
         </div>
       </div>
 
-      {/* Horizontal Carousel Area */}
-      <div className="relative max-w-[1680px] mx-auto px-4 sm:px-8 lg:px-12">
-        {/* Left Scroll Button */}
-        {canScrollLeft && (
-          <button
-            onClick={() => handleScroll('left')}
-            className="absolute left-1 sm:left-4 top-1/2 -translate-y-1/2 z-30 w-10 sm:w-12 h-20 sm:h-28 rounded-r-xl bg-[#07090e]/85 hover:bg-[#131822] border-y border-r border-white/[0.08] text-white flex items-center justify-center backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md"
-            aria-label="Rolar para a esquerda"
-          >
-            <ChevronLeft size={22} className="text-slate-300 hover:text-white" />
-          </button>
-        )}
-
-        {/* Scrollable Container */}
-        <div
-          ref={rowRef}
-          onScroll={checkScroll}
-          className="flex items-center gap-3 sm:gap-4 overflow-x-auto no-scrollbar scroll-smooth py-2 px-1"
-        >
-          {isTop10
-            ? items.map((item, idx) => (
-                <TopTenCard
-                  key={item.id}
-                  media={item}
-                  rank={idx + 1}
-                  onPlay={onPlay}
-                  onOpenDetails={onOpenDetails}
-                  onToggleWatchlist={onToggleWatchlist}
-                  isInWatchlist={isInWatchlist}
-                />
-              ))
-            : items.map((item) => (
-                <MediaCard
-                  key={item.id}
-                  media={item}
-                  aspect={aspect}
-                  onPlay={onPlay}
-                  onOpenDetails={onOpenDetails}
-                  onToggleWatchlist={onToggleWatchlist}
-                  isInWatchlist={isInWatchlist}
-                />
-              ))}
-        </div>
-
-        {/* Right Scroll Button */}
-        {canScrollRight && (
-          <button
-            onClick={() => handleScroll('right')}
-            className="absolute right-1 sm:right-4 top-1/2 -translate-y-1/2 z-30 w-10 sm:w-12 h-20 sm:h-28 rounded-l-xl bg-[#07090e]/85 hover:bg-[#131822] border-y border-l border-white/[0.08] text-white flex items-center justify-center backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md"
-            aria-label="Rolar para a direita"
-          >
-            <ChevronRight size={22} className="text-slate-300 hover:text-white" />
-          </button>
-        )}
+      <div
+        ref={railRef}
+        onScroll={updateScrollState}
+        className={`rail ${isTop10 ? 'ranked' : ''}`}
+      >
+        {isTop10
+          ? items.map((item, idx) => (
+              <TopTenCard
+                key={item.id || idx}
+                media={item}
+                rank={idx + 1}
+                onPlay={onPlay}
+                onOpenDetails={onOpenDetails}
+                onToggleWatchlist={onToggleWatchlist}
+                isInWatchlist={isInWatchlist}
+              />
+            ))
+          : items.map((item, idx) => (
+              <MediaCard
+                key={item.id || idx}
+                media={item}
+                aspect={aspect}
+                onPlay={onPlay}
+                onOpenDetails={onOpenDetails}
+                onToggleWatchlist={onToggleWatchlist}
+                isInWatchlist={isInWatchlist}
+              />
+            ))}
       </div>
     </section>
   );

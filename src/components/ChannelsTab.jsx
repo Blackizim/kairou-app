@@ -5,6 +5,7 @@ import {
   X,
   Play,
   Trophy,
+  Futbol,
   Baby,
   Newspaper,
   Clock,
@@ -26,7 +27,7 @@ import { resolveChannelStream } from '../services/channelsResolver.js';
 // Genre filter list for channels
 const CHANNEL_GENRES = [
   { id: 'all', label: 'Todos os Canais', icon: Sparkles },
-  { id: 'esportes', label: 'Esportes', icon: Trophy },
+  { id: 'esportes', label: 'Esportes', icon: Futbol },
   { id: 'canais-abertos', label: 'Canais Abertos', icon: Tv },
   { id: 'filmes-series', label: 'Filmes & Séries', icon: Film },
   { id: '24-horas', label: 'Canais 24h', icon: Clock },
@@ -39,7 +40,7 @@ const CHANNEL_GENRES = [
 // Main tab categories
 const SPORTS_CATEGORIES = [
   { id: 'all', label: 'Todos os Jogos', icon: Flame },
-  { id: 'futebol', label: 'Futebol Ao Vivo', icon: Trophy },
+  { id: 'futebol', label: 'Futebol Ao Vivo', icon: Futbol },
   { id: 'basquete', label: 'NBA & Basquete', icon: Flame },
   { id: 'lutas', label: 'UFC & Lutas', icon: Swords },
   { id: 'motor', label: 'F1 & Motor', icon: Flame },

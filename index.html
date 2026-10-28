@@ -4,12 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     
-    <!-- Monetag Verification & Smart Multitag -->
-    <script src="https://quge5.com/88/tag.min.js" data-zone="291063" async data-cfasync="false"></script>
+    <!-- Limpeza Imediata de Service Workers Antigos -->
+    <script>
+      (function() {
+        if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            for (var r of regs) {
+              r.unregister();
+            }
+          }).catch(function() {});
+        }
+      })();
+    </script>
+
     
-    <!-- Clickadu Verification -->
-    <meta name="clckd" content="2568fd57970617a440f52381ced8d9ab" />
-    <meta name="6a97888e-site-verification" content="d1f8fed3457feb5e941f95e553aedd52" />
+
+
+
 
     <!-- Primary Meta Tags -->
     <title>Kairou — Assistir Filmes, Séries e Animes Online Grátis em HD e 4K</title>
@@ -29,7 +40,7 @@
     <meta name="revisit-after" content="1 days" />
 
     <!-- Mobile & PWA Theme -->
-    <meta name="theme-color" content="#07090e" />
+    <meta name="theme-color" content="#0b0e15" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Kairou" />
@@ -114,15 +125,18 @@
     }
     </script>
 
+    <!-- Umami Analytics -->
+    <script defer src="https://cloud.umami.is/script.js" data-website-id="d582c5d4-7f2b-423d-ac50-02d2cd1ac4ba"></script>
+
     <!-- Preconnect & Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/png" href="/kairou-spiral.png" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/kairou.svg" />
     <link rel="apple-touch-icon" href="/kairou-spiral.png" />
     <style>
       body {
-        background-color: #07090e;
+        background-color: #0b0e15;
         color: #f8fafc;
         overflow-x: hidden;
       }
@@ -142,6 +156,8 @@
         background: #38bdf8;
       }
     </style>
+    <!-- Font Awesome 6.4.0 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   </head>
   <body class="bg-[#07090e] text-slate-100 antialiased selection:bg-sky-500/30 selection:text-sky-200">
     <div id="root">
@@ -173,8 +189,8 @@
     <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" async></script>
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- Ad Network Zone Tags (Inert HTML structure for site verification) -->
-    <ins class="eas6a97888e35" data-zoneid="6042726" style="display:none"></ins> 
-    <ins class="eas6a97888e29" data-zoneid="6042728" style="display:none"></ins>
+
+ 
+
   </body>
 </html>

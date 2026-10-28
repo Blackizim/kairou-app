@@ -13,30 +13,12 @@ import Footer from './components/Footer';
 import Toast from './components/Toast';
 import AuthModal from './components/AuthModal';
 import ProfileModal from './components/ProfileModal';
-import AdminPanelModal from './components/AdminPanelModal';
-import GlobalAnnouncementBanner from './components/GlobalAnnouncementBanner';
-import SupportPromptModal from './components/SupportPromptModal';
 import DonationSection from './components/DonationSection';
-import VipSubscriptionModal from './components/VipSubscriptionModal';
-import {
-  isUserAdmin,
-  getAdminSpotlight,
-  getMaintenanceMode,
-  setMaintenanceMode,
-  recordVisitHit,
-  initRealtimePresence,
-  syncGlobalSystemSettings,
-} from './services/adminAnalytics';
-import {
-  initAdConsent,
-  setAdConsent,
-  disableAds,
-  loadAdScript,
-  loadWatchingAds,
-  unloadWatchingAds,
-} from './services/adConsent';
-import { isVipUser } from './services/vipService';
-import { Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import SupportPromptModal from './components/SupportPromptModal';
+import HalloweenSection from './components/HalloweenSection';
+import { initAdConsent, setAdConsent } from './services/adConsent';
+
+import { Loader2 } from 'lucide-react';
 import {
   supabase,
   getUserProfile,
@@ -59,7 +41,7 @@ import {
 } from './services/tmdb';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('home'); // 'home', 'series', 'movies', 'anime', 'watchlist'
+  const [activeTab, setActiveTab] = useState('home'); // 'home', 'series', 'movies', 'anime', 'watchlist', 'channels'
   const [selectedFilter, setSelectedFilter] = useState(GENRE_FILTERS[0]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -91,15 +73,10 @@ export default function App() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState('login');
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [adminModalOpen, setAdminModalOpen] = useState(false);
-  const [adminSpotlight, setAdminSpotlight] = useState(() => getAdminSpotlight());
-  const [isMaintenance, setIsMaintenance] = useState(() => getMaintenanceMode());
-  const [previewVisitorMaintenance, setPreviewVisitorMaintenance] = useState(false);
 
-  // Popup de apoio / anúncios e Modal de Assinatura VIP
-  const [supportModalOpen, setSupportModalOpen] = useState(false);
+  // Modal de doação PixGG & Apoio com Anúncios
   const [donationModalOpen, setDonationModalOpen] = useState(false);
-  const [vipModalOpen, setVipModalOpen] = useState(false);
+  const [supportModalOpen, setSupportModalOpen] = useState(false);
   const [pendingPlayMedia, setPendingPlayMedia] = useState(null);
 
   // Continuar Assistindo (Watch Progress)
@@ -130,7 +107,7 @@ export default function App() {
       } else {
         setUser(null);
         setProfile(null);
-        setWatchProgressList([]);
+        loadUserProgress();
       }
     });
 
@@ -143,7 +120,7 @@ export default function App() {
       } else {
         setUser(null);
         setProfile(null);
-        setWatchProgressList([]);
+        loadUserProgress();
       }
     });
 
@@ -152,35 +129,12 @@ export default function App() {
     };
   }, [loadUserProgress]);
 
-  // Registrar acesso e escutar alterações do painel admin
-  useEffect(() => {
-    recordVisitHit();
-    initRealtimePresence(user);
-    syncGlobalSystemSettings();
-
-    const handleSpotlight = () => setAdminSpotlight(getAdminSpotlight());
-    const handleMaintenance = (e) => {
-      if (e?.detail?.enabled !== undefined) {
-        setIsMaintenance(Boolean(e.detail.enabled));
-      } else {
-        setIsMaintenance(getMaintenanceMode());
-      }
-    };
-
-    window.addEventListener('kairou_spotlight_changed', handleSpotlight);
-    window.addEventListener('kairou_maintenance_changed', handleMaintenance);
-    return () => {
-      window.removeEventListener('kairou_spotlight_changed', handleSpotlight);
-      window.removeEventListener('kairou_maintenance_changed', handleMaintenance);
-    };
-  }, [user]);
-
   const handleSignOut = async () => {
     try {
       await signOutUser();
       setUser(null);
       setProfile(null);
-      setWatchProgressList([]);
+      loadUserProgress();
       showToast('Você saiu da sua conta.');
     } catch (err) {
       console.error('Erro ao sair:', err);
@@ -342,43 +296,10 @@ export default function App() {
     }, 3000);
   };
 
-  // Inicialização do consentimento de anúncios & escuta de ativação VIP
+  // Inicialização do AdShield (Garante plataforma 100% livre de anúncios)
   useEffect(() => {
-    initAdConsent(user, profile);
-
-    const handleVipUpdate = () => {
-      disableAds(user, profile);
-    };
-    window.addEventListener('kairou_vip_updated', handleVipUpdate);
-    window.addEventListener('borlaflix_vip_updated', handleVipUpdate);
-    return () => {
-      window.removeEventListener('kairou_vip_updated', handleVipUpdate);
-      window.removeEventListener('borlaflix_vip_updated', handleVipUpdate);
-    };
-  }, [user, profile]);
-
-  const handleSelectAdConsent = (consented) => {
-    setSupportModalOpen(false);
-    if (consented) {
-      loadAdScript();
-      showToast('Muito obrigado por apoiar o Kairou! ❤️');
-    } else {
-      // Usuário gratuito não pode desativar anúncios sem assinatura VIP
-      const isVip = isVipUser(user, profile);
-      if (isVip) {
-        disableAds(user, profile);
-        showToast('Modo VIP: Sem anúncios.');
-      } else {
-        loadAdScript();
-        showToast('Anúncios mantêm o Kairou no ar. Apoie via PixGG para manter o projeto!');
-      }
-    }
-
-    if (pendingPlayMedia) {
-      setActiveVideoPlayer(pendingPlayMedia);
-      setPendingPlayMedia(null);
-    }
-  };
+    initAdConsent();
+  }, []);
 
   const isInWatchlist = (id) => watchlist.some((m) => m.id === id);
 
@@ -393,25 +314,24 @@ export default function App() {
   };
 
   const handlePlayMedia = (media, episode = null, options = {}) => {
-    // Apenas usuários logados podem assistir filmes, séries e canais
-    if (!user) {
-      setPendingPlayMedia({ media, episode, ...options });
-      setAuthModalMode('login');
-      setAuthModalOpen(true);
-      showToast('Faça login ou crie uma conta gratuita para assistir!');
-      return;
+    // Exibe tela com escolha: assistir com anúncios, sem anúncios ou apoiar Pix
+    setPendingPlayMedia({ media, episode, ...options });
+    setSupportModalOpen(true);
+  };
+
+  const handleSelectAdConsent = (consented) => {
+    setAdConsent(consented);
+    setSupportModalOpen(false);
+
+    if (consented) {
+      showToast('Muito obrigado por apoiar o Kairou! ❤️');
+    } else {
+      showToast('Iniciando sem anúncios.');
     }
 
-    const isVip = isVipUser(user, profile);
-    if (isVip) {
-      // Assinante VIP: Zero anúncios, servidores 4K e bitrate máximo
-      disableAds(user, profile);
-      setActiveVideoPlayer({ media, episode, ...options });
-      showToast('👑 Reproduzindo em modo VIP: Zero Anúncios & 4K!');
-    } else {
-      // Usuário Gratuito: Anúncios ativados apenas no momento da reprodução
-      loadWatchingAds(user, profile);
-      setActiveVideoPlayer({ media, episode, ...options });
+    if (pendingPlayMedia) {
+      setActiveVideoPlayer(pendingPlayMedia);
+      setPendingPlayMedia(null);
     }
   };
 
@@ -431,103 +351,11 @@ export default function App() {
     } else {
       list = trendingAll.slice(0, 5);
     }
-
-    if (adminSpotlight && activeTab === 'home') {
-      return [adminSpotlight, ...list.filter((item) => String(item.id) !== String(adminSpotlight.id))];
-    }
     return list;
-  }, [trendingAll, popularTV, popularMovies, animeSeries, activeTab, adminSpotlight]);
-
-  // Modo Manutenção Preventiva (bloqueia visitantes, ou quando o admin ativa "Ver como Visitante")
-  if (isMaintenance && (!isUserAdmin(user) || previewVisitorMaintenance)) {
-    return (
-      <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col items-center justify-center p-6 text-center select-none relative overflow-hidden">
-        {previewVisitorMaintenance && (
-          <div className="fixed top-5 z-50 bg-amber-500/20 border border-amber-500/40 text-amber-300 px-4 py-2 rounded-2xl text-xs font-bold backdrop-blur-md flex items-center gap-3 shadow-2xl">
-            <AlertTriangle size={16} />
-            <span>👀 Visualizando modo visitante (simulação da tela de bloqueio)</span>
-            <button
-              onClick={() => setPreviewVisitorMaintenance(false)}
-              className="px-3 py-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors cursor-pointer"
-            >
-              Voltar ao Painel Admin
-            </button>
-          </div>
-        )}
-
-        <div className="w-16 h-16 rounded-3xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-5 animate-pulse shadow-lg shadow-amber-500/10">
-          <AlertTriangle size={32} />
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Kairou em Manutenção Preventiva</h1>
-        <p className="text-xs sm:text-sm text-slate-400 max-w-md mt-3 leading-relaxed">
-          Estamos aprimorando a infraestrutura de servidores e adicionando novos títulos e canais em alta velocidade. Voltaremos em breve!
-        </p>
-
-        {!isUserAdmin(user) && (
-          <button
-            onClick={() => {
-              setAuthModalMode('login');
-              setAuthModalOpen(true);
-            }}
-            className="mt-8 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
-          >
-            Acesso Administrativo (Login)
-          </button>
-        )}
-
-        {authModalOpen && (
-          <AuthModal
-            isOpen={authModalOpen}
-            onClose={() => setAuthModalOpen(false)}
-            initialMode={authModalMode}
-            onAuthSuccess={async (u) => {
-              setUser(u);
-              const p = await getUserProfile(u.id);
-              setProfile(p);
-              loadUserProgress();
-            }}
-          />
-        )}
-      </div>
-    );
-  }
+  }, [trendingAll, popularTV, popularMovies, animeSeries, activeTab]);
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col selection:bg-sky-500/30 selection:text-sky-200">
-      {/* Alerta de Manutenção Ativa Exclusivo para o Administrador */}
-      {isMaintenance && isUserAdmin(user) && !previewVisitorMaintenance && (
-        <div className="sticky top-0 z-[100] bg-gradient-to-r from-amber-600 via-rose-600 to-amber-600 text-white px-4 py-2 text-xs font-bold flex flex-wrap items-center justify-between gap-2 shadow-2xl border-b border-amber-300/40">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={16} className="text-amber-200 shrink-0" />
-            <span>
-              MODO MANUTENÇÃO ATIVO: O site está bloqueado para todos os visitantes normais no mundo todo.
-              Você está navegando com passe livre de Administrador.
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPreviewVisitorMaintenance(true)}
-              className="px-2.5 py-1 rounded-lg bg-black/40 hover:bg-black/60 text-white text-[11px] font-semibold border border-white/20 transition-all cursor-pointer"
-            >
-              👁️ Ver como Visitante
-            </button>
-            <button
-              onClick={() => {
-                setMaintenanceMode(false);
-                setIsMaintenance(false);
-                showToast('Modo manutenção desativado!');
-              }}
-              className="px-2.5 py-1 rounded-lg bg-white text-rose-700 hover:bg-rose-50 text-[11px] font-black transition-all cursor-pointer shadow-sm"
-            >
-              Desativar Agora
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Global Announcement Broadcast Banner */}
-      <GlobalAnnouncementBanner />
-
+    <div className="min-h-screen bg-[#0b0e15] text-[#f4f6fb] flex flex-col selection:bg-sky-500/30 selection:text-sky-200">
       {/* Navbar */}
       <Navbar
         activeTab={activeTab}
@@ -546,8 +374,6 @@ export default function App() {
           setAuthModalOpen(true);
         }}
         onOpenProfile={() => setProfileModalOpen(true)}
-        onOpenAdmin={() => setAdminModalOpen(true)}
-        onOpenSubscription={() => setVipModalOpen(true)}
         onOpenDonation={() => window.open('https://pixgg.com/pommern', '_blank')}
         onSignOut={handleSignOut}
       />
@@ -626,7 +452,7 @@ export default function App() {
             />
 
             {/* Catalog Rails Container */}
-            <div className="space-y-4 sm:space-y-6 pb-20">
+            <div className="content-sections pb-20">
               {/* Filtered View if a specific genre or filter is active */}
               {selectedFilter.id !== 'all' ? (
                 loadingGenre ? (
@@ -677,6 +503,14 @@ export default function App() {
                           onOpenDetails={handleOpenDetails}
                           onToggleWatchlist={toggleWatchlist}
                           isInWatchlist={isInWatchlist}
+                        />
+                      )}
+
+                      {/* Halloween Interactive Spotlight (kai4) */}
+                      {activeTab === 'home' && (
+                        <HalloweenSection
+                          onSelectHorror={() => handleSelectFilter({ id: '27', label: 'Terror', genreId: 27, type: 'movie' })}
+                          posters={actionMovies.slice(0, 2)}
                         />
                       )}
 
@@ -842,8 +676,8 @@ export default function App() {
               )}
             </div>
 
-            {/* Seção de Assinatura VIP no Catálogo */}
-            <DonationSection onOpenVipModal={() => setVipModalOpen(true)} />
+            {/* Seção de Doação PixGG no Catálogo */}
+            <DonationSection />
           </>
         )}
       </main>
@@ -856,7 +690,6 @@ export default function App() {
           profile={profile}
           onClose={() => setActiveMediaModal(null)}
           onPlay={handlePlayMedia}
-          onOpenSubscription={() => setVipModalOpen(true)}
           onToggleWatchlist={toggleWatchlist}
           isInWatchlist={isInWatchlist}
           onSelectMedia={(newMedia) => setActiveMediaModal(newMedia)}
@@ -872,10 +705,8 @@ export default function App() {
           autoCast={Boolean(activeVideoPlayer.autoCast)}
           user={user}
           profile={profile}
-          onOpenSubscription={() => setVipModalOpen(true)}
           onClose={() => {
             setActiveVideoPlayer(null);
-            unloadWatchingAds();
             loadUserProgress();
           }}
         />
@@ -892,17 +723,6 @@ export default function App() {
           setProfile(p);
           loadUserProgress();
           showToast(`Bem-vindo(a) ao Kairou, ${p?.display_name || u.user_metadata?.display_name || 'Membro'}!`);
-          if (pendingPlayMedia) {
-            const isVip = isVipUser(u, p);
-            if (isVip) {
-              disableAds(u, p);
-              showToast('👑 VIP Reconhecido: Zero Anúncios!');
-            } else {
-              loadWatchingAds(u, p);
-            }
-            setActiveVideoPlayer(pendingPlayMedia);
-            setPendingPlayMedia(null);
-          }
         }}
       />
 
@@ -916,45 +736,37 @@ export default function App() {
           setProfile(updated);
           showToast('Perfil atualizado com sucesso!');
         }}
-        onOpenAdmin={() => setAdminModalOpen(true)}
-        onOpenSubscription={() => setVipModalOpen(true)}
         onSignOut={handleSignOut}
-      />
-
-      {/* Admin Panel Modal (Exclusivo para shizuu122@gmail.com) */}
-      <AdminPanelModal
-        isOpen={adminModalOpen}
-        onClose={() => setAdminModalOpen(false)}
-        user={user}
-        showToast={showToast}
-        onPreviewMaintenance={() => {
-          setAdminModalOpen(false);
-          setPreviewVisitorMaintenance(true);
-        }}
       />
 
       {/* Toast Notification */}
       <Toast toast={toast} onClose={() => setToast(null)} />
 
-      {/* Modal de Assinatura VIP (MB WAY & Criptomoedas) */}
-      <VipSubscriptionModal
-        isOpen={vipModalOpen || donationModalOpen}
-        onClose={() => {
-          setVipModalOpen(false);
-          setDonationModalOpen(false);
-        }}
-        user={user}
-        profile={profile}
-        onVipActivated={() => {
-          showToast('🎉 Assinatura VIP ativada com sucesso! Aproveite 4K e Zero Anúncios.');
-          disableAds(user, profile);
+      {/* Modal de Escolha: Assistir com anúncios, sem anúncios ou apoiar Pix */}
+      <SupportPromptModal
+        isOpen={supportModalOpen}
+        onSelectChoice={handleSelectAdConsent}
+        onOpenDonation={() => {
+          setSupportModalOpen(false);
+          setDonationModalOpen(true);
+          if (pendingPlayMedia) {
+            setActiveVideoPlayer(pendingPlayMedia);
+            setPendingPlayMedia(null);
+          }
         }}
       />
 
+      {/* Modal de Doação PixGG */}
+      {donationModalOpen && (
+        <DonationSection
+          isModal={true}
+          onClose={() => setDonationModalOpen(false)}
+        />
+      )}
+
       {/* Footer */}
       <Footer
-        onOpenSubscription={() => setVipModalOpen(true)}
-        onOpenDonation={() => window.open('https://pixgg.com/pommern', '_blank')}
+        onOpenDonation={() => setDonationModalOpen(true)}
       />
     </div>
   );

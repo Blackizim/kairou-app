@@ -3,7 +3,7 @@ import { X, Heart, Shield, Sparkles, Check, ExternalLink } from 'lucide-react';
 import KairouIcon from './KairouIcon';
 
 export default function SupportPromptModal({ isOpen, onSelectChoice, onOpenDonation }) {
-  // Fechar ao pressionar ESC (escolhe continuar sem anuncios por padrao)
+  // Fechar ao pressionar ESC (escolhe continuar sem anúncios por padrão)
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
@@ -28,7 +28,7 @@ export default function SupportPromptModal({ isOpen, onSelectChoice, onOpenDonat
         <div className="absolute -top-24 -left-24 w-60 h-60 bg-sky-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-60 h-60 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Botao Fechar (X) - Continua sem anuncios */}
+        {/* Botão Fechar (X) - Continua sem anúncios */}
         <button
           onClick={() => onSelectChoice(false)}
           className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-white/[0.08] transition-colors z-20 cursor-pointer"
@@ -51,7 +51,7 @@ export default function SupportPromptModal({ isOpen, onSelectChoice, onOpenDonat
           </div>
         </div>
 
-        {/* Titulo e Descricao */}
+        {/* Título e Descrição */}
         <div className="space-y-2 mb-6">
           <div className="flex items-center gap-2.5">
             <KairouIcon size={32} />
@@ -63,16 +63,15 @@ export default function SupportPromptModal({ isOpen, onSelectChoice, onOpenDonat
             O Kairou é uma plataforma independente e gratuita. Para mantermos a alta velocidade e os custos de infraestrutura no ar, você pode escolher se quer nos apoiar assistindo a anúncios ou continuar navegando sem nenhum anúncio.
           </p>
           
-          {/* Informacao discreta (nao parece botao) */}
           <div className="flex items-center gap-2 text-xs text-slate-400 pt-1">
             <Sparkles size={14} className="text-sky-400 shrink-0" />
             <span>Você decide livremente se deseja assistir com anúncios ou continuar sem.</span>
           </div>
         </div>
 
-        {/* Opcoes de Acao */}
+        {/* Opções de Ação */}
         <div className="space-y-3">
-          {/* Opcao 1: Apoiar com Anuncios (Azul Kairou) */}
+          {/* Opção 1: Apoiar com Anúncios (Azul Kairou) */}
           <button
             type="button"
             onClick={() => onSelectChoice(true)}
@@ -94,7 +93,7 @@ export default function SupportPromptModal({ isOpen, onSelectChoice, onOpenDonat
             <Check size={18} className="text-white/90 shrink-0 ml-2" />
           </button>
 
-          {/* Opcao 2: Continuar sem Anuncios */}
+          {/* Opção 2: Continuar sem Anúncios */}
           <button
             type="button"
             onClick={() => onSelectChoice(false)}
@@ -115,7 +114,7 @@ export default function SupportPromptModal({ isOpen, onSelectChoice, onOpenDonat
             </div>
           </button>
 
-          {/* Opcao 3: Apoiar com Doação Pix (PixGG) */}
+          {/* Opção 3: Apoiar com Doação Pix (PixGG) */}
           <a
             href="https://pixgg.com/pommern"
             target="_blank"

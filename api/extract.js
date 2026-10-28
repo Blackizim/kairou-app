@@ -1,15 +1,17 @@
 // Vercel Serverless & Local PC Node.js Function: /api/extract
-// Resolves video streams directly from Stremio Addons (FrostStream, FenixFlix, Zeus)
-// and high-speed web providers with 100% Zero BRFLIX dependency.
+// Resolvedor de alta performance para Kairou Streaming
+// Integra as melhores fontes BR testadas: BestCine, FrostStream, Vê Tela, MagnetFlix, BsCine e FenixFlix
+// Prioridade máxima estrita: 4K Ultra HD Dublado > 4K Legendado > 1080p Full HD Dublado
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-const FETCH_TIMEOUT_MS = 4500;
+const FETCH_TIMEOUT_MS = 5000;
 
-// Memória Cache de Alta Performance em RAM do Servidor Node.js (< 1ms resposta)
+// Memória Cache de Alta Performance em RAM (< 1ms resposta)
 const serverExtractCache = new Map();
 const CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 horas
 const imdbIdCache = new Map();
+const tmdbFromImdbCache = new Map();
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
   const controller = new AbortController();
@@ -24,7 +26,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS)
   }
 }
 
-// Normaliza streams, descarta placeholders e garante que HLS sem CORS passem pelo proxy local
+// Normaliza streams, descarta placeholders e garante compatibilidade de CORS e mixed content
 function normalizeStreamUrl(url) {
   if (!url || typeof url !== 'string') return '';
   let u = url.trim();
@@ -36,7 +38,8 @@ function normalizeStreamUrl(url) {
     u.includes('koyeb.app') ||
     u.includes('squareweb.app') ||
     u.includes('imagesskill.com') ||
-    u.includes('v-net.work')
+    u.includes('v-net.work') ||
+    u.includes('never_gonna_give_you_up')
   ) {
     return '';
   }
@@ -46,47 +49,30 @@ function normalizeStreamUrl(url) {
     return u;
   }
 
-  // Remove referências antigas a proxy brflix se houver
+  // Remove referências antigas a proxy se houver
   if (u.includes('brflix.lat/dynamic-proxy/')) {
     u = u.replace(/https?:\/\/brflix\.lat\/dynamic-proxy\//i, '');
     if (!u.startsWith('http')) u = `https://${u}`;
   }
 
-  // Qualquer stream em IP direto sem SSL (ex: http://152.233.*.* ou http://\d+\.\d+\.\d+\.\d+)
-  // DEVE passar pelo Turbo Proxy local para ganhar CORS, Range HTTP 206 e evitar bloqueio de Mixed Content no browser
-  if (/^https?:\/\/\d+\.\d+\.\d+\.\d+/i.test(u)) {
-    return `/api/proxy?url=${encodeURIComponent(u)}`;
+  // Únicos hosts diretos com HTTPS válido, alta velocidade e CORS nativo que NÃO devem passar pelo proxy:
+  // (Nota: bestcine.dpdns.org NUNCA deve passar pelo proxy da VPS pois a Cloudflare bloqueia IPs de datacenter)
+  const isDirectFastHost =
+    u.includes('bestcine.dpdns.org') ||
+    u.includes('froststream.cloutteam.com') ||
+    u.includes('cnvods.com') ||
+    u.includes('wasabisys.com') ||
+    u.includes('vodshuby.com') ||
+    u.includes('duckdns.org');
+
+  if (isDirectFastHost && u.startsWith('https://')) {
+    return u;
   }
 
-  // Hosts que bloqueiam CORS no browser: encapsular no proxy local de alta velocidade
-  if (
-    u.includes('devcorp.me') ||
-    u.includes('36ghhjjbxtv71.site') ||
-    u.includes('hcjgkko87g.shop') ||
-    u.includes('embedplayer2.xyz') ||
-    u.includes('embedplayer.online') ||
-    u.includes('112234152.xyz') ||
-    u.includes('clickhost.xyz') ||
-    u.includes('embed-api')
-  ) {
-    return `/api/proxy?url=${encodeURIComponent(u)}`;
-  }
-
-  // Upgrade de HTTP para HTTPS em hosts conhecidos para evitar bloqueio de mixed content
-  if (
-    u.startsWith('http://') &&
-    (u.includes('workers.dev') ||
-      u.includes('p2vipserver.top') ||
-      u.includes('2kbrfonte.space') ||
-      u.includes('marciadesouza.com') ||
-      u.includes('apperror404.com') ||
-      u.includes('77zzhf54vdll71.com') ||
-      u.includes('iptvmais.one'))
-  ) {
-    u = u.replace(/^http:\/\//i, 'https://').replace(/:80(?=\/|$)/, '');
-  }
-
-  return u;
+  // QUALQUER OUTRA FONTE (IPTV dinâmico, vodis, pfsv, gmafast, oneplayfast, 2kbrfonte, tech-cdn,
+  // HTTP inseguro, IPs diretos ou domínios com SSL autoassinado/inválido/cipher antigo)
+  // DEVE ser encapsulada no Turbo Proxy local para garantir HTTPS, CORS, Range HTTP 206 e eliminar Mixed Content!
+  return `/api/proxy?url=${encodeURIComponent(u)}`;
 }
 
 function detectQuality(url = '', name = '', title = '', explicitQuality = null) {
@@ -105,10 +91,9 @@ function detectQuality(url = '', name = '', title = '', explicitQuality = null) 
   }
 
   const metaText = `${name} ${title}`.toLowerCase();
-  // Analisar apenas o caminho do arquivo / rota sem tokens ou parâmetros de query
   const urlPath = (url || '').toLowerCase().split('?')[0];
 
-  // 1. 4K Ultra HD (2160p / 4K / UHD) - Rigoroso em limites de palavra
+  // 1. 4K Ultra HD (2160p / 4K / UHD)
   if (
     /\b(4k|uhd|2160p?|ultra\s*hd|ultrahd)\b/i.test(metaText) ||
     /(?:_|-|\/|\.)(?:2160p?|4k|uhd)(?:_|-|\/|\.|$)/i.test(urlPath) ||
@@ -117,7 +102,7 @@ function detectQuality(url = '', name = '', title = '', explicitQuality = null) 
     return { quality: '4K Ultra HD', rank: 1, is4k: true };
   }
 
-  // 2. 1440p 2K (QHD) - Apenas se especificado explicitamente como resolução (evita falso positivo com IDs de stream tipo 11440939)
+  // 2. 1440p 2K (QHD)
   if (
     /\b(1440p?|2560x1440|qhd)\b/i.test(metaText) ||
     /(?:_|-|\/|\.)(?:1440p?|qhd)(?:_|-|\/|\.|$)/i.test(urlPath) ||
@@ -135,7 +120,7 @@ function detectQuality(url = '', name = '', title = '', explicitQuality = null) 
     return { quality: '1080p Full HD', rank: 3, is1080: true };
   }
 
-  // 4. 720p HD (Apenas se especificado explicitamente 720 ou 720p)
+  // 4. 720p HD
   if (
     /\b(720p?)\b/i.test(metaText) ||
     /(?:_|-|\/|\.)(?:720p?)(?:_|-|\/|\.|$)/i.test(urlPath) ||
@@ -153,13 +138,13 @@ function detectQuality(url = '', name = '', title = '', explicitQuality = null) 
     return { quality: '480p', rank: 5 };
   }
 
-  // Padrão de servidores de alta qualidade: 1080p Full HD
+  // Padrão de alta qualidade: 1080p Full HD
   return { quality: '1080p Full HD', rank: 3, is1080: true };
 }
 
 const TMDB_READ_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4MjljMjk3OTUwZTYxZTBjNzE3OGI1ZmQ5YzllNmZhMCIsIm5iZiI6MTc1MTgyNDMyMC40NTcsInN1YiI6IjY4NmFiN2MwZDQ4OWE5YzMyYTUzZmFjNCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.IBBf0y2Nv9mzgXSpswQC2MsezfsDKAkhtKTC3211BpY';
 
-// Resolução de IMDb ID via TMDB com fallback inteligente de tipo (tv <-> movie)
+// Resolução de IMDb ID via TMDB com fallback inteligente de tipo
 async function resolveImdbId(tmdbId, isSeries) {
   if (!tmdbId || isNaN(Number(tmdbId))) return null;
   const primaryType = isSeries ? 'tv' : 'movie';
@@ -178,7 +163,6 @@ async function resolveImdbId(tmdbId, isSeries) {
     let imdbId = data?.imdb_id || null;
 
     if (!imdbId) {
-      // Tentar tipo alternativo (ex: anime ou série marcado como filme ou vice-versa)
       res = await fetchWithTimeout(
         `https://api.themoviedb.org/3/${fallbackType}/${tmdbId}/external_ids`,
         { headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` } },
@@ -196,9 +180,7 @@ async function resolveImdbId(tmdbId, isSeries) {
   return null;
 }
 
-const tmdbFromImdbCache = new Map();
-
-// Resolução de TMDB ID a partir de IMDb ID (ex: tt31450459) via TMDB /find/
+// Resolução de TMDB ID a partir de IMDb ID
 async function resolveTmdbFromImdb(imdbId) {
   if (!imdbId || typeof imdbId !== 'string') return null;
   const clean = imdbId.trim();
@@ -208,9 +190,7 @@ async function resolveTmdbFromImdb(imdbId) {
   try {
     const res = await fetchWithTimeout(
       `https://api.themoviedb.org/3/find/${clean}?external_source=imdb_id`,
-      {
-        headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` }
-      },
+      { headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` } },
       3000
     );
     if (res && res.ok) {
@@ -232,10 +212,14 @@ async function resolveTmdbFromImdb(imdbId) {
   return null;
 }
 
-// 0. BestCine (Stremio Multi-Source Oficial PT-BR - 4K Ultra HD & 1080p Dublado / HLS / MP4)
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. BestCine (https://bestcine.dpdns.org) - PRIORIDADE 1 ABSOLUTA (4K HDR & 1080p)
+// ─────────────────────────────────────────────────────────────────────────────
 async function extractBestCine({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries)) || (tmdbId ? `tmdb:${tmdbId}` : null);
+  const targetId = isSeries
+    ? (tmdbId ? `tmdb:${tmdbId}` : null) || imdbId || (await resolveImdbId(tmdbId, isSeries))
+    : (imdbId || (await resolveImdbId(tmdbId, isSeries)) || (tmdbId ? `tmdb:${tmdbId}` : null));
   if (!targetId) return [];
 
   const path = isSeries
@@ -258,38 +242,24 @@ async function extractBestCine({ tmdbId, imdbId, type, season = 1, episode = 1 }
       if (Array.isArray(data.streams)) {
         for (let idx = 0; idx < data.streams.length; idx++) {
           const s = data.streams[idx];
-          // Descartar qualquer torrent / P2P
           if (!s || !s.url || s.infoHash || s.behaviorHints?.p2p) continue;
 
           let streamUrl = normalizeStreamUrl(s.url);
           if (!streamUrl) continue;
 
-          // Se for rota do BestCine ou sem SSL direto, encapsular no proxy local
-          if (s.behaviorHints?.notWebReady || streamUrl.includes('bestcine.dpdns.org') || !streamUrl.startsWith('https://')) {
-            if (!streamUrl.startsWith('/api/proxy')) {
-              streamUrl = `/api/proxy?url=${encodeURIComponent(streamUrl)}`;
-            }
-          }
-
           const isHls = streamUrl.includes('.m3u8') || streamUrl.includes('master.txt');
-          const titleText = s.title || s.description || '';
-          const nameText = s.name || '';
-          const metaLower = `${titleText} ${nameText}`.toLowerCase();
-          const hasDubAudio =
-            metaLower.includes('dublado') ||
-            metaLower.includes('dub') ||
-            metaLower.includes('dual') ||
-            metaLower.includes('multi') ||
-            metaLower.includes('nacional') ||
-            metaLower.includes('português') ||
-            metaLower.includes('portugues') ||
-            metaLower.includes('pt-br') ||
-            metaLower.includes('ptbr') ||
-            metaLower.includes('🇧🇷');
-          const isLegOnly = !hasDubAudio && (metaLower.includes('legendado') || metaLower.includes('legend') || metaLower.includes('sub') || metaLower.includes('🇺🇸') || metaLower.includes('🇯🇵') || metaLower.includes('japones') || metaLower.includes('japonês'));
-          const isDub = hasDubAudio || !isLegOnly;
+          const titleText = (s.title || s.description || '');
+          const nameText = (s.name || '');
+          const combined = `${titleText} ${nameText}`;
+          const metaLower = combined.toLowerCase();
 
-          const qInfo = detectQuality(streamUrl, nameText, titleText);
+          const is4k = /\b(4k|uhd|2160p?)\b/i.test(combined);
+          const isDual = metaLower.includes('dual') || metaLower.includes('🔀');
+          const hasDub = metaLower.includes('dublado') || metaLower.includes('dub') || isDual || metaLower.includes('nacional') || metaLower.includes('português') || metaLower.includes('portugues') || metaLower.includes('🇧🇷');
+          const isLegOnly = !hasDub && (metaLower.includes('legendado') || metaLower.includes('legend') || metaLower.includes('sub') || metaLower.includes('🇺🇸') || metaLower.includes('🇯🇵'));
+          const isDub = hasDub || !isLegOnly;
+
+          const qInfo = detectQuality(streamUrl, nameText, titleText, is4k ? '4K' : null);
 
           streams.push({
             id: `kairou-best-${idx}-${Date.now()}`,
@@ -300,8 +270,10 @@ async function extractBestCine({ tmdbId, imdbId, type, season = 1, episode = 1 }
             quality: qInfo.quality,
             rank: qInfo.rank,
             isHls,
-            priority: isDub ? 1 : 2,
+            is4k: qInfo.is4k || is4k,
+            priority: (qInfo.is4k && isDub) ? 1 : (qInfo.is4k ? 2 : (isDub ? 3 : 4)),
             isDub,
+            isDual: isDual || is4k,
             isBest: true,
             subtitles: s.subtitles || [],
           });
@@ -315,7 +287,9 @@ async function extractBestCine({ tmdbId, imdbId, type, season = 1, episode = 1 }
   return streams;
 }
 
-// 1. FrostStream (Stremio Addon Direto - 4K e 1080p Ultra HD Dublado)
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. FrostStream (https://froststream.cloutteam.com) - PRIORIDADE 2 (4K HDR & 1080p)
+// ─────────────────────────────────────────────────────────────────────────────
 async function extractFrostStream({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
   const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries));
@@ -339,33 +313,24 @@ async function extractFrostStream({ tmdbId, imdbId, type, season = 1, episode = 
     if (res && res.ok) {
       const data = await res.json();
       if (Array.isArray(data.streams) && data.streams.length > 0) {
-        // Testar rapidamente se o backend do FrostStream está online ou com streams expiradas (404)
-        const sampleUrl = data.streams[0]?.url;
-        if (sampleUrl) {
-          try {
-            const probe = await fetchWithTimeout(sampleUrl, { method: 'HEAD' }, 1500);
-            if (probe && probe.status === 404) {
-              console.warn('[extractFrostStream] FrostStream retornando 404. Ignorando streams caídos...');
-              return [];
-            }
-          } catch {}
-        }
-
         for (let idx = 0; idx < data.streams.length; idx++) {
           const s = data.streams[idx];
+          if (!s || !s.url || s.infoHash) continue;
           let streamUrl = normalizeStreamUrl(s.url);
           if (!streamUrl) continue;
-          if (s.behaviorHints?.notWebReady && !streamUrl.startsWith('/api/proxy')) {
-            streamUrl = `/api/proxy?url=${encodeURIComponent(streamUrl)}`;
-          }
 
           const isHls = streamUrl.includes('.m3u8') || streamUrl.includes('master.txt');
-          const titleText = s.title || s.description || '';
-          const nameText = s.name || '';
-          const qInfo = detectQuality(streamUrl, nameText, titleText);
-          const metaLower = `${titleText} ${nameText}`.toLowerCase();
-          const isLeg = metaLower.includes('legendado') || metaLower.includes('legend') || metaLower.includes('sub') || metaLower.includes('🇺🇸') || metaLower.includes('🇯🇵') || metaLower.includes('japones') || metaLower.includes('japonês');
-          const isDub = !isLeg && (metaLower.includes('português') || metaLower.includes('portugues') || metaLower.includes('dublado') || metaLower.includes('dub') || metaLower.includes('nacional') || metaLower.includes('🇧🇷'));
+          const titleText = (s.title || s.description || '');
+          const nameText = (s.name || '');
+          const combined = `${titleText} ${nameText}`;
+          const metaLower = combined.toLowerCase();
+
+          const is4k = /\b(4k|uhd|2160p?)\b/i.test(combined);
+          const isDual = metaLower.includes('dual') || metaLower.includes('🔀');
+          const isLeg = metaLower.includes('legendado') || metaLower.includes('legend') || metaLower.includes('sub') || metaLower.includes('🇺🇸') || metaLower.includes('🇯🇵');
+          const isDub = !isLeg && (metaLower.includes('português') || metaLower.includes('portugues') || metaLower.includes('dublado') || metaLower.includes('dub') || isDual || metaLower.includes('nacional') || metaLower.includes('🇧🇷'));
+
+          const qInfo = detectQuality(streamUrl, nameText, titleText, is4k ? '4K' : null);
 
           streams.push({
             id: `kairou-frost-${idx}-${Date.now()}`,
@@ -376,8 +341,10 @@ async function extractFrostStream({ tmdbId, imdbId, type, season = 1, episode = 
             quality: qInfo.quality,
             rank: qInfo.rank,
             isHls,
-            priority: isDub ? 1 : 2,
+            is4k: qInfo.is4k || is4k,
+            priority: (qInfo.is4k && isDub) ? 1 : (qInfo.is4k ? 2 : (isDub ? 3 : 4)),
             isDub,
+            isDual: isDual || is4k,
             isFrost: true,
             subtitles: s.subtitles || [],
           });
@@ -391,7 +358,201 @@ async function extractFrostStream({ tmdbId, imdbId, type, season = 1, episode = 
   return streams;
 }
 
-// 2. FenixFlix (Stremio Addon Direto - PT-BR Dublado / Legendado)
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. Vê Tela (https://addon.thsolucoes.site) - PRIORIDADE 3 (Wasabi S3, cnvods MP4)
+// ─────────────────────────────────────────────────────────────────────────────
+async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries));
+  if (!targetId) return [];
+
+  const path = isSeries
+    ? `series/${targetId}:${season}:${episode}.json`
+    : `movie/${targetId}.json`;
+
+  const url = `https://addon.thsolucoes.site/stream/${path}`;
+  const streams = [];
+
+  try {
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      }
+    }, 4500);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.streams)) {
+        for (let idx = 0; idx < data.streams.length; idx++) {
+          const s = data.streams[idx];
+          if (!s || !s.url || s.infoHash) continue;
+          let streamUrl = normalizeStreamUrl(s.url);
+          if (!streamUrl) continue;
+
+          const isHls = streamUrl.includes('.m3u8');
+          const titleText = (s.title || s.description || '');
+          const nameText = (s.name || '');
+          const combined = `${titleText} ${nameText}`;
+          const metaLower = combined.toLowerCase();
+
+          const isDub = metaLower.includes('dublado') || metaLower.includes('dub') || metaLower.includes('🇧🇷') || metaLower.includes('cs') || metaLower.includes('ss');
+          const qInfo = detectQuality(streamUrl, nameText, titleText);
+
+          streams.push({
+            id: `kairou-vetela-${idx}-${Date.now()}`,
+            server: 'Kairou',
+            providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality})`,
+            url: streamUrl,
+            type: isHls ? 'hls' : 'mp4',
+            quality: qInfo.quality,
+            rank: qInfo.rank,
+            isHls,
+            priority: isDub ? 3 : 5,
+            isDub,
+            isVeTela: true,
+            subtitles: s.subtitles || [],
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[extractVeTela] Erro:', e?.message);
+  }
+
+  return streams;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. MagnetFlix (https://magnetflix.flixbr.online) - PRIORIDADE 4 (HLS Dublado)
+// ─────────────────────────────────────────────────────────────────────────────
+async function extractMagnetFlix({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  return []; // Desativado (servidor magnetflix fora do ar com HTTP 525)
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries));
+  if (!targetId) return [];
+
+  const path = isSeries
+    ? `series/${targetId}:${season}:${episode}.json`
+    : `movie/${targetId}.json`;
+
+  const url = `https://magnetflix.flixbr.online/stream/${path}`;
+  const streams = [];
+
+  try {
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      }
+    }, 4500);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.streams)) {
+        for (let idx = 0; idx < data.streams.length; idx++) {
+          const s = data.streams[idx];
+          if (!s || !s.url || s.infoHash || s.url.startsWith('magnet:')) continue;
+          let streamUrl = normalizeStreamUrl(s.url);
+          if (!streamUrl) continue;
+
+          const isHls = streamUrl.includes('.m3u8');
+          const titleText = (s.title || s.description || '');
+          const nameText = (s.name || '');
+          const metaLower = `${titleText} ${nameText}`.toLowerCase();
+          const isDub = metaLower.includes('dublado') || metaLower.includes('pt-br') || metaLower.includes('dub');
+          const qInfo = detectQuality(streamUrl, nameText, titleText);
+
+          streams.push({
+            id: `kairou-mf-${idx}-${Date.now()}`,
+            server: 'Kairou',
+            providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality})`,
+            url: streamUrl,
+            type: isHls ? 'hls' : 'mp4',
+            quality: qInfo.quality,
+            rank: qInfo.rank,
+            isHls,
+            priority: isDub ? 3 : 5,
+            isDub,
+            isMagnetFlix: true,
+            subtitles: s.subtitles || [],
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[extractMagnetFlix] Erro:', e?.message);
+  }
+
+  return streams;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. BsCine (https://bscine.alwaysdata.net) - PRIORIDADE 5 (MP4 1080p Dublado)
+// ─────────────────────────────────────────────────────────────────────────────
+async function extractBsCine({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries));
+  if (!targetId) return [];
+
+  const path = isSeries
+    ? `series/${targetId}:${season}:${episode}.json`
+    : `movie/${targetId}.json`;
+
+  const url = `https://bscine.alwaysdata.net/stream/${path}`;
+  const streams = [];
+
+  try {
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      }
+    }, 4500);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.streams)) {
+        for (let idx = 0; idx < data.streams.length; idx++) {
+          const s = data.streams[idx];
+          if (!s || !s.url || s.infoHash) continue;
+          let streamUrl = normalizeStreamUrl(s.url);
+          if (!streamUrl) continue;
+
+          const isHls = streamUrl.includes('.m3u8');
+          const titleText = (s.title || s.description || '');
+          const nameText = (s.name || '');
+          const metaLower = `${titleText} ${nameText}`.toLowerCase();
+          const isDub = metaLower.includes('dublado');
+          const qInfo = detectQuality(streamUrl, nameText, titleText);
+
+          streams.push({
+            id: `kairou-bscine-${idx}-${Date.now()}`,
+            server: 'Kairou',
+            providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality})`,
+            url: streamUrl,
+            type: isHls ? 'hls' : 'mp4',
+            quality: qInfo.quality,
+            rank: qInfo.rank,
+            isHls,
+            priority: 4,
+            isDub,
+            isBsCine: true,
+            subtitles: s.subtitles || [],
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[extractBsCine] Erro:', e?.message);
+  }
+
+  return streams;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. FenixFlix (https://fenixflix.fenixhub.online) - FALLBACK SECUNDÁRIO
+// ─────────────────────────────────────────────────────────────────────────────
 async function extractFenixFlix({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
   const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries)) || `tmdb:${tmdbId}`;
@@ -425,7 +586,7 @@ async function extractFenixFlix({ tmdbId, imdbId, type, season = 1, episode = 1 
           const nameText = (s.name || '');
           const qInfo = detectQuality(streamUrl, nameText, titleText);
           const metaLower = `${titleText} ${nameText}`.toLowerCase();
-          const isLeg = metaLower.includes('legendado') || metaLower.includes('legend') || metaLower.includes('sub') || metaLower.includes('🇺🇸') || metaLower.includes('🇯🇵') || metaLower.includes('japones') || metaLower.includes('japonês');
+          const isLeg = metaLower.includes('legendado') || metaLower.includes('legend') || metaLower.includes('sub') || metaLower.includes('🇺🇸') || metaLower.includes('🇯🇵');
           const isDub = !isLeg && (metaLower.includes('dublado') || metaLower.includes('dub') || metaLower.includes('nacional') || metaLower.includes('🇧🇷') || metaLower.includes('dual') || metaLower.includes('português') || metaLower.includes('portugues'));
 
           streams.push({
@@ -437,7 +598,7 @@ async function extractFenixFlix({ tmdbId, imdbId, type, season = 1, episode = 1 
             quality: qInfo.quality,
             rank: qInfo.rank,
             isHls,
-            priority: isDub ? 1 : 2,
+            priority: isDub ? 3 : 5,
             isDub,
             isFenix: true,
             subtitles: s.subtitles || [],
@@ -452,225 +613,9 @@ async function extractFenixFlix({ tmdbId, imdbId, type, season = 1, episode = 1 
   return streams;
 }
 
-// 3. Servidor Zeus (Stremio Addon Direto BeamUp - Descontinuado/Offline)
-async function extractZeus({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
-  return [];
-}
-
-// 4. ClickHost (embed-api.clickhost.xyz)
-async function extractClickHost({ tmdbId, type, season = 1, episode = 1 }) {
-  if (!tmdbId) return [];
-  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const path = isSeries
-    ? `/embed/serie/${tmdbId}/${season}/${episode}?ad_played=1`
-    : `/embed/filme/${tmdbId}?ad_played=1`;
-
-  try {
-    const res = await fetchWithTimeout(`https://embed-api.clickhost.xyz${path}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://embed-api.clickhost.xyz/',
-        'Origin': 'https://embed-api.clickhost.xyz',
-      },
-    }, 4500);
-
-    if (!res || !res.ok) return [];
-    const html = await res.text();
-    const serversMatch = html.match(/(?:const\s+servers\s*=\s*|servers\s*:\s*)(\[[\s\S]*?\])/);
-    if (!serversMatch) return [];
-
-    let serversList = [];
-    try {
-      serversList = JSON.parse(serversMatch[1]);
-    } catch {
-      return [];
-    }
-
-    const initPromises = serversList.map(async (srv) => {
-      if (!srv.id || srv.down) return null;
-      try {
-        const initRes = await fetchWithTimeout(`https://embed-api.clickhost.xyz/embed/stream/${srv.id}/init`, {
-          method: 'POST',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': `https://embed-api.clickhost.xyz${path}`,
-            'Origin': 'https://embed-api.clickhost.xyz',
-            'Accept': 'application/json, text/plain, */*',
-            'Content-Type': 'application/json',
-          },
-        }, 4000);
-
-        if (!initRes || !initRes.ok) return null;
-        const initJson = await initRes.json();
-        if (initJson && initJson.ok && initJson.url) {
-          const rawUrl = initJson.url.startsWith('http')
-            ? initJson.url
-            : `https://embed-api.clickhost.xyz${initJson.url}`;
-          const streamUrl = normalizeStreamUrl(rawUrl);
-          if (!streamUrl) return null;
-          const isHls = Boolean(initJson.is_hls || streamUrl.includes('.m3u8'));
-          const qInfo = detectQuality(streamUrl, srv.label || srv.name || '', '');
-          return {
-            id: `kairou-click-${srv.id}`,
-            server: 'Kairou',
-            providerName: `Kairou · ClickHost (${qInfo.quality}) [Dublado]`,
-            url: streamUrl,
-            type: isHls ? 'hls' : 'mp4',
-            quality: qInfo.quality,
-            rank: qInfo.rank,
-            isHls,
-            priority: 2,
-            isDub: true,
-          };
-        }
-      } catch {
-        return null;
-      }
-      return null;
-    });
-
-    const settled = await Promise.allSettled(initPromises);
-    return settled
-      .filter((r) => r.status === 'fulfilled' && r.value)
-      .map((r) => r.value);
-  } catch {
-    return [];
-  }
-}
-
-// 5. SuperFlix (superflixapi.beer)
-async function extractSuperFlix({ tmdbId, type, season = 1, episode = 1 }) {
-  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const path = isSeries
-    ? `/serie/${tmdbId}/${season}/${episode}`
-    : `/filme/${tmdbId}`;
-
-  try {
-    const res = await fetchWithTimeout(`https://superflixapi.beer${path}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://superflixapi.beer/',
-      },
-    }, 2500);
-
-    if (!res || !res.ok) return [];
-    const html = await res.text();
-    const streamRegex = /(?:file|source|src):\s*["'](https?:\/\/[^"']+\.(?:m3u8|mp4)[^"']*)["']/i;
-    const match = html.match(streamRegex);
-    if (match && match[1]) {
-      const url = match[1];
-      const isHls = url.includes('.m3u8');
-      const qInfo = detectQuality(url, '', '');
-      return [{
-        id: `kairou-sflix-${Date.now()}`,
-        server: 'Kairou',
-        providerName: `Kairou · SuperFlix (${qInfo.quality})`,
-        url,
-        type: isHls ? 'hls' : 'mp4',
-        quality: qInfo.quality,
-        rank: qInfo.rank,
-        isHls,
-        priority: qInfo.rank,
-        isDub: true,
-      }];
-    }
-  } catch {}
-  return [];
-}
-
-// 6. WarezCDN (warezcdn.lat)
-async function extractWarezCDN({ tmdbId, type, season = 1, episode = 1 }) {
-  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const path = isSeries
-    ? `/serie/${tmdbId}/${season}/${episode}`
-    : `/filme/${tmdbId}`;
-
-  try {
-    const res = await fetchWithTimeout(`https://warezcdn.lat${path}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://warezcdn.lat/',
-      },
-    }, 2500);
-
-    if (!res || !res.ok) return [];
-    const html = await res.text();
-    const streamRegex = /(?:file|source|src):\s*["'](https?:\/\/[^"']+\.(?:m3u8|mp4)[^"']*)["']/i;
-    const match = html.match(streamRegex);
-    if (match && match[1]) {
-      const url = match[1];
-      const isHls = url.includes('.m3u8');
-      const qInfo = detectQuality(url, '', '');
-      return [{
-        id: `kairou-warez-${Date.now()}`,
-        server: 'Kairou',
-        providerName: `Kairou · Warez (${qInfo.quality})`,
-        url,
-        type: isHls ? 'hls' : 'mp4',
-        quality: qInfo.quality,
-        rank: qInfo.rank,
-        isHls,
-        priority: qInfo.rank,
-        isDub: true,
-      }];
-    }
-  } catch {}
-  return [];
-}
-
-// 7. MegaEmbed (mgeb.top / FontedeCanais)
-async function extractMegaEmbed({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
-  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const id = tmdbId || imdbId;
-  const path = isSeries
-    ? `/embed/${id}/${season}/${episode}`
-    : `/embed/${id}`;
-
-  const streams = [];
-
-  try {
-    const res = await fetchWithTimeout(`https://mgeb.top${path}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://mgeb.top/',
-      },
-    }, 3000);
-
-    if (res && res.ok) {
-      const html = await res.text();
-      const sourcesMatch = html.match(/var\s+sources\s*=\s*(\[[\s\S]*?\]);/);
-      if (sourcesMatch) {
-        const rawSources = JSON.parse(sourcesMatch[1]);
-        for (let idx = 0; idx < rawSources.length; idx++) {
-          const s = rawSources[idx];
-          if (!s.file || typeof s.file !== 'string') continue;
-          let fileUrl = normalizeStreamUrl(s.file);
-          if (!fileUrl) continue;
-
-          const isHls = s.type === 'hls' || fileUrl.includes('.m3u8') || fileUrl.includes('hls.php');
-          const qInfo = detectQuality(fileUrl, s.label || '', '');
-
-          streams.push({
-            id: `kairou-mega-${idx}-${Date.now()}`,
-            server: 'Kairou',
-            providerName: `Kairou · MegaEmbed (${qInfo.quality}) [Dublado]`,
-            url: fileUrl,
-            type: isHls ? 'hls' : 'mp4',
-            quality: qInfo.quality,
-            rank: qInfo.rank,
-            isHls,
-            priority: 1,
-            isDub: true,
-          });
-        }
-      }
-    }
-  } catch {}
-
-  return streams;
-}
-
-// 8. OpenSubtitles v3 (Stremio Addon Oficial - Legendas PT-BR, EN, ES)
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. OpenSubtitles v3 (Legendas)
+// ─────────────────────────────────────────────────────────────────────────────
 async function extractOpenSubtitles({ imdbId, type, season = 1, episode = 1 }) {
   if (!imdbId) return [];
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
@@ -728,8 +673,10 @@ async function extractOpenSubtitles({ imdbId, type, season = 1, episode = 1 }) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HANDLER PRINCIPAL
+// ─────────────────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
-  // CORS Headers para frontend
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -745,37 +692,28 @@ export default async function handler(req, res) {
 
   let { tmdbId, type = 'movie', season = 1, episode = 1, imdbId: queryImdbId } = req.query || {};
 
-  // Se tmdbId foi enviado como um ID do IMDb (ex: tt31450459)
   if (typeof tmdbId === 'string' && tmdbId.startsWith('tt')) {
     queryImdbId = tmdbId;
     tmdbId = null;
   }
 
-  // Sanitizar tmdbId numérico inválido
-  if (tmdbId === 'NaN' || tmdbId === 'undefined' || !tmdbId) {
-    tmdbId = null;
-  }
-
-  let imdbId = queryImdbId || null;
-
-  // Se temos imdbId mas não temos tmdbId numérico, resolver via TMDB /find/
-  if (!tmdbId && imdbId) {
-    const resolved = await resolveTmdbFromImdb(imdbId);
+  if (queryImdbId && !tmdbId) {
+    const resolved = await resolveTmdbFromImdb(queryImdbId);
     if (resolved?.tmdbId) {
       tmdbId = resolved.tmdbId;
       if (resolved.type) type = resolved.type;
     }
   }
 
-  if (!tmdbId && !imdbId) {
-    return res.status(400).json({ ok: false, error: 'tmdbId ou imdbId é obrigatório' });
+  if (!tmdbId && !queryImdbId) {
+    return res.status(400).json({ ok: false, error: 'Parâmetro tmdbId ou imdbId é obrigatório' });
   }
 
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const effectiveId = tmdbId || imdbId;
-  const cacheKey = `${effectiveId}-${isSeries ? 'series' : 'movie'}-${season}-${episode}`;
+  const normalizedType = isSeries ? 'series' : 'movie';
+  let imdbId = queryImdbId || null;
 
-  // 1. Cache Instantâneo em RAM do Servidor (< 1ms)
+  const cacheKey = `${tmdbId || imdbId}-${normalizedType}-${season}-${episode}`;
   const cached = serverExtractCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS) && cached.payload?.streams?.length > 0) {
     res.setHeader('X-Cache-Status', 'HIT');
@@ -784,107 +722,210 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 2. Resolver IMDb ID se tivermos apenas tmdbId
     if (!imdbId && tmdbId) {
       imdbId = await resolveImdbId(tmdbId, isSeries);
     }
 
-    // 3. Execução Paralela de Provedores Stremio Nativos & Web (100% Streams Diretos) + OpenSubtitles
-    const [bestRes, fenixRes, frostRes, zeusRes, clickRes, superRes, warezRes, megaRes, subsRes] = await Promise.allSettled([
+    // Execução Paralela das Fontes BR Oficiais
+    const [bestRes, frostRes, vetelaRes, magnetRes, bscineRes, fenixRes, subsRes] = await Promise.allSettled([
       extractBestCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractFenixFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractFrostStream({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractZeus({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractClickHost({ tmdbId, type, season: Number(season), episode: Number(episode) }),
-      extractSuperFlix({ tmdbId, type, season: Number(season), episode: Number(episode) }),
-      extractWarezCDN({ tmdbId, type, season: Number(season), episode: Number(episode) }),
-      extractMegaEmbed({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractVeTela({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractMagnetFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractBsCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractFenixFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractOpenSubtitles({ imdbId, type, season: Number(season), episode: Number(episode) }),
     ]);
 
     const collected = [];
     if (bestRes.status === 'fulfilled' && Array.isArray(bestRes.value)) collected.push(...bestRes.value);
-    if (fenixRes.status === 'fulfilled' && Array.isArray(fenixRes.value)) collected.push(...fenixRes.value);
     if (frostRes.status === 'fulfilled' && Array.isArray(frostRes.value)) collected.push(...frostRes.value);
-    if (zeusRes.status === 'fulfilled' && Array.isArray(zeusRes.value)) collected.push(...zeusRes.value);
-    if (clickRes.status === 'fulfilled' && Array.isArray(clickRes.value)) collected.push(...clickRes.value);
-    if (superRes.status === 'fulfilled' && Array.isArray(superRes.value)) collected.push(...superRes.value);
-    if (warezRes.status === 'fulfilled' && Array.isArray(warezRes.value)) collected.push(...warezRes.value);
-    if (megaRes.status === 'fulfilled' && Array.isArray(megaRes.value)) collected.push(...megaRes.value);
+    if (vetelaRes.status === 'fulfilled' && Array.isArray(vetelaRes.value)) collected.push(...vetelaRes.value);
+    if (magnetRes.status === 'fulfilled' && Array.isArray(magnetRes.value)) collected.push(...magnetRes.value);
+    if (bscineRes.status === 'fulfilled' && Array.isArray(bscineRes.value)) collected.push(...bscineRes.value);
+    if (fenixRes.status === 'fulfilled' && Array.isArray(fenixRes.value)) collected.push(...fenixRes.value);
 
     const extractedSubtitles = subsRes.status === 'fulfilled' && Array.isArray(subsRes.value) ? subsRes.value : [];
 
-    // Desduplicação por URL
+    // Desduplicação inteligente preservando Dublado e Áudio Original (incluindo Dual Audio e 4K)
     const seenUrls = new Set();
     const uniqueStreams = [];
     for (const s of collected) {
-      // Ignorar qualquer stream de iframe ou embed
       if (!s.url || s.isEmbed || s.type === 'iframe') continue;
-      if (!seenUrls.has(s.url)) {
-        seenUrls.add(s.url);
+      const key = `${s.url}::${s.isDub ? 'dub' : 'sub'}`;
+      if (!seenUrls.has(key)) {
+        seenUrls.add(key);
         uniqueStreams.push(s);
+      }
+
+      // Se for stream 4K ou marcado como Dual Audio, garantir também versão Áudio Original caso só exista como Dublado
+      const is4k = s.is4k || (s.quality || '').includes('4K');
+      if ((is4k || s.isDual) && s.isDub) {
+        const subKey = `${s.url}::sub`;
+        if (!seenUrls.has(subKey)) {
+          seenUrls.add(subKey);
+          uniqueStreams.push({
+            ...s,
+            id: `${s.id}-orig`,
+            isDub: false,
+            lang: 'en',
+            isDual: true,
+            priority: is4k ? 2 : 4,
+          });
+        }
       }
     }
 
-    // Ordenação Inteligente com PRIORIDADE ABSOLUTA PARA 4K ULTRA HD:
-    // 1. 4K TEM PRECEDÊNCIA MÁXIMA (Qualquer 4K vai para o topo imediatamente)
-    // 2. Entre 4K (ou não-4K), ÁUDIO PT-BR (Dublado / Dual Áudio) vem em 1º lugar
-    // 3. Resolução máxima (1080p > 720p > 480p)
-    // 4. Desempate: BestCine (4K Dedicado) > FenixFlix > FrostStream > Zeus > ClickHost > HTTPS
+    // ─────────────────────────────────────────────────────────────────────────
+    // TESTE RÁPIDO DE VELOCIDADE E SAÚDE DOS SERVIDORES (LATÊNCIA REAL EM MS)
+    // 1. Pré-ordenar para colocar os melhores candidatos em evidência para o teste de ping
+    // 2. Faz ping simultâneo nas melhores fontes com timeout de 1100ms.
+    // 3. Descarta servidores caídos (403, 404, 500) e ranqueia o mais rápido para o topo.
+    // ─────────────────────────────────────────────────────────────────────────
     uniqueStreams.sort((a, b) => {
-      const rankA = typeof a.rank === 'number' ? a.rank : detectQuality(a.url || '', a.providerName || '', a.quality || '').rank;
-      const rankB = typeof b.rank === 'number' ? b.rank : detectQuality(b.url || '', b.providerName || '', b.quality || '').rank;
+      const aIsDub = Boolean(a.isDub);
+      const bIsDub = Boolean(b.isDub);
+      if (aIsDub !== bIsDub) return aIsDub ? -1 : 1;
 
-      const aIs4k = rankA === 1 || (a.quality || '').includes('4K') || (a.providerName || '').includes('4K');
-      const bIs4k = rankB === 1 || (b.quality || '').includes('4K') || (b.providerName || '').includes('4K');
+      const aIs4k = Boolean(a.is4k || (a.quality || '').includes('4K') || (a.name || '').includes('4k'));
+      const bIs4k = Boolean(b.is4k || (b.quality || '').includes('4K') || (b.name || '').includes('4k'));
+      const getScore = (item, is4k) => {
+        if (is4k) return 10;
+        const q = (item.quality || '').toLowerCase();
+        if (q.includes('1080') || q.includes('full hd')) return 1;
+        if (q.includes('720') || q.includes('hd')) return 2;
+        if (q.includes('1440') || q.includes('2k')) return 3;
+        if (q.includes('480')) return 4;
+        return 2;
+      };
+      return getScore(a, aIs4k) - getScore(b, bIs4k);
+    });
 
-      // 4K SEMPRE NO TOPO: Se A é 4K e B não é, A vence imediatamente
-      if (aIs4k && !bIs4k) return -1;
-      if (!aIs4k && bIs4k) return 1;
+    const probeTargets = uniqueStreams.slice(0, 14);
+    await Promise.allSettled(
+      probeTargets.map(async (s) => {
+        let testUrl = s.url;
+        if (!testUrl) {
+          s.alive = false;
+          s.latency = 9999;
+          return;
+        }
+        if (testUrl.startsWith('/api/proxy?url=')) {
+          try {
+            testUrl = decodeURIComponent(testUrl.split('/api/proxy?url=')[1]);
+          } catch {}
+        }
+        const isHls = s.isHls || testUrl.includes('.m3u8') || testUrl.includes('master.txt');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1100);
+        const t0 = Date.now();
+        try {
+          const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          };
+          if (!isHls) {
+            headers['Range'] = 'bytes=0-512';
+          }
+          const pingRes = await fetch(testUrl, {
+            method: 'GET',
+            headers,
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          const dt = Date.now() - t0;
+          const isAlive = pingRes.status === 200 || pingRes.status === 206;
+          s.alive = isAlive;
+          s.latency = isAlive ? dt : 9999;
+          s.httpStatus = pingRes.status;
+          try {
+            if (pingRes.body && typeof pingRes.body.cancel === 'function') {
+              pingRes.body.cancel().catch(() => {});
+            }
+          } catch {}
+        } catch {
+          clearTimeout(timeoutId);
+          s.alive = false;
+          s.latency = 9999;
+        }
+      })
+    );
 
-      // Se ambos são 4K (ou ambos não são 4K), priorizar áudio Dublado / PT-BR
-      const aIsDub = Boolean((a.providerName || '').includes('Dublado') || a.isDub || a.dubbed);
-      const bIsDub = Boolean((b.providerName || '').includes('Dublado') || b.isDub || b.dubbed);
+    // ─────────────────────────────────────────────────────────────────────────
+    // ORDENAÇÃO PARA REPRODUÇÃO AUTOMÁTICA:
+    // 1. Dublado vence Legendado
+    // 2. Servidores testados e VIVOS vencem servidores mortos/caídos
+    // 3. 1080p Full HD (1) > 720p HD (2) > 1440p 2K (3) > 480p (4) > 360p (5) > 4K (10)
+    // 4. Velocidade real: O servidor com menor latência é ranqueado em 1º lugar
+    // 5. 4K Ultra HD permanece na lista para escolha manual, mas NUNCA roda automaticamente
+    // ─────────────────────────────────────────────────────────────────────────
+    uniqueStreams.sort((a, b) => {
+      const aIs4k = Boolean(a.is4k || (a.quality || '').includes('4K') || (a.providerName || '').includes('4K') || (a.name || '').includes('4k') || (a.title || '').includes('4k'));
+      const bIs4k = Boolean(b.is4k || (b.quality || '').includes('4K') || (b.providerName || '').includes('4K') || (b.name || '').includes('4k') || (b.title || '').includes('4k'));
+      const aIsDub = Boolean(a.isDub);
+      const bIsDub = Boolean(b.isDub);
+
+      // Regra 1: Dublado sempre vence Legendado
       if (aIsDub !== bIsDub) {
         return aIsDub ? -1 : 1;
       }
 
-      // Entre streams de mesma categoria, resolução máxima
-      if (rankA !== rankB) {
-        return rankA - rankB;
+      // Regra 2: Servidores testados e VIVOS vencem servidores mortos/caídos
+      const aAlive = a.alive !== false ? 1 : 0;
+      const bAlive = b.alive !== false ? 1 : 0;
+      if (aAlive !== bAlive) {
+        return bAlive - aAlive;
       }
 
-      // Desempate de mesma resolução:
-      if (a.isBest && !b.isBest) return -1;
-      if (!a.isBest && b.isBest) return 1;
+      // Regra 3: Resolução para Auto-Play (1080p > 720p > outros > 4K)
+      const getAutoPlayScore = (item, is4k) => {
+        if (is4k) return 10;
+        const q = (item.quality || '').toLowerCase();
+        if (q.includes('1080') || q.includes('full hd') || q.includes('fhd')) return 1;
+        if (q.includes('720') || q.includes('hd')) return 2;
+        if (q.includes('1440') || q.includes('2k') || q.includes('qhd')) return 3;
+        if (q.includes('480') || q.includes('sd')) return 4;
+        if (q.includes('360')) return 5;
+        return 2;
+      };
 
-      if (a.isFenix && !b.isFenix) return -1;
-      if (!a.isFenix && b.isFenix) return 1;
+      const scoreA = getAutoPlayScore(a, aIs4k);
+      const scoreB = getAutoPlayScore(b, bIs4k);
+      if (scoreA !== scoreB) {
+        return scoreA - scoreB;
+      }
 
-      if (a.isFrost && !b.isFrost) return -1;
-      if (!a.isFrost && b.isFrost) return 1;
+      // Regra 4: VELOCIDADE REAL (O servidor mais rápido testado fica na frente!)
+      const latA = typeof a.latency === 'number' ? a.latency : 4000;
+      const latB = typeof b.latency === 'number' ? b.latency : 4000;
+      if (Math.abs(latA - latB) > 40) {
+        return latA - latB;
+      }
 
-      if (a.isZeus && !b.isZeus) return -1;
-      if (!a.isZeus && b.isZeus) return 1;
+      // Regra 5: Confiabilidade do provedor (BestCine > FrostStream > VeTela > MagnetFlix > BsCine)
+      const prioA = a.priority || 5;
+      const prioB = b.priority || 5;
+      if (prioA !== prioB) {
+        return prioA - prioB;
+      }
 
+      // Regra 6: HTTPS direto primeiro
       const aIsHttps = (a.url || '').startsWith('https://') ? 1 : 0;
       const bIsHttps = (b.url || '').startsWith('https://') ? 1 : 0;
-      if (aIsHttps !== bIsHttps) {
-        return bIsHttps - aIsHttps;
-      }
-
-      return (a.priority || 5) - (b.priority || 5);
+      return bIsHttps - aIsHttps;
     });
 
-    // Mascarar nomes mantendo 100% Kairou (Zero vazamento de nomes originais)
+    // Mascarar nomes mantendo 100% Identidade Kairou
     let dubCounter = 0;
     let subCounter = 0;
+    let dub4kCounter = 0;
+    let sub4kCounter = 0;
 
     const finalStreams = uniqueStreams.map((s) => {
-      const is4k = (s.quality || '').includes('4K');
-      const is2k = (s.quality || '').includes('1440') || (s.quality || '').includes('2K');
-      const is1080 = (s.quality || '').includes('1080');
-      const isDub = Boolean(s.isDub || s.dubbed || (s.providerName || '').includes('[Dublado]'));
+      const is4k = Boolean(s.is4k || (s.quality || '').includes('4K') || (s.name || '').includes('4k') || (s.title || '').includes('4k'));
+      const is2k = Boolean((s.quality || '').includes('1440') || (s.quality || '').includes('2K'));
+      const is1080 = Boolean((s.quality || '').includes('1080'));
+      const isDub = Boolean(s.isDub);
+
       let badge = '1080p Full HD';
       if (is4k) badge = '4K Ultra HD';
       else if (is2k) badge = '1440p 2K';
@@ -894,21 +935,35 @@ export default async function handler(req, res) {
 
       let finalName = '';
       if (isDub) {
-        dubCounter++;
-        if (dubCounter === 1) {
-          finalName = `Kairou · Servidor Principal (${badge}) [Dublado]`;
-        } else if (dubCounter === 2) {
-          finalName = `Kairou · Servidor Ultra (${badge}) [Dublado]`;
-        } else if (dubCounter === 3) {
-          finalName = `Kairou · Servidor Rápido (${badge}) [Dublado]`;
-        } else if (dubCounter === 4) {
-          finalName = `Kairou · Servidor Estável (${badge}) [Dublado]`;
+        if (is4k) {
+          dub4kCounter++;
+          finalName = dub4kCounter === 1
+            ? `Kairou · Servidor 4K Ultra HD [Dublado]`
+            : `Kairou · Servidor 4K Ultra HD ${dub4kCounter} [Dublado]`;
         } else {
-          finalName = `Kairou · Servidor Reserva ${dubCounter - 4} (${badge}) [Dublado]`;
+          dubCounter++;
+          if (dubCounter === 1) {
+            finalName = `Kairou · Servidor Principal (${badge}) [Dublado]`;
+          } else if (dubCounter === 2) {
+            finalName = `Kairou · Servidor Rápido (${badge}) [Dublado]`;
+          } else if (dubCounter === 3) {
+            finalName = `Kairou · Servidor Estável (${badge}) [Dublado]`;
+          } else if (dubCounter === 4) {
+            finalName = `Kairou · Servidor Cinema (${badge}) [Dublado]`;
+          } else {
+            finalName = `Kairou · Servidor Reserva ${dubCounter - 4} (${badge}) [Dublado]`;
+          }
         }
       } else {
-        subCounter++;
-        finalName = `Kairou · Áudio Original ${subCounter} (${badge}) [Legendado PT-BR]`;
+        if (is4k) {
+          sub4kCounter++;
+          finalName = sub4kCounter === 1
+            ? `Kairou · Servidor 4K Ultra HD [Legendado PT-BR]`
+            : `Kairou · Servidor 4K Ultra HD ${sub4kCounter} [Legendado PT-BR]`;
+        } else {
+          subCounter++;
+          finalName = `Kairou · Áudio Original ${subCounter} (${badge}) [Legendado PT-BR]`;
+        }
       }
 
       const streamSubs = Array.isArray(s.subtitles) && s.subtitles.length > 0 ? s.subtitles : extractedSubtitles;
@@ -921,6 +976,9 @@ export default async function handler(req, res) {
         lang: isDub ? 'pt' : 'en',
         quality: badge,
         subtitles: streamSubs,
+        alive: s.alive !== false,
+        latency: typeof s.latency === 'number' ? s.latency : null,
+        isFastest: (dubCounter === 1 || subCounter === 1),
       };
     });
 
@@ -941,5 +999,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: err.message, streams: [] });
   }
 }
-
-

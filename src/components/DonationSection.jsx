@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Heart, Sparkles, ArrowRight, ShieldCheck, Zap, Copy, Check, X, ExternalLink, Crown } from 'lucide-react';
+import { Heart, Sparkles, ArrowRight, ShieldCheck, Zap, Copy, Check, X, ExternalLink } from 'lucide-react';
 
 const PRESET_AMOUNTS = [
   { label: 'R$ 5', value: '5.00' },
@@ -34,7 +34,7 @@ export function formatPixAmount(rawInput) {
   return `${num}.00`;
 }
 
-export default function DonationSection({ isModal = false, onClose, onOpenVipModal }) {
+export default function DonationSection({ isModal = false, onClose }) {
   const [customAmount, setCustomAmount] = useState('10.00');
   const [selectedPreset, setSelectedPreset] = useState('10.00');
   const [copied, setCopied] = useState(false);
@@ -194,19 +194,7 @@ export default function DonationSection({ isModal = false, onClose, onOpenVipMod
           <ExternalLink size={16} className="text-slate-950 ml-1" />
         </a>
 
-        {/* Link para Assinatura VIP se disponível */}
-        {onOpenVipModal && (
-          <div className="mt-4 pt-4 border-t border-white/[0.06] text-center">
-            <button
-              type="button"
-              onClick={onOpenVipModal}
-              className="inline-flex items-center gap-2 text-xs font-bold text-amber-300 hover:text-amber-200 transition-colors cursor-pointer"
-            >
-              <Crown size={14} className="fill-amber-400 text-amber-400" />
-              <span>Deseja assinar o VIP (Zero Anúncios, MB WAY ou Crypto)? Clique aqui</span>
-            </button>
-          </div>
-        )}
+
       </div>
     </div>
   );

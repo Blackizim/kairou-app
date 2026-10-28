@@ -43,7 +43,7 @@ export const GENRE_FILTERS = [
   { id: 'scifi', label: 'Ficção Científica', genreId: 878, icon: 'Sparkles' },
   { id: 'thriller', label: 'Suspense', genreId: 53, icon: 'Shield' },
   { id: 'animation', label: 'Animação', genreId: 16, icon: 'Clapperboard' },
-  { id: 'drama', label: 'Drama', genreId: 18, icon: 'Compass' },
+  { id: 'drama', label: 'Drama', genreId: 18, icon: 'MasksTheater' },
   { id: 'crime', label: 'Crime', genreId: 80, icon: 'Search' },
 ];
 

@@ -1,67 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Play,
-  Plus,
-  Check,
-  Star,
-  Film,
-  Tv,
-  Clock,
-  Calendar,
-  Users,
-  Clapperboard,
-  Loader2,
-  Crown,
-  Download,
-  ShieldCheck
-} from 'lucide-react';
 import { fetchMediaDetails, fetchSeasonEpisodes } from '../services/tmdb';
 import { prefetchMediaStreams } from '../services/extractor';
-import { isVipUser } from '../services/vipService';
+import { KaiPlay, KaiPlus, KaiCheck, KaiClose, KaiTv } from './KaiIcons';
 
 export default function MediaModal({
   media,
-  user,
-  profile,
   onClose,
   onPlay,
-  onOpenSubscription,
   onToggleWatchlist,
   isInWatchlist,
   onSelectMedia
 }) {
-  const isVip = isVipUser(user, profile);
   if (!media) return null;
 
   const inWatchlist = isInWatchlist(media.id);
   const [detailedMedia, setDetailedMedia] = useState(media);
   const [loadingDetails, setLoadingDetails] = useState(true);
 
-  // Eager prefetch para reprodução instantânea (0ms ao clicar em Assistir)
-  useEffect(() => {
-    if (!media?.tmdbId && !media?.id) return;
-    const isTv = media.type === 'series' || media.type === 'tv' || media.type === 'anime';
-    prefetchMediaStreams({
-      tmdbId: media.tmdbId || media.id,
-      type: isTv ? 'series' : 'movie',
-      season: 1,
-      episode: 1,
-      title: media.title,
-    });
-  }, [media]);
-
   // Seasons & Episodes State
   const [selectedSeasonNumber, setSelectedSeasonNumber] = useState(1);
   const [episodes, setEpisodes] = useState([]);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   // Fetch TMDB rich details on modal open
   useEffect(() => {
     let isMounted = true;
     setLoadingDetails(true);
 
-    fetchMediaDetails(media.tmdbId, media.type).then((details) => {
+    fetchMediaDetails(media.tmdbId || media.id, media.type).then((details) => {
       if (!isMounted) return;
       if (details) {
         setDetailedMedia((prev) => ({ ...prev, ...details }));
@@ -72,20 +47,19 @@ export default function MediaModal({
     return () => {
       isMounted = false;
     };
-  }, [media.tmdbId, media.type]);
+  }, [media.tmdbId, media.id, media.type]);
 
-  // Fetch Season Episodes if it's a TV series
-  const isExplicitMovie = detailedMedia.type === 'movie' || Boolean(detailedMedia.title && !detailedMedia.name && !detailedMedia.number_of_seasons && !detailedMedia.seasons?.length);
-  const isSeries = !isExplicitMovie && (detailedMedia.type === 'series' || detailedMedia.type === 'tv' || Boolean(detailedMedia.seasons?.length > 0 || detailedMedia.number_of_seasons || detailedMedia.first_air_date));
+  const isSeries = detailedMedia.type === 'series' || detailedMedia.type === 'tv' || detailedMedia.type === 'anime';
   const availableSeasons = detailedMedia.seasons || [];
 
+  // Fetch Season Episodes if it's a TV series
   useEffect(() => {
-    if (!isSeries || !detailedMedia.tmdbId) return;
+    if (!isSeries || (!detailedMedia.tmdbId && !detailedMedia.id)) return;
 
     let isMounted = true;
     setLoadingEpisodes(true);
 
-    fetchSeasonEpisodes(detailedMedia.tmdbId, selectedSeasonNumber).then((epList) => {
+    fetchSeasonEpisodes(detailedMedia.tmdbId || detailedMedia.id, selectedSeasonNumber).then((epList) => {
       if (!isMounted) return;
       setEpisodes(epList || []);
       setLoadingEpisodes(false);
@@ -94,212 +68,146 @@ export default function MediaModal({
     return () => {
       isMounted = false;
     };
-  }, [isSeries, detailedMedia.tmdbId, selectedSeasonNumber]);
+  }, [isSeries, detailedMedia.tmdbId, detailedMedia.id, selectedSeasonNumber]);
+
+  const handleStartPlay = () => {
+    if (isSeries && episodes.length > 0) {
+      onPlay(detailedMedia, { ...episodes[0], season: selectedSeasonNumber });
+    } else if (isSeries) {
+      onPlay(detailedMedia, { ep: 1, season: selectedSeasonNumber, title: 'Episódio 1' });
+    } else {
+      onPlay(detailedMedia);
+    }
+  };
+
+  const castList = Array.isArray(detailedMedia.cast) ? detailedMedia.cast : [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-black/85 backdrop-blur-md animate-fade-in select-none">
-      {/* Click outside to close */}
-      <div className="fixed inset-0" onClick={onClose}></div>
-
-      {/* Modal Card */}
-      <div className="relative w-full max-w-4xl bg-[#0e121a] border border-white/[0.08] rounded-2xl sm:rounded-3xl shadow-modal overflow-hidden z-10 my-auto animate-scale-in max-h-[92vh] flex flex-col">
+    <div
+      className="modal-veil"
+      id="modal-veil"
+      onClick={(e) => {
+        if (e.target.id === 'modal-veil') onClose();
+      }}
+    >
+      <section
+        className="detail-modal"
+        id="detail-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={detailedMedia.title}
+        tabIndex="-1"
+      >
         {/* Close Button */}
         <button
+          className="circle modal-close"
+          id="modal-close"
           onClick={onClose}
-          className="absolute top-4 right-4 z-30 w-10 h-10 rounded-full bg-[#07090e]/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/[0.08] flex items-center justify-center backdrop-blur-md transition-colors"
-          aria-label="Fechar detalhes"
+          aria-label="Fechar"
         >
-          <X size={18} />
+          <KaiClose size={12} />
         </button>
 
-        {/* Scrollable Container */}
-        <div className="overflow-y-auto no-scrollbar flex-1">
-          {/* Hero Backdrop Banner */}
-          <div className="relative w-full aspect-video sm:aspect-[21/9] max-h-[400px] overflow-hidden bg-slate-950">
+        <div id="modal-body">
+          {/* Cover Header */}
+          <div className="detail-cover">
             <img
-              src={detailedMedia.backdrop}
-              alt={detailedMedia.title}
-              className="w-full h-full object-cover object-center"
+              src={detailedMedia.backdrop || detailedMedia.poster}
+              alt=""
             />
-            {/* Scrims */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0e121a] via-[#0e121a]/50 to-transparent"></div>
-            <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#07090e]/70 to-transparent"></div>
-
-            {/* In-hero Title & Actions */}
-            <div className="absolute bottom-6 left-6 sm:left-10 right-6 flex items-end justify-between">
-              <div className="space-y-3">
-                <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight drop-shadow-md">
-                  {detailedMedia.title}
-                </h2>
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    onClick={() => {
-                      if (isSeries && episodes.length > 0) {
-                        onPlay(detailedMedia, { ...episodes[0], season: selectedSeasonNumber });
-                      } else if (isSeries) {
-                        onPlay(detailedMedia, { ep: 1, season: selectedSeasonNumber, title: 'Episódio 1' });
-                      } else {
-                        onPlay(detailedMedia);
-                      }
-                    }}
-                    onMouseEnter={() => {
-                      const isTv = detailedMedia.type === 'series' || detailedMedia.type === 'tv' || detailedMedia.type === 'anime';
-                      prefetchMediaStreams({
-                        tmdbId: detailedMedia.tmdbId || detailedMedia.id,
-                        type: isTv ? 'series' : 'movie',
-                        season: selectedSeasonNumber,
-                        episode: 1,
-                        title: detailedMedia.title,
-                      });
-                    }}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold text-sm transition-all shadow-md hover:scale-[1.02] cursor-pointer"
-                  >
-                    <Play size={16} className="fill-slate-950 ml-0.5" />
-                    {user ? 'Assistir Agora' : 'Entrar para Assistir'}
-                  </button>
-
-                  <button
-                    onClick={() => onToggleWatchlist(detailedMedia)}
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all ${
-                      inWatchlist
-                        ? 'bg-sky-500/20 text-sky-400 border-sky-400/60'
-                        : 'bg-slate-900/90 border-slate-700 text-slate-300 hover:text-white hover:border-slate-500'
-                    }`}
-                    title={inWatchlist ? "Remover da lista" : "Adicionar à Minha Lista"}
-                  >
-                    {inWatchlist ? <Check size={18} /> : <Plus size={18} />}
-                  </button>
-
-                  {/* Botão Download Offline MP4 (Benefício VIP) */}
-                  <button
-                    onClick={() => {
-                      if (isVip) {
-                        alert(`Iniciando download seguro em alta velocidade de "${detailedMedia.title}". O arquivo MP4 será salvo.`);
-                      } else {
-                        onOpenSubscription?.();
-                      }
-                    }}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                      isVip
-                        ? 'bg-amber-500/15 border-amber-400/40 text-amber-300 hover:bg-amber-500/25'
-                        : 'bg-slate-900/90 border-slate-700 text-slate-300 hover:text-white hover:border-sky-400/40'
-                    }`}
-                    title={isVip ? "Baixar MP4 para assistir offline" : "Download Offline exclusivo para membros VIP"}
-                  >
-                    <Download size={15} className={isVip ? "text-amber-400" : "text-sky-400"} />
-                    <span className="hidden sm:inline">Download</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-extrabold uppercase flex items-center gap-0.5">
-                      <Crown size={9} className="fill-amber-400" /> VIP
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
 
-          {/* Details Body */}
-          <div className="p-6 sm:p-10 space-y-8">
-            {/* Meta & Synopsis Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Left 2 cols */}
-              <div className="lg:col-span-2 space-y-4">
-                <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                  <span className="text-emerald-400 font-bold flex items-center gap-1">
-                    <Star size={12} className="fill-emerald-400" />
-                    {detailedMedia.matchScore}% Relevante
-                  </span>
-                  <span className="text-slate-600">•</span>
-                  <span className="text-slate-300">{detailedMedia.year}</span>
-                  <span className="text-slate-600">•</span>
-                  <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 font-semibold text-xs border border-slate-800">
-                    {detailedMedia.rating}
-                  </span>
-                  <span className="text-slate-600">•</span>
-                  <span className="text-slate-300 font-medium">
-                    {detailedMedia.duration}
-                  </span>
-                  <span className="text-slate-600">•</span>
-                  {isVip ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-400/40">
-                      <Crown size={12} className="fill-amber-400" />
-                      4K Ultra HD & Dolby
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onOpenSubscription?.()}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 hover:text-white font-medium text-xs border border-sky-400/30 hover:border-sky-400 cursor-pointer transition-all"
-                      title="Clique para assinar o VIP (MB WAY & Crypto) e liberar 4K"
-                    >
-                      <Crown size={11} className="text-amber-400" />
-                      <span>4K Ultra HD</span>
-                      <span className="text-[9px] px-1 rounded bg-amber-400/25 text-amber-300 font-black">VIP</span>
-                    </button>
-                  )}
-                </div>
+          {/* Content Details */}
+          <div className="detail-content">
+            <h2 className="detail-title">{detailedMedia.title}</h2>
 
-                <p className="text-slate-200 text-sm sm:text-base leading-relaxed">
-                  {detailedMedia.synopsis}
-                </p>
-              </div>
-
-              {/* Right 1 col: Technical info & Cast */}
-              <div className="space-y-3.5 p-4 rounded-2xl bg-[#131822] border border-white/[0.06] text-xs">
-                {detailedMedia.cast && detailedMedia.cast.length > 0 && (
-                  <div>
-                    <span className="text-slate-400 font-semibold block mb-1">Elenco Principal:</span>
-                    <span className="text-slate-200 leading-relaxed">
-                      {detailedMedia.cast.join(', ')}
-                    </span>
-                  </div>
-                )}
-
-                {detailedMedia.director && (
-                  <div>
-                    <span className="text-slate-400 font-semibold block mb-0.5">Direção:</span>
-                    <span className="text-slate-200">{detailedMedia.director}</span>
-                  </div>
-                )}
-
-                <div>
-                  <span className="text-slate-400 font-semibold block mb-1">Gêneros:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {detailedMedia.genres?.map((g, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2 py-0.5 rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/80 text-[11px]"
-                      >
-                        {g}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <span className="text-slate-400 font-semibold block mb-0.5">Idiomas de Transmissão:</span>
-                  <span className="text-slate-300 text-[11px]">
-                    Português [Original], Inglês (Dolby 5.1), Espanhol • Legendas em PT-BR e EN
-                  </span>
-                </div>
-              </div>
+            {/* Meta tags */}
+            <div className="hero-meta">
+              {detailedMedia.matchScore && (
+                <span className="score">{detailedMedia.matchScore}%</span>
+              )}
+              {detailedMedia.rating && (
+                <span className="cert">{detailedMedia.rating}</span>
+              )}
+              {detailedMedia.year && (
+                <span>{detailedMedia.year}</span>
+              )}
+              <span>
+                {detailedMedia.duration || detailedMedia.genres?.slice(0, 2).join(' · ')}
+              </span>
+              <span className="type-label">
+                {isSeries ? 'SÉRIE' : 'FILME'}
+              </span>
             </div>
 
-            {/* Series Seasons and Episodes */}
+            {/* Overview */}
+            <p className="detail-overview">
+              {detailedMedia.synopsis || detailedMedia.overview || 'Sinopse não disponível para este título.'}
+            </p>
+
+            {/* Buttons */}
+            <div className="detail-buttons">
+              <button
+                className="button-primary"
+                onClick={handleStartPlay}
+              >
+                <KaiPlay size={11} />
+                Assistir
+              </button>
+
+              <button
+                className="button-glass"
+                onClick={() => onToggleWatchlist(detailedMedia)}
+                aria-pressed={inWatchlist}
+              >
+                {inWatchlist ? <KaiCheck size={13} /> : <KaiPlus size={13} />}
+                <span>{inWatchlist ? 'Na minha lista' : 'Minha lista'}</span>
+              </button>
+            </div>
+
+            {/* Cast Rail */}
+            {castList.length > 0 && (
+              <>
+                <h3 className="detail-subtitle">Elenco</h3>
+                <div className="cast-rail">
+                  {castList.slice(0, 10).map((person, idx) => {
+                    const name = typeof person === 'string' ? person : (person.name || '');
+                    const role = typeof person === 'object' ? person.character : '';
+                    const photo = typeof person === 'object' ? person.image : null;
+                    const initial = (name[0] || 'K').toUpperCase();
+
+                    return (
+                      <div className="cast-item" key={idx}>
+                        {photo ? (
+                          <img src={photo} alt={name} loading="lazy" />
+                        ) : (
+                          <span className="cast-fallback">{initial}</span>
+                        )}
+                        <strong>{name}</strong>
+                        {role && <small>{role}</small>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* TV Series Seasons & Episodes */}
             {isSeries && availableSeasons.length > 0 && (
-              <div className="pt-4 border-t border-slate-800">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+              <div className="mt-8 pt-6 border-t border-white/[0.08]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                   <div className="flex items-center gap-2">
-                    <Tv size={18} className="text-sky-400" />
-                    <h3 className="text-lg font-bold text-white">Temporadas & Episódios</h3>
+                    <KaiTv size={16} className="text-[#8bd4ff]" />
+                    <h3 className="text-base font-bold text-white m-0">Temporadas e Episódios</h3>
                   </div>
 
-                  {/* Season Selector */}
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-slate-400">Temporada:</label>
+                  {/* Season Dropdown */}
+                  <div className="flex items-center gap-2 text-xs text-[#aeb6c5]">
+                    <span>Temporada:</span>
                     <select
                       value={selectedSeasonNumber}
                       onChange={(e) => setSelectedSeasonNumber(Number(e.target.value))}
-                      className="bg-[#131822] border border-slate-700 text-slate-200 text-xs sm:text-sm rounded-xl px-3 py-1.5 focus:outline-none focus:border-sky-400"
+                      className="bg-[#172133] border border-white/10 text-white text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-[#bdd9ff]"
                     >
                       {availableSeasons.map((s) => (
                         <option key={s.season_number} value={s.season_number}>
@@ -312,106 +220,81 @@ export default function MediaModal({
 
                 {/* Episodes List */}
                 {loadingEpisodes ? (
-                  <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
-                    <Loader2 size={20} className="animate-spin text-sky-400" />
-                    <span className="text-xs">Carregando episódios...</span>
+                  <div className="py-12 flex items-center justify-center text-xs text-slate-400 gap-2">
+                    <div className="loading-orbit" />
+                    <span>Carregando episódios...</span>
                   </div>
                 ) : episodes.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {episodes.map((ep) => (
                       <div
                         key={ep.ep}
                         onClick={() => onPlay(detailedMedia, { ...ep, season: selectedSeasonNumber })}
                         onMouseEnter={() => {
                           prefetchMediaStreams({
-                            tmdbId: detailedMedia.tmdbId,
+                            tmdbId: detailedMedia.tmdbId || detailedMedia.id,
                             type: 'series',
                             season: selectedSeasonNumber,
                             episode: ep.ep,
                             title: detailedMedia.title,
                           });
                         }}
-                        className="group flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 rounded-2xl bg-[#131822]/80 hover:bg-[#1a2230] border border-white/[0.06] hover:border-slate-600 transition-all cursor-pointer"
+                        className="group flex flex-col sm:flex-row items-start sm:items-center gap-3.5 p-3 rounded-xl bg-[#172133]/60 hover:bg-[#1a263b] border border-white/[0.06] hover:border-[#bdd9ff]/30 transition-all cursor-pointer"
                       >
-                        <span className="text-base font-bold text-slate-500 group-hover:text-sky-400 w-6 text-center hidden sm:block">
+                        <span className="text-sm font-bold text-[#637892] group-hover:text-[#bdd9ff] w-6 text-center hidden sm:block">
                           {ep.ep}
                         </span>
 
-                        <div className="relative w-full sm:w-40 aspect-video rounded-xl overflow-hidden bg-slate-900 flex-shrink-0 border border-slate-800">
-                          <img
-                            src={ep.thumbnail}
-                            alt={ep.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div className="w-8 h-8 rounded-full bg-sky-400 text-slate-950 flex items-center justify-center shadow-md">
-                              <Play size={14} className="fill-slate-950 ml-0.5" />
+                        <div className="relative w-full sm:w-36 aspect-video rounded-lg overflow-hidden bg-[#0e141f] flex-shrink-0 border border-white/10">
+                          {ep.still ? (
+                            <img
+                              src={ep.still}
+                              alt={ep.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-600">
+                              <KaiTv size={20} />
                             </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                            <span className="w-8 h-8 rounded-full bg-[#def0ffed] text-[#172538] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:scale-100 scale-75">
+                              <KaiPlay size={10} />
+                            </span>
                           </div>
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <h4 className="text-sm font-bold text-white group-hover:text-sky-300 transition-colors">
-                              {ep.ep}. {ep.title}
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-[#bdd9ff] transition-colors truncate">
+                              {ep.ep}. {ep.title || `Episódio ${ep.ep}`}
                             </h4>
-                            <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                              <Clock size={12} className="text-slate-400" />
-                              {ep.duration}
-                            </span>
+                            {ep.duration && (
+                              <span className="text-[11px] text-[#8fa4bf] flex-shrink-0">
+                                {ep.duration}
+                              </span>
+                            )}
                           </div>
-                          <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
-                            {ep.synopsis}
-                          </p>
+                          {ep.overview && (
+                            <p className="text-[11px] text-[#8fa4bf] line-clamp-2 mt-1 leading-relaxed">
+                              {ep.overview}
+                            </p>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-400 py-6 text-center">
-                    Episódios desta temporada estão sendo processados pela distribuidora.
+                  <p className="text-xs text-[#8fa4bf] text-center py-6">
+                    Nenhum episódio listado para esta temporada.
                   </p>
                 )}
               </div>
             )}
-
-            {/* Similar Titles Grid */}
-            {detailedMedia.similar && detailedMedia.similar.length > 0 && (
-              <div className="pt-6 border-t border-slate-800">
-                <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                  <Film size={16} className="text-sky-400" />
-                  Títulos Semelhantes
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                  {detailedMedia.similar.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => onSelectMedia(item)}
-                      className="group cursor-pointer rounded-xl overflow-hidden bg-[#131822] border border-white/[0.06] hover:border-slate-600 transition-all hover:scale-[1.02]"
-                    >
-                      <div className="aspect-[2/3] w-full overflow-hidden relative">
-                        <img
-                          src={item.poster}
-                          alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                      </div>
-                      <div className="p-2">
-                        <h4 className="text-xs font-bold text-white truncate group-hover:text-sky-300">
-                          {item.title}
-                        </h4>
-                        <div className="text-[10px] text-slate-400 mt-0.5">
-                          {item.year}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

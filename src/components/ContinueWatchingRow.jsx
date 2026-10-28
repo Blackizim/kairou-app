@@ -1,6 +1,15 @@
 import React, { useRef } from 'react';
 import { Play, X, ChevronLeft, ChevronRight, Clock, History, LogIn, Sparkles } from 'lucide-react';
 
+const resolveImageUrl = (path, size = 'w780') => {
+  if (!path || typeof path !== 'string') return null;
+  const trimmed = path.trim();
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return null;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  const clean = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return `https://image.tmdb.org/t/p/${size}${clean}`;
+};
+
 export default function ContinueWatchingRow({
   user,
   items = [],
@@ -33,52 +42,9 @@ export default function ContinueWatchingRow({
     return `Restam ${mins} min`;
   };
 
-  // 1. Caso o usuário NÃO esteja logado: Aviso para fazer login
-  if (!user) {
-    return (
-      <section className="relative px-4 sm:px-8 lg:px-12 my-8 select-none">
-        <div className="max-w-[1680px] mx-auto">
-          <div className="flex items-center gap-2 mb-3">
-            <History size={20} className="text-sky-400" />
-            <h2 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
-              Continuar Assistindo
-            </h2>
-          </div>
-
-          <div className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-sky-500/10 via-[#0f141e] to-blue-600/10 border border-sky-400/20 backdrop-blur-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-500/20 text-sky-300">
-                  Progresso em Nuvem
-                </span>
-                <span className="text-xs text-slate-400 hidden sm:inline">
-                  Sincronização instantânea
-                </span>
-              </div>
-              <h3 className="text-base sm:text-lg font-bold text-white">
-                Faça login para salvar de onde você parou
-              </h3>
-              <p className="text-xs text-slate-400 max-w-xl leading-relaxed">
-                Acesse sua conta do Kairou para retomar seus filmes e episódios de onde parou em qualquer dispositivo (Smart TV, celular ou PC).
-              </p>
-            </div>
-
-            <button
-              onClick={onOpenAuth}
-              className="px-6 py-3 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-lg hover:scale-105 active:scale-95 flex items-center gap-2 shrink-0"
-            >
-              <LogIn size={16} />
-              <span>Entrar ou Criar Conta</span>
-            </button>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  // 2. Caso o usuário esteja logado, mas ainda não tenha itens
-  if (!loading && items.length === 0) {
-    return null; // Oculta a linha se a lista estiver vazia
+  // Se não houver itens em andamento ou estiver carregando vazio, oculta a linha
+  if (items.length === 0) {
+    return null;
   }
 
   // 3. Usuário logado com itens em andamento
@@ -127,6 +93,11 @@ export default function ContinueWatchingRow({
             const episodeLabel = isSeries ? `T${item.season || 1}:E${item.episode || 1}` : null;
             const remainingText = formatRemaining(item.duration, item.playback_time);
 
+            const backdropUrl = resolveImageUrl(item.backdrop_path, 'w780');
+            const posterUrl = resolveImageUrl(item.poster_path, 'w500');
+            const primaryBanner = backdropUrl || posterUrl;
+            const hasOnlyPoster = !backdropUrl && Boolean(posterUrl);
+
             return (
               <div
                 key={`${item.media_id}-${item.season}-${item.episode}`}
@@ -141,8 +112,8 @@ export default function ContinueWatchingRow({
                       tmdbId: parseInt(String(item.media_id).replace(/^(movie|series|tv)-/, ''), 10),
                       title: item.title,
                       type: isSeries ? 'series' : 'movie',
-                      poster: item.poster_path,
-                      backdrop: item.backdrop_path || item.poster_path,
+                      poster: posterUrl || item.poster_path,
+                      backdrop: backdropUrl || posterUrl || item.backdrop_path,
                     };
                     const epObj = isSeries
                       ? {
@@ -155,14 +126,30 @@ export default function ContinueWatchingRow({
                   }}
                   className="relative aspect-video w-full overflow-hidden bg-slate-950 cursor-pointer"
                 >
+                  {/* Blurry backdrop if only vertical poster exists to maintain 16:9 banner consistency */}
+                  {hasOnlyPoster && (
+                    <div
+                      className="absolute inset-0 bg-cover bg-center filter blur-md scale-110 opacity-40 pointer-events-none"
+                      style={{ backgroundImage: `url(${posterUrl})` }}
+                    />
+                  )}
+
                   <img
-                    src={item.backdrop_path || item.poster_path}
+                    src={primaryBanner || '/kairou.svg'}
                     alt={item.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    onError={(e) => {
+                      if (posterUrl && e.currentTarget.src !== posterUrl) {
+                        e.currentTarget.src = posterUrl;
+                      } else {
+                        e.currentTarget.src = '/kairou.svg';
+                      }
+                    }}
+                    className={`w-full h-full ${hasOnlyPoster ? 'object-contain relative z-[1]' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`}
+                    loading="lazy"
                   />
 
                   {/* Gradient Scrim */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent z-[2]" />
 
                   {/* Play Icon Hover Overlay */}
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
