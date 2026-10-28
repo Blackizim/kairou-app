@@ -118,6 +118,7 @@ export default async function handler(req, res) {
     const isM3u8 =
       targetUrl.includes('.m3u8') ||
       targetUrl.includes('master.txt') ||
+      targetUrl.includes('hls-proxy') ||
       contentType.includes('mpegurl') ||
       contentType.includes('application/x-mpegURL') ||
       contentType.includes('vnd.apple.mpegurl');

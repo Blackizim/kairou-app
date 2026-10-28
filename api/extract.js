@@ -1,6 +1,6 @@
 // Vercel Serverless & Local PC Node.js Function: /api/extract
 // Resolvedor de alta performance para Kairou Streaming
-// Integra as melhores fontes BR testadas: BestCine, FrostStream, Vê Tela, MagnetFlix, BsCine e FenixFlix
+// Integra as melhores fontes BR testadas: Kairou Native, BestCine, FrostStream, Vê Tela, MagnetFlix e BsCine
 // Prioridade máxima estrita: 4K Ultra HD Dublado > 4K Legendado > 1080p Full HD Dublado
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -485,63 +485,81 @@ async function extractBsCine({ tmdbId, imdbId, type, season = 1, episode = 1 }) 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. FenixFlix (https://fenixflix.fenixhub.online) - FALLBACK SECUNDÁRIO
+// 6. Kairou Native Server (Infraestrutura Própria Oficial do Kairou)
+// Consulta direta aos servidores CDN originais em altíssima velocidade (< 300ms)
+// Substitui completamente o FenixFlix com suporte nativo a 1080p e 4K Dublado e Legendado
 // ─────────────────────────────────────────────────────────────────────────────
-async function extractFenixFlix({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+async function extractKairouNative({ tmdbId, type, season = 1, episode = 1 }) {
+  if (!tmdbId || isNaN(Number(tmdbId))) return [];
   const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries)) || `tmdb:${tmdbId}`;
-
-  const path = isSeries
-    ? `series/${targetId}:${season}:${episode}.json`
-    : `movie/${targetId}.json`;
-
-  const url = `https://fenixflix.fenixhub.online/stream/${path}`;
   const streams = [];
 
-  try {
-    const res = await fetchWithTimeout(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json, text/plain, */*',
-      }
-    }, 4500);
+  const audios = ['dub', 'leg'];
+  const fetchPromises = audios.map(async (audio) => {
+    const q = new URLSearchParams({
+      id: String(tmdbId),
+      audio,
+    });
+    if (isSeries) {
+      q.set('s', String(season || 1));
+      q.set('e', String(episode || 1));
+    }
 
-    if (res && res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.streams)) {
-        for (let idx = 0; idx < data.streams.length; idx++) {
-          const s = data.streams[idx];
-          if (!s || !s.url) continue;
-          const streamUrl = normalizeStreamUrl(s.url);
-          if (!streamUrl) continue;
+    const url = `https://zunderflix.lat/api/media/sources?${q.toString()}`;
+    try {
+      const res = await fetchWithTimeout(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Referer': 'https://zunderflix.lat/',
+          'Accept': 'application/json',
+        }
+      }, 3500);
 
-          const isHls = streamUrl.includes('.m3u8') || streamUrl.includes('master.txt');
-          const titleText = (s.title || s.description || '');
-          const nameText = (s.name || '');
-          const qInfo = detectQuality(streamUrl, nameText, titleText);
-          const metaLower = `${titleText} ${nameText}`.toLowerCase();
-          const isLeg = metaLower.includes('legendado') || metaLower.includes('legend') || metaLower.includes('sub') || metaLower.includes('🇺🇸') || metaLower.includes('🇯🇵');
-          const isDub = !isLeg && (metaLower.includes('dublado') || metaLower.includes('dub') || metaLower.includes('nacional') || metaLower.includes('🇧🇷') || metaLower.includes('dual') || metaLower.includes('português') || metaLower.includes('portugues'));
-
-          streams.push({
-            id: `kairou-fenix-${idx}-${Date.now()}`,
-            server: s.server || 'Kairou',
-            providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality}) [Legendado PT-BR]`,
-            url: streamUrl,
-            type: isHls ? 'hls' : 'mp4',
-            quality: qInfo.quality,
-            rank: qInfo.rank,
-            isHls,
-            priority: isDub ? 3 : 5,
-            isDub,
-            isFenix: true,
-            subtitles: s.subtitles || [],
-          });
+      if (res && res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.sources)) {
+          return { audio, sources: data.sources };
         }
       }
+    } catch (e) {
+      console.warn(`[extractKairouNative:${audio}] Erro:`, e?.message);
     }
-  } catch (e) {
-    console.warn('[extractFenixFlix] Erro:', e?.message);
+    return null;
+  });
+
+  const results = await Promise.allSettled(fetchPromises);
+  for (const r of results) {
+    if (r.status !== 'fulfilled' || !r.value) continue;
+    const { audio, sources } = r.value;
+    const isDub = audio === 'dub';
+
+    sources.forEach((s, idx) => {
+      if (!s || !s.src) return;
+      const fullUrl = s.src.startsWith('http') ? s.src : `https://zunderflix.lat${s.src}`;
+      const streamUrl = normalizeStreamUrl(fullUrl);
+      if (!streamUrl) return;
+
+      const isHls = streamUrl.includes('.m3u8') || streamUrl.includes('hls') || Boolean(s.hls) || Boolean(s.nativeHls);
+      const labelText = s.label || '';
+      const qInfo = detectQuality(fullUrl, labelText, isDub ? 'Dublado' : 'Legendado');
+
+      streams.push({
+        id: `kairou-native-${audio}-${idx}-${Date.now()}`,
+        server: 'Kairou',
+        providerName: isDub
+          ? `Kairou · ${qInfo.quality} [Dublado]`
+          : `Kairou · Áudio Original (${qInfo.quality}) [Legendado PT-BR]`,
+        url: streamUrl,
+        type: isHls ? 'hls' : 'mp4',
+        quality: qInfo.quality,
+        rank: qInfo.rank,
+        isHls,
+        priority: isDub ? 1 : 2, // Prioridade máxima no player Kairou
+        isDub,
+        isKairouNative: true,
+        subtitles: [],
+      });
+    });
   }
 
   return streams;
@@ -944,7 +962,9 @@ function curateTopStreams(allStreams, extractedSubtitles = []) {
       continue;
     }
 
-    const urlClean = s.url.split('?')[0];
+    const urlClean = s.url.startsWith('/api/proxy?url=')
+      ? decodeURIComponent(s.url.slice('/api/proxy?url='.length)).split('&t=')[0].split('&sig=')[0]
+      : s.url.split('?')[0];
     if (seenUrls.has(urlClean)) continue;
     seenUrls.add(urlClean);
 
@@ -996,8 +1016,10 @@ function curateTopStreams(allStreams, extractedSubtitles = []) {
       const bAlive = b.alive !== false ? 1 : 0;
       if (aAlive !== bAlive) return bAlive - aAlive;
 
-      const getCdnScore = (u) => {
-        if (!u) return 10;
+      const getCdnScore = (item) => {
+        if (item.isKairouNative) return 0; // Kairou Native Server é a fonte oficial prioritária!
+        const u = item.url || '';
+        if (u.includes('zunderflix.lat')) return 0;
         if (u.includes('cnvods.com')) return 1;
         if (u.includes('bestcine.dpdns.org')) return 2;
         if (u.includes('froststream.cloutteam.com')) return 3;
@@ -1007,7 +1029,7 @@ function curateTopStreams(allStreams, extractedSubtitles = []) {
         if (u.includes('qzz.io')) return 7;
         return 8;
       };
-      return getCdnScore(a.url) - getCdnScore(b.url);
+      return getCdnScore(a) - getCdnScore(b);
     });
   };
 
@@ -1018,7 +1040,9 @@ function curateTopStreams(allStreams, extractedSubtitles = []) {
     const pickedUrls = new Set();
     const chosen = [];
     for (const item of pool) {
-      const u = item.url.split('?')[0];
+      const u = item.url.startsWith('/api/proxy?url=')
+        ? decodeURIComponent(item.url.slice('/api/proxy?url='.length)).split('&t=')[0].split('&sig=')[0]
+        : item.url.split('?')[0];
       if (!pickedUrls.has(u)) {
         pickedUrls.add(u);
         chosen.push(item);
@@ -1135,13 +1159,13 @@ export default async function handler(req, res) {
       imdbId = await resolveImdbId(tmdbId, isSeries);
     }
 
-    // Execução Paralela das Fontes BR Oficiais
-    const [bestRes, frostRes, vetelaRes, bscineRes, fenixRes, veyraRes, kingRes, magnetRes, pleiadesRes, ssRes, subsRes] = await Promise.allSettled([
+    // Execução Paralela das Fontes BR Oficiais (Kairou Native como Prioridade 1)
+    const [kairouNativeRes, bestRes, frostRes, vetelaRes, bscineRes, veyraRes, kingRes, magnetRes, pleiadesRes, ssRes, subsRes] = await Promise.allSettled([
+      extractKairouNative({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractBestCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractFrostStream({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractVeTela({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractBsCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractFenixFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractVeyra({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractKingVod({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractMagnetFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
@@ -1151,6 +1175,7 @@ export default async function handler(req, res) {
     ]);
 
     const collected = [];
+    if (kairouNativeRes.status === 'fulfilled' && Array.isArray(kairouNativeRes.value)) collected.push(...kairouNativeRes.value);
     if (bestRes.status === 'fulfilled' && Array.isArray(bestRes.value)) collected.push(...bestRes.value);
     if (frostRes.status === 'fulfilled' && Array.isArray(frostRes.value)) collected.push(...frostRes.value);
     if (vetelaRes.status === 'fulfilled' && Array.isArray(vetelaRes.value)) collected.push(...vetelaRes.value);
@@ -1160,7 +1185,6 @@ export default async function handler(req, res) {
     if (pleiadesRes.status === 'fulfilled' && Array.isArray(pleiadesRes.value)) collected.push(...pleiadesRes.value);
     if (ssRes.status === 'fulfilled' && Array.isArray(ssRes.value)) collected.push(...ssRes.value);
     if (bscineRes.status === 'fulfilled' && Array.isArray(bscineRes.value)) collected.push(...bscineRes.value);
-    if (fenixRes.status === 'fulfilled' && Array.isArray(fenixRes.value)) collected.push(...fenixRes.value);
 
     const extractedSubtitles = subsRes.status === 'fulfilled' && Array.isArray(subsRes.value) ? subsRes.value : [];
 

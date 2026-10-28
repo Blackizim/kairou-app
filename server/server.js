@@ -26,7 +26,6 @@ const HOST = '0.0.0.0';
 
 // Configuração de Proxies Reversos de Addons
 const REVERSE_PROXIES = [
-  { prefix: '/api-fenixflix', target: 'https://fenixflix.fenixhub.online' },
   { prefix: '/api-clickhost', target: 'https://embed-api.clickhost.xyz' },
   { prefix: '/api-mgeb', target: 'https://mgeb.top' },
   { prefix: '/api-superflix', target: 'https://superflixapi.beer' },
