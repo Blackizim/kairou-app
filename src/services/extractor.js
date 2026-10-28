@@ -794,163 +794,190 @@ export async function extractFenixFlixClient({ tmdbId, imdbId, type, season = 1,
 // ORDENAÇÃO E FORMATAÇÃO KAIROU COM PRIORIDADE 4K MÁXIMA
 // ─────────────────────────────────────────────────────────────────────────────
 export function formatKairouServers(streams) {
-  if (!Array.isArray(streams)) return [];
+  if (!Array.isArray(streams) || streams.length === 0) return [];
+
+  // Se já foi curado no backend, preserva sem alterar
+  if (streams.some((s) => s && s.isCurated)) {
+    return streams;
+  }
+
+  const pools = {
+    '4k_dub': [],
+    '4k_sub': [],
+    '1080_dub': [],
+    '1080_sub': [],
+    '720_dub': [],
+    'embeds': [],
+    'others': [],
+  };
 
   const seenUrls = new Set();
-  const normalized = [];
+
   for (const s of streams) {
     if (!s) continue;
     const isApprovedIframe = Boolean(s.isIframe || s.type === 'iframe');
     if (!isApprovedIframe && (s.isEmbed || s.type === 'iframe')) continue;
     const url = isApprovedIframe ? s.url : normalizeStreamUrl(s.url || '');
     if (!url) continue;
-    const key = `${url}::${s.isDub ? 'dub' : 'sub'}`;
-    if (!seenUrls.has(key)) {
-      seenUrls.add(key);
-      normalized.push({ ...s, url });
+
+    if (s.server === 'WarezCDN' || s.server === 'VidRU' || s.server === 'VidLink' || isApprovedIframe) {
+      if (!seenUrls.has(url)) {
+        seenUrls.add(url);
+        pools.embeds.push({ ...s, url });
+      }
+      continue;
     }
 
-    const is4k = s.is4k || (s.quality || '').includes('4K') || (s.providerName || '').includes('4K');
-    if ((is4k || s.isDual) && s.isDub) {
-      const subKey = `${url}::sub`;
-      if (!seenUrls.has(subKey)) {
-        seenUrls.add(subKey);
-        normalized.push({
+    const urlClean = url.split('?')[0];
+    if (seenUrls.has(urlClean)) continue;
+    seenUrls.add(urlClean);
+
+    const is4k = Boolean(s.is4k || (s.quality || '').includes('4K') || (s.name || '').includes('4k') || (s.title || '').includes('4k') || (s.providerName || '').includes('4K'));
+    const is1080 = Boolean((s.quality || '').includes('1080') || (s.providerName || '').includes('1080'));
+    const is720 = Boolean((s.quality || '').includes('720') || (s.providerName || '').includes('720'));
+    const isDub = Boolean(s.isDub || (s.providerName || '').includes('[Dublado]'));
+
+    if (is4k) {
+      if (isDub) {
+        pools['4k_dub'].push({ ...s, url });
+        pools['4k_sub'].push({
           ...s,
-          id: `${s.id || 'kairou'}-orig`,
+          id: `${s.id || 'k4'}-orig`,
           url,
           isDub: false,
           lang: 'en',
           isDual: true,
-          priority: is4k ? 2 : 4,
         });
+      } else {
+        pools['4k_sub'].push({ ...s, url });
       }
+    } else if (is1080) {
+      if (isDub) {
+        pools['1080_dub'].push({ ...s, url });
+        if (s.isDual) {
+          pools['1080_sub'].push({
+            ...s,
+            id: `${s.id || 'k1080'}-orig`,
+            url,
+            isDub: false,
+            lang: 'en',
+          });
+        }
+      } else {
+        pools['1080_sub'].push({ ...s, url });
+      }
+    } else if (is720) {
+      if (isDub) pools['720_dub'].push({ ...s, url });
+      else pools['1080_sub'].push({ ...s, url });
+    } else {
+      pools['others'].push({ ...s, url });
     }
   }
 
-  const sorted = [...normalized].sort((a, b) => {
-    const aIs4k = Boolean(a.is4k || (a.quality || '').includes('4K') || (a.providerName || '').includes('4K') || (a.name || '').includes('4k') || (a.title || '').includes('4k'));
-    const bIs4k = Boolean(b.is4k || (b.quality || '').includes('4K') || (b.providerName || '').includes('4K') || (b.name || '').includes('4k') || (b.title || '').includes('4k'));
-    const aIsDub = Boolean(a.isDub);
-    const bIsDub = Boolean(b.isDub);
+  const sortPool = (list) => {
+    return list.sort((a, b) => {
+      const aAlive = a.alive !== false ? 1 : 0;
+      const bAlive = b.alive !== false ? 1 : 0;
+      if (aAlive !== bAlive) return bAlive - aAlive;
 
-    // 1. Dublado sempre vence Legendado
-    if (aIsDub !== bIsDub) {
-      return aIsDub ? -1 : 1;
-    }
+      const getCdnScore = (u) => {
+        if (!u) return 10;
+        if (u.includes('wasabisys.com')) return 1;
+        if (u.includes('cnvods.com')) return 2;
+        if (u.includes('bestcine.dpdns.org')) return 3;
+        if (u.includes('froststream.cloutteam.com')) return 4;
+        if (u.includes('shardweb.app')) return 5;
+        if (u.includes('baby-beamup.club')) return 6;
+        if (u.includes('qzz.io')) return 7;
+        return 8;
+      };
+      return getCdnScore(a.url) - getCdnScore(b.url);
+    });
+  };
 
-    // 2. Servidores testados e VIVOS vencem servidores mortos
-    const aAlive = a.alive !== false ? 1 : 0;
-    const bAlive = b.alive !== false ? 1 : 0;
-    if (aAlive !== bAlive) {
-      return bAlive - aAlive;
-    }
+  const curated = [];
 
-    // 3. ORDENAÇÃO PARA REPRODUÇÃO AUTOMÁTICA:
-    // 1080p Full HD (1) > 720p HD (2) > 1440p 2K (3) > 480p (4) > 360p (5) > 4K Ultra HD (10)
-    const getAutoPlayScore = (item, is4k) => {
-      if (is4k) return 10;
-      const q = (item.quality || '').toLowerCase();
-      if (q.includes('1080') || q.includes('full hd') || q.includes('fhd')) return 1;
-      if (q.includes('720') || q.includes('hd')) return 2;
-      if (q.includes('1440') || q.includes('2k') || q.includes('qhd')) return 3;
-      if (q.includes('480') || q.includes('sd')) return 4;
-      if (q.includes('360')) return 5;
-      return 2;
-    };
-
-    const scoreA = getAutoPlayScore(a, aIs4k);
-    const scoreB = getAutoPlayScore(b, bIs4k);
-    if (scoreA !== scoreB) {
-      return scoreA - scoreB;
-    }
-
-    // 4. VELOCIDADE REAL (Menor latência primeiro)
-    const latA = typeof a.latency === 'number' ? a.latency : 4000;
-    const latB = typeof b.latency === 'number' ? b.latency : 4000;
-    if (Math.abs(latA - latB) > 40) {
-      return latA - latB;
-    }
-
-    // 5. Prioridade de provedor (BestCine > FrostStream > VeTela > MagnetFlix > BsCine)
-    const prioA = a.priority || 5;
-    const prioB = b.priority || 5;
-    if (prioA !== prioB) {
-      return prioA - prioB;
-    }
-
-    // 6. HTTPS direto
-    const aIsHttps = (a.url || '').startsWith('https://') ? 1 : 0;
-    const bIsHttps = (b.url || '').startsWith('https://') ? 1 : 0;
-    return bIsHttps - aIsHttps;
-  });
-
-  let dubCounter = 0;
-  let subCounter = 0;
-  let dub4kCounter = 0;
-  let sub4kCounter = 0;
-
-  return sorted.map((s) => {
-    const is4k = Boolean(s.is4k || (s.quality || '').includes('4K') || (s.name || '').includes('4k') || (s.title || '').includes('4k'));
-    const is2k = Boolean((s.quality || '').includes('1440') || (s.quality || '').includes('2K'));
-    const is1080 = Boolean((s.quality || '').includes('1080'));
-    const isDub = Boolean(s.isDub);
-
-    let badge = '1080p Full HD';
-    if (is4k) badge = '4K Ultra HD';
-    else if (is2k) badge = '1440p 2K';
-    else if (is1080) badge = '1080p Full HD';
-    else if ((s.quality || '').includes('720')) badge = '720p HD';
-    else if ((s.quality || '').includes('480')) badge = '480p';
-
-    let finalName = '';
-    if (s.server === 'WarezCDN' || s.server === 'VidRU' || s.server === 'VidLink' || s.server === 'Veyra' || s.server === 'King VOD' || s.server === 'MagnetFlix' || s.server === 'PleiadesStream') {
-      finalName = s.providerName;
-    } else if (isDub) {
-      if (is4k) {
-        dub4kCounter++;
-        finalName = dub4kCounter === 1
-          ? `Kairou · Servidor 4K Ultra HD [Dublado]`
-          : `Kairou · Servidor 4K Ultra HD ${dub4kCounter} [Dublado]`;
-      } else {
-        dubCounter++;
-        if (dubCounter === 1) {
-          finalName = `Kairou · Servidor Principal (${badge}) [Dublado]`;
-        } else if (dubCounter === 2) {
-          finalName = `Kairou · Servidor Rápido (${badge}) [Dublado]`;
-        } else if (dubCounter === 3) {
-          finalName = `Kairou · Servidor Estável (${badge}) [Dublado]`;
-        } else if (dubCounter === 4) {
-          finalName = `Kairou · Servidor Cinema (${badge}) [Dublado]`;
-        } else {
-          finalName = `Kairou · Servidor Reserva ${dubCounter - 4} (${badge}) [Dublado]`;
-        }
-      }
-    } else {
-      if (is4k) {
-        sub4kCounter++;
-        finalName = sub4kCounter === 1
-          ? `Kairou · Servidor 4K Ultra HD [Legendado PT-BR]`
-          : `Kairou · Servidor 4K Ultra HD ${sub4kCounter} [Legendado PT-BR]`;
-      } else {
-        subCounter++;
-        finalName = `Kairou · Áudio Original ${subCounter} (${badge}) [Legendado PT-BR]`;
+  const pickTop = (pool, maxCount, namePrefix, qualityLabel, isDub) => {
+    sortPool(pool);
+    const pickedUrls = new Set();
+    const chosen = [];
+    for (const item of pool) {
+      const u = item.url.split('?')[0];
+      if (!pickedUrls.has(u)) {
+        pickedUrls.add(u);
+        chosen.push(item);
+        if (chosen.length >= maxCount) break;
       }
     }
 
-    return {
-      ...s,
-      server: s.server || 'Kairou',
-      providerName: finalName,
-      isDub,
-      lang: isDub ? 'pt' : 'en',
-      quality: badge,
-      subtitles: s.subtitles || [],
-      alive: s.alive !== false,
-      latency: typeof s.latency === 'number' ? s.latency : null,
-      isFastest: (dubCounter === 1 || subCounter === 1),
-    };
+    chosen.forEach((s, idx) => {
+      let finalName = '';
+      if (chosen.length === 1) {
+        finalName = `${namePrefix} · Mais Estável`;
+      } else {
+        finalName = idx === 0 ? `${namePrefix} · Mais Estável (Opção 1)` : `${namePrefix} (Opção ${idx + 1})`;
+      }
+
+      curated.push({
+        ...s,
+        server: s.server || 'Kairou',
+        providerName: finalName,
+        quality: qualityLabel,
+        is4k: qualityLabel.includes('4K'),
+        isDub,
+        lang: isDub ? 'pt' : 'en',
+        subtitles: s.subtitles || [],
+        isCurated: true,
+      });
+    });
+  };
+
+  // 1. 💎 4K Ultra HD Dublado (até 2 opções)
+  if (pools['4k_dub'].length > 0) {
+    pickTop(pools['4k_dub'], 2, '💎 4K Ultra HD [Dublado]', '4K Ultra HD', true);
+  }
+
+  // 2. ⚡ 1080p Full HD Dublado (até 2 opções)
+  if (pools['1080_dub'].length > 0) {
+    pickTop(pools['1080_dub'], 2, '⚡ 1080p Full HD [Dublado]', '1080p Full HD', true);
+  }
+
+  // 3. 💎 4K Ultra HD Legendado
+  if (pools['4k_sub'].length > 0) {
+    pickTop(pools['4k_sub'], 1, '💎 4K Ultra HD [Legendado PT-BR]', '4K Ultra HD', false);
+  }
+
+  // 4. ⚡ 1080p Full HD Legendado
+  if (pools['1080_sub'].length > 0) {
+    pickTop(pools['1080_sub'], 1, '⚡ 1080p Full HD [Legendado PT-BR]', '1080p Full HD', false);
+  }
+
+  // 5. 📱 720p HD Econômico
+  if (pools['720_dub'].length > 0) {
+    pickTop(pools['720_dub'], 1, '📱 720p HD [Econômico]', '720p HD', true);
+  }
+
+  // 6. Others se nenhum dublado foi encontrado
+  if (curated.filter((s) => s.isDub).length === 0 && pools['others'].length > 0) {
+    pickTop(pools['others'], 1, '⚡ Kairou Direto [Dublado]', '1080p Full HD', true);
+  }
+
+  // 7. 🌐 Provedores Alternativos Embed
+  const seenEmbedServers = new Set();
+  pools.embeds.forEach((s) => {
+    if (!seenEmbedServers.has(s.server)) {
+      seenEmbedServers.add(s.server);
+      curated.push({
+        ...s,
+        server: s.server,
+        providerName: s.providerName || `${s.server} · Player Alternativo`,
+        quality: s.quality || '1080p Full HD',
+        isCurated: true,
+      });
+    }
   });
+
+  return curated;
 }
 
 export function clearStreamCache(key) {

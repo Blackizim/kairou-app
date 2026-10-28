@@ -542,6 +542,7 @@ export default function VideoPlayer({
   const [isSpeedTesting, setIsSpeedTesting] = useState(false);
 
   const [serverLangFilter, setServerLangFilter] = useState('all'); // 'all' | 'dub' | 'sub'
+  const [serverQualityFilter, setServerQualityFilter] = useState('all'); // 'all' | '4k' | '1080' | '720' | 'embed'
   const [audioSubModalOpen, setAudioSubModalOpen] = useState(false);
   const [audioMenuOpen, setAudioMenuOpen] = useState(false);
   const [mobileVolumeOpen, setMobileVolumeOpen] = useState(false);
