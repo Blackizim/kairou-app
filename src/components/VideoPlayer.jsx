@@ -3563,28 +3563,6 @@ export default function VideoPlayer({
               )}
             </div>
           </div>
-
-          {/* Destaque 4K Ultra HD e Botões de Controle Rápido de Resolução */}
-          <div className="flex items-center gap-2 shrink-0">
-            {count4kServers > 0 && (
-              Boolean(activeServer?.is4k || (activeServer?.quality || '').includes('4K') || (activeServer?.providerName || '').includes('4K')) ? (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold shadow-lg shadow-amber-500/10">
-                  <span>💎 4K Ultra HD</span>
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    const k4Idx = servers.findIndex((s) => Boolean(s.is4k || (s.quality || '').includes('4K') || (s.providerName || '').includes('4K')));
-                    if (k4Idx >= 0) handleSelectServer(k4Idx);
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/30 to-amber-600/30 hover:from-amber-500/45 hover:to-amber-600/45 text-amber-200 border border-amber-400/60 text-xs font-bold shadow-xl shadow-amber-500/20 cursor-pointer active:scale-95 transition-all animate-pulse"
-                  title="Assistir em 4K Ultra HD (Servidor mais estável)"
-                >
-                  <span>💎 Assistir em 4K</span>
-                </button>
-              )
-            )}
-          </div>
         </div>
       )}
 

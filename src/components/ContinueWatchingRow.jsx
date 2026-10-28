@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Play, X, ChevronLeft, ChevronRight, Clock, History, LogIn, Sparkles } from 'lucide-react';
+import { Play, X, ChevronLeft, ChevronRight, Clock, History } from 'lucide-react';
 
 const resolveImageUrl = (path, size = 'w780') => {
   if (!path || typeof path !== 'string') return null;
@@ -42,12 +42,11 @@ export default function ContinueWatchingRow({
     return `Restam ${mins} min`;
   };
 
-  // Se não houver itens em andamento ou estiver carregando vazio, oculta a linha
-  if (items.length === 0) {
+  // Se o usuário não estiver logado ou não houver itens em andamento, oculta a linha
+  if (!user || items.length === 0) {
     return null;
   }
 
-  // 3. Usuário logado com itens em andamento
   return (
     <section className="relative px-4 sm:px-8 lg:px-12 my-8 select-none group/section">
       <div className="max-w-[1680px] mx-auto">
@@ -67,14 +66,14 @@ export default function ContinueWatchingRow({
           <div className="flex items-center gap-1.5 opacity-0 group-hover/section:opacity-100 transition-opacity duration-200">
             <button
               onClick={() => scroll('left')}
-              className="w-8 h-8 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors shadow-sm"
+              className="w-8 h-8 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors shadow-sm cursor-pointer"
               aria-label="Rolar para esquerda"
             >
               <ChevronLeft size={16} />
             </button>
             <button
               onClick={() => scroll('right')}
-              className="w-8 h-8 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors shadow-sm"
+              className="w-8 h-8 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors shadow-sm cursor-pointer"
               aria-label="Rolar para direita"
             >
               <ChevronRight size={16} />
@@ -85,7 +84,7 @@ export default function ContinueWatchingRow({
         {/* Horizontal Row Cards */}
         <div
           ref={rowRef}
-          className="flex items-center gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth"
+          className="flex items-stretch gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth"
         >
           {items.map((item) => {
             const isExplicitMovie = item.media_type === 'movie' || String(item.media_id).startsWith('movie-');
@@ -101,10 +100,10 @@ export default function ContinueWatchingRow({
             return (
               <div
                 key={`${item.media_id}-${item.season}-${item.episode}`}
-                className="relative flex-shrink-0 rounded-2xl bg-[#0f141e] border border-white/[0.08] hover:border-sky-400/40 overflow-hidden group transition-all duration-300 hover:scale-[1.02] shadow-md hover:shadow-xl"
-                style={{ width: 'clamp(190px, 45vw, 280px)' }}
+                className="relative flex-shrink-0 flex flex-col rounded-2xl bg-[#0f141e] border border-white/[0.08] hover:border-sky-400/40 overflow-hidden group transition-all duration-300 hover:scale-[1.02] shadow-md hover:shadow-xl"
+                style={{ width: 'clamp(210px, 45vw, 280px)' }}
               >
-                {/* Thumbnail Image */}
+                {/* Thumbnail Image (aspect-video) */}
                 <div
                   onClick={() => {
                     const mediaObj = {
@@ -148,11 +147,11 @@ export default function ContinueWatchingRow({
                     loading="lazy"
                   />
 
-                  {/* Gradient Scrim */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent z-[2]" />
+                  {/* Subtle Gradient Scrim - posicionado no z-[1] para ficar ATRÁS dos badges e botões */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-[1] pointer-events-none" />
 
                   {/* Play Icon Hover Overlay */}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-[2]">
                     <div className="w-12 h-12 rounded-full bg-sky-400 text-slate-950 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
                       <Play size={20} className="fill-slate-950 ml-1" />
                     </div>
@@ -164,20 +163,20 @@ export default function ContinueWatchingRow({
                       e.stopPropagation();
                       onRemove(item.media_id, item.season, item.episode);
                     }}
-                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-rose-600 text-slate-300 hover:text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 z-10"
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-rose-600 text-slate-300 hover:text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 z-10 cursor-pointer"
                     title="Remover do Continuar Assistindo"
                   >
                     <X size={14} />
                   </button>
 
-                  {/* Remaining Time Badge */}
-                  <div className="absolute bottom-2 left-2 flex items-center gap-1 text-[10px] text-white font-semibold bg-black/70 px-2 py-0.5 rounded backdrop-blur-xs">
+                  {/* Remaining Time Badge - posicionado no z-10 com fundo nítido acima do gradiente */}
+                  <div className="absolute bottom-2 left-2 flex items-center gap-1.5 text-[10px] text-white font-semibold bg-[#0b0e15]/90 px-2 py-0.5 rounded-md border border-white/10 shadow-sm z-10 backdrop-blur-md">
                     <Clock size={11} className="text-sky-400" />
                     <span>{remainingText}</span>
                   </div>
 
                   {/* Progress Bar on Bottom of Image */}
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-800">
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-800 z-10">
                     <div
                       className="h-full bg-sky-400 rounded-r-full"
                       style={{ width: `${item.progress_percent || 0}%` }}
@@ -185,23 +184,21 @@ export default function ContinueWatchingRow({
                   </div>
                 </div>
 
-                {/* Details Footer */}
-                <div className="p-3">
-                  <div className="flex items-center justify-between gap-1 mb-1">
+                {/* Details Footer - altura padronizada fixa para manter todos os banners 100% alinhados */}
+                <div className="p-3 flex flex-col justify-center min-h-[58px]">
+                  <div className="flex items-center justify-between gap-1">
                     <h4 className="font-bold text-xs text-white truncate group-hover:text-sky-300 transition-colors">
                       {item.title}
                     </h4>
                     {episodeLabel && (
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 shrink-0 font-semibold">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 shrink-0 font-semibold">
                         {episodeLabel}
                       </span>
                     )}
                   </div>
-                  {isSeries && item.episode_title && (
-                    <p className="text-[11px] text-slate-400 truncate">
-                      {item.episode_title}
-                    </p>
-                  )}
+                  <p className="text-[11px] text-slate-400 truncate h-[16px] leading-[16px] mt-0.5">
+                    {isSeries && item.episode_title ? item.episode_title : '\u00A0'}
+                  </p>
                 </div>
               </div>
             );

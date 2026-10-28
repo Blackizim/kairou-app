@@ -466,8 +466,8 @@ export default function App() {
               />
             )}
 
-            {/* Continuar Assistindo (Progresso Salvo na Nuvem) */}
-            {activeTab === 'home' && (
+            {/* Continuar Assistindo (Progresso Salvo na Nuvem - Apenas para usuários autenticados) */}
+            {activeTab === 'home' && user && watchProgressList.length > 0 && (
               <ContinueWatchingRow
                 user={user}
                 items={watchProgressList}

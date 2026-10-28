@@ -88,7 +88,8 @@ export default function Navbar({
     <>
       <header
         id="topbar"
-        style={{ '--bar-alpha': barAlpha, background: `rgba(9, 13, 20, ${barAlpha})` }}
+        className={barAlpha > 0.05 ? 'scrolled' : ''}
+        style={{ '--bar-alpha': barAlpha, background: barAlpha > 0.05 ? `rgba(9, 13, 20, ${barAlpha})` : 'transparent' }}
       >
         <div className="topbar-inner">
           {/* Brand Logo */}

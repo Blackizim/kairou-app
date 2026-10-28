@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Heart, Sparkles, ArrowRight, ShieldCheck, Zap, Copy, Check, X, ExternalLink } from 'lucide-react';
+import { Heart, Sparkles, Zap, Copy, Check, X, ExternalLink, ShieldCheck } from 'lucide-react';
 
 const PRESET_AMOUNTS = [
   { label: 'R$ 5', value: '5.00' },
@@ -12,25 +12,17 @@ const PRESET_AMOUNTS = [
 
 export function formatPixAmount(rawInput) {
   if (!rawInput) return '10.00';
-  
-  // Substitui vírgula por ponto e remove caracteres não numéricos exceto ponto
   let cleaned = String(rawInput).trim().replace(',', '.').replace(/[^0-9.]/g, '');
-  
-  // Se tiver múltiplos pontos, mantém apenas o primeiro
   const parts = cleaned.split('.');
   if (parts.length > 2) {
     cleaned = parts[0] + '.' + parts.slice(1).join('');
   }
-
   const num = parseFloat(cleaned);
   if (isNaN(num) || num <= 0) return '10.00';
-
-  // Se o usuário digitou casas decimais, preserva exatamente até 2 casas
   if (cleaned.includes('.')) {
     const [intPart, decPart] = cleaned.split('.');
     return `${intPart || '0'}.${decPart.slice(0, 2).padEnd(2, '0')}`;
   }
-
   return `${num}.00`;
 }
 
@@ -40,7 +32,6 @@ export default function DonationSection({ isModal = false, onClose }) {
   const [copied, setCopied] = useState(false);
   const linkRef = useRef(null);
 
-  // Link Oficial PixGG do Kairou
   const pixggUrl = 'https://pixgg.com/pommern';
   const formattedValue = formatPixAmount(customAmount);
 
@@ -62,17 +53,16 @@ export default function DonationSection({ isModal = false, onClose }) {
   };
 
   const content = (
-    <div className={`relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#0e1422] via-[#090d16] to-[#07090e] border border-white/[0.1] shadow-2xl ${isModal ? 'p-6 sm:p-8' : 'p-6 sm:p-10 lg:p-12'}`}>
-      {/* Luzes / Efeitos de Fundo Glassmorphism */}
-      <div className="absolute -top-32 -left-32 w-80 h-80 bg-sky-500/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
+    <div className={`relative overflow-hidden rounded-3xl bg-[#0c101a]/90 border border-white/[0.08] shadow-[0_8px_40px_rgba(0,0,0,0.6)] backdrop-blur-2xl ${isModal ? 'p-6 sm:p-8' : 'p-6 sm:p-10'}`}>
+      {/* Ambient Radial Backlights */}
+      <div className="absolute -top-24 -left-20 w-72 h-72 bg-sky-500/10 rounded-full blur-[80px] pointer-events-none" />
+      <div className="absolute -bottom-24 -right-20 w-72 h-72 bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none" />
 
       {/* Botão Fechar se for Modal */}
       {isModal && onClose && (
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-white/[0.08] transition-colors z-20 cursor-pointer"
+          className="absolute top-4 right-4 p-2 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-white/[0.08] transition-colors z-20 cursor-pointer"
           title="Fechar"
           aria-label="Fechar"
         >
@@ -81,28 +71,28 @@ export default function DonationSection({ isModal = false, onClose }) {
       )}
 
       {/* Cabeçalho */}
-      <div className="relative z-10 text-center max-w-2xl mx-auto mb-8">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-emerald-500/15 to-sky-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-4 shadow-sm">
-          <Heart size={14} className="fill-emerald-400 text-emerald-400 animate-pulse" />
-          <span>Apoie o Projeto Kairou</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+      <div className="relative z-10 text-center max-w-xl mx-auto mb-7">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[11px] font-bold uppercase tracking-wider mb-3.5 shadow-sm">
+          <Heart size={13} className="fill-emerald-400 text-emerald-400 animate-pulse" />
+          <span>Apoie o Kairou</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
         </div>
 
-        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight mb-3">
-          Faça uma doação de <span className="bg-gradient-to-r from-sky-400 via-emerald-400 to-teal-300 bg-clip-text text-transparent">qualquer valor</span>
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug mb-2.5">
+          Ajude a manter o Kairou <span className="bg-gradient-to-r from-sky-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent">no ar e gratuito</span>
         </h2>
 
-        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl mx-auto">
-          O Kairou é 100% independente e gratuito. Nossos servidores de alta velocidade, reprodutor próprio e catálogo em 4K são mantidos com a ajuda direta da comunidade via PixGG.
+        <p className="text-xs sm:text-sm text-slate-300/90 leading-relaxed">
+          Sem mensalidades, sem anúncios e com servidores 4K de alta velocidade. Nossa infraestrutura é 100% independente e mantida pela comunidade.
         </p>
       </div>
 
-      {/* Card Central Interativo */}
-      <div className="relative z-10 max-w-xl mx-auto bg-slate-900/70 border border-white/[0.08] rounded-2xl p-5 sm:p-7 backdrop-blur-xl shadow-xl">
-        {/* Presets Rápidos */}
-        <div className="mb-6">
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
-            Valores Sugeridos
+      {/* Caixa Interativa de Doação */}
+      <div className="relative z-10 max-w-md mx-auto">
+        {/* Presets de Valor */}
+        <div className="mb-5">
+          <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 text-center sm:text-left">
+            Escolha um valor sugerido:
           </label>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {PRESET_AMOUNTS.map((preset) => {
@@ -112,10 +102,10 @@ export default function DonationSection({ isModal = false, onClose }) {
                   key={preset.value}
                   type="button"
                   onClick={() => handlePresetClick(preset.value)}
-                  className={`py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all border cursor-pointer active:scale-95 ${
+                  className={`py-2 px-1 rounded-xl text-xs font-bold transition-all border cursor-pointer active:scale-95 ${
                     isSelected
-                      ? 'bg-gradient-to-r from-sky-500 to-emerald-500 text-slate-950 border-emerald-400/80 shadow-lg shadow-sky-500/25'
-                      : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border-white/[0.06] hover:border-white/20'
+                      ? 'bg-sky-500 text-slate-950 border-sky-400 shadow-md shadow-sky-500/30'
+                      : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 border-white/[0.06] hover:border-white/15'
                   }`}
                 >
                   {preset.label}
@@ -125,19 +115,19 @@ export default function DonationSection({ isModal = false, onClose }) {
           </div>
         </div>
 
-        {/* Input para Qualquer Valor Personalizado */}
-        <div className="mb-6">
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
-            Ou digite qualquer outro valor (R$)
+        {/* Input de Valor Personalizado */}
+        <div className="mb-5">
+          <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 text-center sm:text-left">
+            Ou digite outro valor (R$):
           </label>
           <div className="relative flex items-center">
-            <div className="absolute left-4 pointer-events-none text-slate-400 font-bold text-lg sm:text-xl">
+            <div className="absolute left-4 pointer-events-none text-slate-400 font-bold text-base sm:text-lg">
               R$
             </div>
             <input
               type="text"
               inputMode="decimal"
-              placeholder="Ex: 30.33 ou 15.00"
+              placeholder="10.00"
               value={customAmount}
               onChange={handleInputChange}
               onKeyDown={(e) => {
@@ -146,55 +136,68 @@ export default function DonationSection({ isModal = false, onClose }) {
                   linkRef.current?.click();
                 }
               }}
-              className="w-full bg-slate-950/80 border border-white/[0.12] focus:border-sky-400/80 rounded-xl py-3.5 pl-12 pr-4 text-white text-lg sm:text-xl font-extrabold tracking-wide placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-400/20 transition-all"
+              className="w-full bg-slate-950/80 border border-white/[0.1] focus:border-sky-400 rounded-xl py-3 pl-12 pr-4 text-white text-base sm:text-lg font-bold tracking-wide placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-400/20 transition-all text-left"
             />
           </div>
-          <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1.5">
-            <Sparkles size={12} className="text-sky-400 shrink-0" />
-            <span>Qualquer centavo ou valor é aceito via chave Pix direta no PixGG.</span>
-          </p>
         </div>
 
-        {/* Preview do Link PixGG */}
-        <div className="mb-6 p-3.5 rounded-xl bg-slate-950/60 border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
-          <div className="min-w-0 flex-1">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-              Destino Oficial PixGG
-            </span>
-            <a
-              href={pixggUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-emerald-400 font-mono font-medium truncate block select-all text-[11px] sm:text-xs hover:underline hover:text-emerald-300 transition-colors"
-              title="Abrir página PixGG em nova aba"
-            >
-              {pixggUrl}
-            </a>
-          </div>
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
-            title="Copiar link do PixGG"
-          >
-            {copied ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
-          </button>
-        </div>
-
-        {/* Botão de Doação no PixGG */}
+        {/* Botão de Doação Principal via PixGG */}
         <a
           ref={linkRef}
           href={pixggUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-400 hover:to-sky-400 text-slate-950 font-black text-sm sm:text-base tracking-wide transition-all shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2.5 cursor-pointer group text-center no-underline select-none"
+          className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-sky-500 via-teal-500 to-emerald-500 hover:from-sky-400 hover:to-emerald-400 text-slate-950 font-black text-sm tracking-wide transition-all shadow-lg shadow-sky-500/20 hover:shadow-sky-500/30 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer no-underline select-none mb-3"
         >
-          <Zap size={18} className="fill-slate-950 text-slate-950 group-hover:animate-bounce" />
+          <Zap size={16} className="fill-slate-950 text-slate-950" />
           <span>Doar R$ {formattedValue.replace('.', ',')} no PixGG</span>
-          <ExternalLink size={16} className="text-slate-950 ml-1" />
+          <ExternalLink size={15} className="text-slate-950 ml-0.5" />
         </a>
 
+        {/* Link Copiável PixGG */}
+        <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-2.5 text-xs">
+          <div className="min-w-0 flex-1 pl-1">
+            <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">
+              Chave / Destino Oficial
+            </span>
+            <span className="text-emerald-400/90 font-mono text-[11px] truncate block select-all">
+              {pixggUrl}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="p-1.5 px-2.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 text-[11px] font-semibold"
+            title="Copiar link do PixGG"
+          >
+            {copied ? (
+              <>
+                <Check size={13} className="text-emerald-400" />
+                <span className="text-emerald-400">Copiado!</span>
+              </>
+            ) : (
+              <>
+                <Copy size={13} />
+                <span>Copiar</span>
+              </>
+            )}
+          </button>
+        </div>
 
+        {/* Rodapé de Confiança */}
+        <div className="mt-4 pt-3 border-t border-white/[0.05] flex items-center justify-center gap-4 text-[10px] text-slate-400 font-medium">
+          <span className="flex items-center gap-1">
+            <ShieldCheck size={12} className="text-emerald-400" />
+            100% Seguro
+          </span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1">
+            <Zap size={12} className="text-sky-400" />
+            Pix Instantâneo
+          </span>
+          <span className="text-slate-600">•</span>
+          <span>Apoio Voluntário</span>
+        </div>
       </div>
     </div>
   );
@@ -203,7 +206,7 @@ export default function DonationSection({ isModal = false, onClose }) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in select-none">
         <div className="fixed inset-0" onClick={onClose} />
-        <div className="relative w-full max-w-2xl z-10 max-h-[92vh] overflow-y-auto custom-scrollbar">
+        <div className="relative w-full max-w-xl z-10 max-h-[92vh] overflow-y-auto custom-scrollbar">
           {content}
         </div>
       </div>
@@ -211,8 +214,8 @@ export default function DonationSection({ isModal = false, onClose }) {
   }
 
   return (
-    <section className="relative w-full py-16 px-4 sm:px-8 lg:px-12 select-none overflow-hidden">
-      <div className="max-w-[1680px] mx-auto">
+    <section className="relative w-full py-12 px-4 sm:px-6 select-none">
+      <div className="max-w-2xl mx-auto">
         {content}
       </div>
     </section>
