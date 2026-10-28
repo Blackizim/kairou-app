@@ -334,7 +334,7 @@ async function extractFrostStream({ tmdbId, imdbId, type, season = 1, episode = 
 
           streams.push({
             id: `kairou-frost-${idx}-${Date.now()}`,
-            server: 'Kairou',
+            server: s.server || 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality}) [Legendado PT-BR]`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
@@ -401,7 +401,7 @@ async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode = 1 }) 
 
           streams.push({
             id: `kairou-vetela-${idx}-${Date.now()}`,
-            server: 'Kairou',
+            server: s.server || 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality})`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
@@ -551,7 +551,7 @@ async function extractBsCine({ tmdbId, imdbId, type, season = 1, episode = 1 }) 
 
           streams.push({
             id: `kairou-bscine-${idx}-${Date.now()}`,
-            server: 'Kairou',
+            server: s.server || 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality})`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
@@ -614,7 +614,7 @@ async function extractFenixFlix({ tmdbId, imdbId, type, season = 1, episode = 1 
 
           streams.push({
             id: `kairou-fenix-${idx}-${Date.now()}`,
-            server: 'Kairou',
+            server: s.server || 'Kairou',
             providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Áudio Original (${qInfo.quality}) [Legendado PT-BR]`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
@@ -699,6 +699,314 @@ async function extractOpenSubtitles({ imdbId, type, season = 1, episode = 1 }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // HANDLER PRINCIPAL
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. Veyra (https://veyra.shardweb.app) - Addon BR Filmes e Séries (HLS / MP4)
+// ─────────────────────────────────────────────────────────────────────────────
+async function extractVeyra({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries)) || (tmdbId ? `tmdb:${tmdbId}` : null);
+  if (!targetId) return [];
+
+  const path = isSeries
+    ? `series/${targetId}:${season}:${episode}.json`
+    : `movie/${targetId}.json`;
+
+  const url = `https://veyra.shardweb.app/stream/${path}`;
+  const streams = [];
+
+  try {
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      }
+    }, 4500);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.streams)) {
+        for (let idx = 0; idx < data.streams.length; idx++) {
+          const s = data.streams[idx];
+          if (!s || !s.url || s.infoHash) continue;
+          let streamUrl = normalizeStreamUrl(s.url);
+          if (!streamUrl) continue;
+
+          const isHls = streamUrl.includes('.m3u8') || (s.name || '').includes('HLS');
+          const titleText = (s.title || s.description || '');
+          const nameText = (s.name || '');
+          const combined = `${titleText} ${nameText}`;
+          const metaLower = combined.toLowerCase();
+
+          const is4k = /\b(4k|uhd|2160p?)\b/i.test(combined);
+          const isDub = !metaLower.includes('legendado');
+          const qInfo = detectQuality(streamUrl, nameText, titleText, is4k ? '4K' : null);
+
+          streams.push({
+            id: `kairou-veyra-${idx}-${Date.now()}`,
+            server: 'Veyra',
+            providerName: isDub ? `Veyra · Servidor (${qInfo.quality}) [Dublado]` : `Veyra · Servidor (${qInfo.quality}) [Legendado]`,
+            url: streamUrl,
+            type: isHls ? 'hls' : 'mp4',
+            quality: qInfo.quality,
+            rank: qInfo.rank,
+            isHls,
+            is4k: qInfo.is4k || is4k,
+            priority: (qInfo.is4k && isDub) ? 2 : (isDub ? 3 : 5),
+            isDub,
+            isDual: true,
+            subtitles: s.subtitles || [],
+          });
+        }
+      }
+    }
+  } catch {}
+
+  return streams;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. King VOD (https://da5f663b4690-kingvod.baby-beamup.club) - HLS Dublado
+// ─────────────────────────────────────────────────────────────────────────────
+async function extractKingVod({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries)) || (tmdbId ? `tmdb:${tmdbId}` : null);
+  if (!targetId) return [];
+
+  const path = isSeries
+    ? `series/${targetId}:${season}:${episode}.json`
+    : `movie/${targetId}.json`;
+
+  const url = `https://da5f663b4690-kingvod.baby-beamup.club/stream/${path}`;
+  const streams = [];
+
+  try {
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      }
+    }, 4500);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.streams)) {
+        for (let idx = 0; idx < data.streams.length; idx++) {
+          const s = data.streams[idx];
+          if (!s || !s.url || s.infoHash) continue;
+          let streamUrl = normalizeStreamUrl(s.url);
+          if (!streamUrl) continue;
+
+          const isHls = streamUrl.includes('.m3u8');
+          const titleText = (s.title || s.description || '');
+          const nameText = (s.name || '');
+          const combined = `${titleText} ${nameText}`;
+          const isDub = !combined.toLowerCase().includes('legendado');
+          const qInfo = detectQuality(streamUrl, nameText, titleText);
+
+          streams.push({
+            id: `kairou-king-${idx}-${Date.now()}`,
+            server: 'King VOD',
+            providerName: `King VOD · Servidor (${qInfo.quality}) [${isDub ? 'Dublado' : 'Original'}]`,
+            url: streamUrl,
+            type: isHls ? 'hls' : 'mp4',
+            quality: qInfo.quality,
+            rank: qInfo.rank,
+            isHls,
+            priority: 4,
+            isDub,
+            isDual: true,
+            subtitles: s.subtitles || [],
+          });
+        }
+      }
+    }
+  } catch {}
+
+  return streams;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. MagnetFlix (https://magnetflix.flixbr.online) - Reativado (HLS & MP4)
+// ─────────────────────────────────────────────────────────────────────────────
+async function extractMagnetFlix({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const targetId = isSeries
+    ? (tmdbId ? `tmdb:${tmdbId}` : null) || imdbId || (await resolveImdbId(tmdbId, isSeries))
+    : (imdbId || (await resolveImdbId(tmdbId, isSeries)) || (tmdbId ? `tmdb:${tmdbId}` : null));
+  if (!targetId) return [];
+
+  const path = isSeries
+    ? `series/${targetId}:${season}:${episode}.json`
+    : `movie/${targetId}.json`;
+
+  const url = `https://magnetflix.flixbr.online/stream/${path}`;
+  const streams = [];
+
+  try {
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      }
+    }, 4500);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.streams)) {
+        for (let idx = 0; idx < data.streams.length; idx++) {
+          const s = data.streams[idx];
+          if (!s || !s.url || s.infoHash || s.url.startsWith('magnet:')) continue;
+          let streamUrl = normalizeStreamUrl(s.url);
+          if (!streamUrl) continue;
+
+          const isHls = streamUrl.includes('.m3u8');
+          const titleText = (s.title || s.description || '');
+          const nameText = (s.name || '');
+          const metaLower = `${titleText} ${nameText}`.toLowerCase();
+          const isDub = metaLower.includes('dublado') || metaLower.includes('pt-br') || !metaLower.includes('legendado');
+          const qInfo = detectQuality(streamUrl, nameText, titleText);
+
+          streams.push({
+            id: `kairou-mf-${idx}-${Date.now()}`,
+            server: 'MagnetFlix',
+            providerName: `MagnetFlix · Servidor (${qInfo.quality}) [${isDub ? 'Dublado' : 'Legendado'}]`,
+            url: streamUrl,
+            type: isHls ? 'hls' : 'mp4',
+            quality: qInfo.quality,
+            rank: qInfo.rank,
+            isHls,
+            priority: 4,
+            isDub,
+            isDual: true,
+            subtitles: s.subtitles || [],
+          });
+        }
+      }
+    }
+  } catch {}
+
+  return streams;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10. PleiadesStream Anime (https://pleiadesstream.duckdns.org/addon/pleiades)
+// ─────────────────────────────────────────────────────────────────────────────
+async function extractPleiadesAnime({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries));
+  if (!targetId) return [];
+
+  const path = isSeries
+    ? `series/${targetId}:${season}:${episode}.json`
+    : `movie/${targetId}.json`;
+
+  const url = `https://pleiadesstream.duckdns.org/addon/pleiades/stream/${path}`;
+  const streams = [];
+
+  try {
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      }
+    }, 4500);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.streams)) {
+        for (let idx = 0; idx < data.streams.length; idx++) {
+          const s = data.streams[idx];
+          if (!s || !s.url || s.infoHash) continue;
+          let streamUrl = normalizeStreamUrl(s.url);
+          if (!streamUrl) continue;
+
+          const isHls = streamUrl.includes('.m3u8');
+          const titleText = (s.title || s.description || '');
+          const nameText = (s.name || '');
+          const qInfo = detectQuality(streamUrl, nameText, titleText);
+
+          streams.push({
+            id: `kairou-pleiades-${idx}-${Date.now()}`,
+            server: 'PleiadesStream',
+            providerName: `Pleiades · Anime (${qInfo.quality}) [Dual/Legendado]`,
+            url: streamUrl,
+            type: isHls ? 'hls' : 'mp4',
+            quality: qInfo.quality,
+            rank: qInfo.rank,
+            isHls,
+            priority: 4,
+            isDub: false,
+            isDual: true,
+            subtitles: s.subtitles || [],
+          });
+        }
+      }
+    }
+  } catch {}
+
+  return streams;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 11. SuperStream (https://da5f663b4690-superstream.baby-beamup.club)
+// ─────────────────────────────────────────────────────────────────────────────
+async function extractSuperStream({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
+  const targetId = imdbId || (await resolveImdbId(tmdbId, isSeries)) || (tmdbId ? `tmdb:${tmdbId}` : null);
+  if (!targetId) return [];
+
+  const path = isSeries
+    ? `series/${targetId}:${season}:${episode}.json`
+    : `movie/${targetId}.json`;
+
+  const url = `https://da5f663b4690-superstream.baby-beamup.club/stream/${path}`;
+  const streams = [];
+
+  try {
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      }
+    }, 4000);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.streams)) {
+        for (let idx = 0; idx < data.streams.length; idx++) {
+          const s = data.streams[idx];
+          if (!s || !s.url || s.infoHash) continue;
+          let streamUrl = normalizeStreamUrl(s.url);
+          if (!streamUrl) continue;
+
+          const isHls = streamUrl.includes('.m3u8');
+          const titleText = (s.title || s.description || '');
+          const nameText = (s.name || '');
+          const qInfo = detectQuality(streamUrl, nameText, titleText);
+
+          streams.push({
+            id: `kairou-ss-${idx}-${Date.now()}`,
+            server: 'SuperStream',
+            providerName: `SuperStream · Servidor (${qInfo.quality})`,
+            url: streamUrl,
+            type: isHls ? 'hls' : 'mp4',
+            quality: qInfo.quality,
+            rank: qInfo.rank,
+            isHls,
+            priority: 5,
+            isDub: true,
+            isDual: true,
+            subtitles: s.subtitles || [],
+          });
+        }
+      }
+    }
+  } catch {}
+
+  return streams;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -750,12 +1058,17 @@ export default async function handler(req, res) {
     }
 
     // Execução Paralela das Fontes BR Oficiais
-    const [bestRes, frostRes, vetelaRes, bscineRes, fenixRes, warezRes, vidruRes, vidlinkRes, subsRes] = await Promise.allSettled([
+    const [bestRes, frostRes, vetelaRes, bscineRes, fenixRes, veyraRes, kingRes, magnetRes, pleiadesRes, ssRes, warezRes, vidruRes, vidlinkRes, subsRes] = await Promise.allSettled([
       extractBestCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractFrostStream({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractVeTela({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractBsCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractFenixFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractVeyra({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractKingVod({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractMagnetFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractPleiadesAnime({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
+      extractSuperStream({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractWarezCDN({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractVidRU({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractVidLink({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
@@ -766,11 +1079,16 @@ export default async function handler(req, res) {
     if (bestRes.status === 'fulfilled' && Array.isArray(bestRes.value)) collected.push(...bestRes.value);
     if (frostRes.status === 'fulfilled' && Array.isArray(frostRes.value)) collected.push(...frostRes.value);
     if (vetelaRes.status === 'fulfilled' && Array.isArray(vetelaRes.value)) collected.push(...vetelaRes.value);
+    if (veyraRes.status === 'fulfilled' && Array.isArray(veyraRes.value)) collected.push(...veyraRes.value);
+    if (kingRes.status === 'fulfilled' && Array.isArray(kingRes.value)) collected.push(...kingRes.value);
+    if (magnetRes.status === 'fulfilled' && Array.isArray(magnetRes.value)) collected.push(...magnetRes.value);
+    if (pleiadesRes.status === 'fulfilled' && Array.isArray(pleiadesRes.value)) collected.push(...pleiadesRes.value);
+    if (ssRes.status === 'fulfilled' && Array.isArray(ssRes.value)) collected.push(...ssRes.value);
+    if (bscineRes.status === 'fulfilled' && Array.isArray(bscineRes.value)) collected.push(...bscineRes.value);
+    if (fenixRes.status === 'fulfilled' && Array.isArray(fenixRes.value)) collected.push(...fenixRes.value);
     if (warezRes.status === 'fulfilled' && Array.isArray(warezRes.value)) collected.push(...warezRes.value);
     if (vidruRes.status === 'fulfilled' && Array.isArray(vidruRes.value)) collected.push(...vidruRes.value);
     if (vidlinkRes.status === 'fulfilled' && Array.isArray(vidlinkRes.value)) collected.push(...vidlinkRes.value);
-    if (bscineRes.status === 'fulfilled' && Array.isArray(bscineRes.value)) collected.push(...bscineRes.value);
-    if (fenixRes.status === 'fulfilled' && Array.isArray(fenixRes.value)) collected.push(...fenixRes.value);
 
     const extractedSubtitles = subsRes.status === 'fulfilled' && Array.isArray(subsRes.value) ? subsRes.value : [];
 
@@ -968,12 +1286,8 @@ export default async function handler(req, res) {
       else if ((s.quality || '').includes('480')) badge = '480p';
 
       let finalName = '';
-      if (s.server === 'WarezCDN') {
-        finalName = 'WarezCDN · Servidor BR (1080p) [Dublado]';
-      } else if (s.server === 'VidRU') {
-        finalName = 'VidRU · Servidor VidSrc (1080p) [Multi-Áudio]';
-      } else if (s.server === 'VidLink') {
-        finalName = 'VidLink · Servidor Pro (1080p) [Legendado]';
+      if (s.server === 'WarezCDN' || s.server === 'VidRU' || s.server === 'VidLink' || s.server === 'Veyra' || s.server === 'King VOD' || s.server === 'MagnetFlix' || s.server === 'PleiadesStream' || s.server === 'SuperStream') {
+        finalName = s.providerName;
       } else if (isDub) {
         if (is4k) {
           dub4kCounter++;
@@ -1010,7 +1324,7 @@ export default async function handler(req, res) {
 
       return {
         ...s,
-        server: 'Kairou',
+        server: s.server || 'Kairou',
         providerName: finalName,
         isDub,
         lang: isDub ? 'pt' : 'en',
