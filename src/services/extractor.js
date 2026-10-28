@@ -341,93 +341,6 @@ export async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. Extrator WarezCDN (https://warezcdn.sbs) - Servidor BR Dublado (1080p)
-// ─────────────────────────────────────────────────────────────────────────────
-export async function extractWarezCDN({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
-  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const id = tmdbId || imdbId;
-  if (!id) return [];
-
-  const embedUrl = isSeries
-    ? `https://warezcdn.sbs/serie/${id}/${season}/${episode}`
-    : `https://warezcdn.sbs/filme/${id}`;
-
-  return [{
-    id: `warezcdn-${id}-${season}-${episode}`,
-    server: 'WarezCDN',
-    providerName: 'WarezCDN · Servidor BR (1080p) [Dublado]',
-    url: embedUrl,
-    type: 'iframe',
-    isIframe: true,
-    quality: '1080p Full HD',
-    rank: 3,
-    is4k: false,
-    priority: 6,
-    isDub: true,
-    isDual: true,
-    subtitles: [],
-  }];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 5. Extrator VidRU / VidSrc RU (https://vidsrc2.ru) - Servidor VidSrc Multi-Áudio (1080p)
-// ─────────────────────────────────────────────────────────────────────────────
-export async function extractVidRU({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
-  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const id = tmdbId || imdbId;
-  if (!id) return [];
-
-  const embedUrl = isSeries
-    ? `https://vidsrc2.ru/embed/tv/${id}/${season}/${episode}`
-    : `https://vidsrc2.ru/embed/movie/${id}`;
-
-  return [{
-    id: `vidru-${id}-${season}-${episode}`,
-    server: 'VidRU',
-    providerName: 'VidRU · Servidor VidSrc (1080p) [Multi-Áudio]',
-    url: embedUrl,
-    type: 'iframe',
-    isIframe: true,
-    quality: '1080p Full HD',
-    rank: 3,
-    is4k: false,
-    priority: 7,
-    isDub: false,
-    isDual: true,
-    subtitles: [],
-  }];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 6. Extrator VidLink (https://vidlink.pro) - Servidor Pro Legendado / HD (1080p)
-// ─────────────────────────────────────────────────────────────────────────────
-export async function extractVidLink({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
-  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const id = tmdbId;
-  if (!id) return [];
-
-  const embedUrl = isSeries
-    ? `https://vidlink.pro/tv/${id}/${season}/${episode}`
-    : `https://vidlink.pro/movie/${id}`;
-
-  return [{
-    id: `vidlink-${id}-${season}-${episode}`,
-    server: 'VidLink',
-    providerName: 'VidLink · Servidor Pro (1080p) [Legendado]',
-    url: embedUrl,
-    type: 'iframe',
-    isIframe: true,
-    quality: '1080p Full HD',
-    rank: 3,
-    is4k: false,
-    priority: 8,
-    isDub: false,
-    isDual: true,
-    subtitles: [],
-  }];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // 5. Extrator BsCine (https://bscine.alwaysdata.net) - MP4 1080p Dublado
 // ─────────────────────────────────────────────────────────────────────────────
 export async function extractBsCine({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
@@ -807,7 +720,6 @@ export function formatKairouServers(streams) {
     '1080_dub': [],
     '1080_sub': [],
     '720_dub': [],
-    'embeds': [],
     'others': [],
   };
 
@@ -820,11 +732,7 @@ export function formatKairouServers(streams) {
     const url = isApprovedIframe ? s.url : normalizeStreamUrl(s.url || '');
     if (!url) continue;
 
-    if (s.server === 'WarezCDN' || s.server === 'VidRU' || s.server === 'VidLink' || isApprovedIframe) {
-      if (!seenUrls.has(url)) {
-        seenUrls.add(url);
-        pools.embeds.push({ ...s, url });
-      }
+    if (s.server === 'WarezCDN' || s.server === 'VidRU' || s.server === 'VidLink' || isApprovedIframe || s.isEmbed || s.type === 'iframe') {
       continue;
     }
 
@@ -962,20 +870,7 @@ export function formatKairouServers(streams) {
     pickTop(pools['others'], 1, '⚡ Kairou Direto [Dublado]', '1080p Full HD', true);
   }
 
-  // 7. 🌐 Provedores Alternativos Embed
-  const seenEmbedServers = new Set();
-  pools.embeds.forEach((s) => {
-    if (!seenEmbedServers.has(s.server)) {
-      seenEmbedServers.add(s.server);
-      curated.push({
-        ...s,
-        server: s.server,
-        providerName: s.providerName || `${s.server} · Player Alternativo`,
-        quality: s.quality || '1080p Full HD',
-        isCurated: true,
-      });
-    }
-  });
+
 
   return curated;
 }
@@ -1243,15 +1138,6 @@ export async function extractAllServers({
       .then(pushStreams)
       .catch(() => {}),
     extractPleiadesAnime({ tmdbId, imdbId, type: normalizedType, season, episode })
-      .then(pushStreams)
-      .catch(() => {}),
-    extractWarezCDN({ tmdbId, imdbId, type: normalizedType, season, episode })
-      .then(pushStreams)
-      .catch(() => {}),
-    extractVidRU({ tmdbId, imdbId, type: normalizedType, season, episode })
-      .then(pushStreams)
-      .catch(() => {}),
-    extractVidLink({ tmdbId, imdbId, type: normalizedType, season, episode })
       .then(pushStreams)
       .catch(() => {})
   );

@@ -424,93 +424,6 @@ async function extractVeTela({ tmdbId, imdbId, type, season = 1, episode = 1 }) 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. WarezCDN (https://warezcdn.sbs) - Servidor BR Dublado (1080p)
-// ─────────────────────────────────────────────────────────────────────────────
-async function extractWarezCDN({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
-  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const id = tmdbId || imdbId;
-  if (!id) return [];
-
-  const embedUrl = isSeries
-    ? `https://warezcdn.sbs/serie/${id}/${season}/${episode}`
-    : `https://warezcdn.sbs/filme/${id}`;
-
-  return [{
-    id: `warezcdn-${id}-${season}-${episode}`,
-    server: 'WarezCDN',
-    providerName: 'WarezCDN · Servidor BR (1080p) [Dublado]',
-    url: embedUrl,
-    type: 'iframe',
-    isIframe: true,
-    quality: '1080p Full HD',
-    rank: 3,
-    is4k: false,
-    priority: 6,
-    isDub: true,
-    isDual: true,
-    subtitles: [],
-  }];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 5. VidRU / VidSrc RU (https://vidsrc2.ru) - Servidor VidSrc Multi-Áudio (1080p)
-// ─────────────────────────────────────────────────────────────────────────────
-async function extractVidRU({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
-  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const id = tmdbId || imdbId;
-  if (!id) return [];
-
-  const embedUrl = isSeries
-    ? `https://vidsrc2.ru/embed/tv/${id}/${season}/${episode}`
-    : `https://vidsrc2.ru/embed/movie/${id}`;
-
-  return [{
-    id: `vidru-${id}-${season}-${episode}`,
-    server: 'VidRU',
-    providerName: 'VidRU · Servidor VidSrc (1080p) [Multi-Áudio]',
-    url: embedUrl,
-    type: 'iframe',
-    isIframe: true,
-    quality: '1080p Full HD',
-    rank: 3,
-    is4k: false,
-    priority: 7,
-    isDub: false,
-    isDual: true,
-    subtitles: [],
-  }];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 6. VidLink (https://vidlink.pro) - Servidor Pro Legendado / HD (1080p)
-// ─────────────────────────────────────────────────────────────────────────────
-async function extractVidLink({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
-  const isSeries = type === 'series' || type === 'tv' || type === 'anime';
-  const id = tmdbId;
-  if (!id) return [];
-
-  const embedUrl = isSeries
-    ? `https://vidlink.pro/tv/${id}/${season}/${episode}`
-    : `https://vidlink.pro/movie/${id}`;
-
-  return [{
-    id: `vidlink-${id}-${season}-${episode}`,
-    server: 'VidLink',
-    providerName: 'VidLink · Servidor Pro (1080p) [Legendado]',
-    url: embedUrl,
-    type: 'iframe',
-    isIframe: true,
-    quality: '1080p Full HD',
-    rank: 3,
-    is4k: false,
-    priority: 8,
-    isDub: false,
-    isDual: true,
-    subtitles: [],
-  }];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // 5. BsCine (https://bscine.alwaysdata.net) - PRIORIDADE 5 (MP4 1080p Dublado)
 // ─────────────────────────────────────────────────────────────────────────────
 async function extractBsCine({ tmdbId, imdbId, type, season = 1, episode = 1 }) {
@@ -1020,7 +933,6 @@ function curateTopStreams(allStreams, extractedSubtitles = []) {
     '1080_dub': [],
     '1080_sub': [],
     '720_dub': [],
-    'embeds': [],
     'others': []
   };
 
@@ -1029,12 +941,8 @@ function curateTopStreams(allStreams, extractedSubtitles = []) {
   for (const s of allStreams) {
     if (!s || !s.url) continue;
 
-    // Provedores Embed Iframe Aprovados
-    if (s.server === 'WarezCDN' || s.server === 'VidRU' || s.server === 'VidLink' || s.isIframe || s.type === 'iframe') {
-      if (!seenUrls.has(s.url)) {
-        seenUrls.add(s.url);
-        pools.embeds.push(s);
-      }
+    // Descartar iframes e embeds externos
+    if (s.isIframe || s.type === 'iframe' || s.server === 'WarezCDN' || s.server === 'VidRU' || s.server === 'VidLink') {
       continue;
     }
 
@@ -1174,21 +1082,7 @@ function curateTopStreams(allStreams, extractedSubtitles = []) {
     pickTop(pools['others'], 1, '⚡ Kairou Direto [Dublado]', '1080p Full HD', true);
   }
 
-  // 7. 🌐 Provedores Alternativos Embed (WarezCDN, VidRU, VidLink)
-  const seenEmbedServers = new Set();
-  pools.embeds.forEach(s => {
-    if (!seenEmbedServers.has(s.server)) {
-      seenEmbedServers.add(s.server);
-      curated.push({
-        ...s,
-        server: s.server,
-        providerName: s.providerName || (s.server + ' · Player Alternativo'),
-        quality: s.quality || '1080p Full HD',
-        isCurated: true,
-        subtitles: extractedSubtitles,
-      });
-    }
-  });
+
 
   return curated;
 }
@@ -1244,7 +1138,7 @@ export default async function handler(req, res) {
     }
 
     // Execução Paralela das Fontes BR Oficiais
-    const [bestRes, frostRes, vetelaRes, bscineRes, fenixRes, veyraRes, kingRes, magnetRes, pleiadesRes, ssRes, warezRes, vidruRes, vidlinkRes, subsRes] = await Promise.allSettled([
+    const [bestRes, frostRes, vetelaRes, bscineRes, fenixRes, veyraRes, kingRes, magnetRes, pleiadesRes, ssRes, subsRes] = await Promise.allSettled([
       extractBestCine({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractFrostStream({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractVeTela({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
@@ -1255,9 +1149,6 @@ export default async function handler(req, res) {
       extractMagnetFlix({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractPleiadesAnime({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractSuperStream({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractWarezCDN({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractVidRU({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
-      extractVidLink({ tmdbId, imdbId, type, season: Number(season), episode: Number(episode) }),
       extractOpenSubtitles({ imdbId, type, season: Number(season), episode: Number(episode) }),
     ]);
 
@@ -1272,9 +1163,6 @@ export default async function handler(req, res) {
     if (ssRes.status === 'fulfilled' && Array.isArray(ssRes.value)) collected.push(...ssRes.value);
     if (bscineRes.status === 'fulfilled' && Array.isArray(bscineRes.value)) collected.push(...bscineRes.value);
     if (fenixRes.status === 'fulfilled' && Array.isArray(fenixRes.value)) collected.push(...fenixRes.value);
-    if (warezRes.status === 'fulfilled' && Array.isArray(warezRes.value)) collected.push(...warezRes.value);
-    if (vidruRes.status === 'fulfilled' && Array.isArray(vidruRes.value)) collected.push(...vidruRes.value);
-    if (vidlinkRes.status === 'fulfilled' && Array.isArray(vidlinkRes.value)) collected.push(...vidlinkRes.value);
 
     const extractedSubtitles = subsRes.status === 'fulfilled' && Array.isArray(subsRes.value) ? subsRes.value : [];
 

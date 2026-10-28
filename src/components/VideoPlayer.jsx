@@ -771,16 +771,41 @@ export default function VideoPlayer({
     return (servers || []).filter((s) => !s.isDub || s.isDual || !(s.providerName || '').includes('[Dublado]')).length;
   }, [servers]);
 
+  // Contadores de resolução para seleção rápida
+  const count4kServers = useMemo(() => {
+    return (servers || []).filter((s) => Boolean(s.is4k || (s.quality || '').includes('4K') || (s.providerName || '').includes('4K'))).length;
+  }, [servers]);
+
+  const count1080Servers = useMemo(() => {
+    return (servers || []).filter((s) => !Boolean(s.is4k || (s.quality || '').includes('4K') || (s.providerName || '').includes('4K')) && Boolean((s.quality || '').includes('1080') || (s.providerName || '').includes('1080'))).length;
+  }, [servers]);
+
+  const count720Servers = useMemo(() => {
+    return (servers || []).filter((s) => Boolean((s.quality || '').includes('720') || (s.providerName || '').includes('720'))).length;
+  }, [servers]);
+
   const filteredServers = useMemo(() => {
     if (!servers || servers.length === 0) return [];
+    let list = servers;
+
+    // Filtro por Idioma (Dublado vs Original)
     if (serverLangFilter === 'dub') {
-      return servers.filter((s) => Boolean(s.isDub || s.isDual || (s.providerName || '').includes('[Dublado]')));
+      list = list.filter((s) => Boolean(s.isDub || s.isDual || (s.providerName || '').includes('[Dublado]')));
+    } else if (serverLangFilter === 'sub') {
+      list = list.filter((s) => Boolean(!s.isDub || s.isDual || !(s.providerName || '').includes('[Dublado]')));
     }
-    if (serverLangFilter === 'sub') {
-      return servers.filter((s) => Boolean(!s.isDub || s.isDual || !(s.providerName || '').includes('[Dublado]')));
+
+    // Filtro por Resolução (4K vs 1080p vs 720p)
+    if (serverQualityFilter === '4k') {
+      list = list.filter((s) => Boolean(s.is4k || (s.quality || '').includes('4K') || (s.providerName || '').includes('4K')));
+    } else if (serverQualityFilter === '1080') {
+      list = list.filter((s) => !Boolean(s.is4k || (s.quality || '').includes('4K') || (s.providerName || '').includes('4K')) && Boolean((s.quality || '').includes('1080') || (s.providerName || '').includes('1080')));
+    } else if (serverQualityFilter === '720') {
+      list = list.filter((s) => Boolean((s.quality || '').includes('720') || (s.providerName || '').includes('720')));
     }
-    return servers;
-  }, [servers, serverLangFilter]);
+
+    return list;
+  }, [servers, serverLangFilter, serverQualityFilter]);
 
   // Informações da mídia e Gerenciamento de Episódios
   const rawMediaId = String(media?.id || media?.tmdbId || '');
@@ -3491,7 +3516,27 @@ export default function VideoPlayer({
             </div>
           </div>
 
-
+          {/* Destaque 4K Ultra HD e Botões de Controle Rápido de Resolução */}
+          <div className="flex items-center gap-2 shrink-0">
+            {count4kServers > 0 && (
+              Boolean(activeServer?.is4k || (activeServer?.quality || '').includes('4K') || (activeServer?.providerName || '').includes('4K')) ? (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold shadow-lg shadow-amber-500/10">
+                  <span>💎 4K Ultra HD</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    const k4Idx = servers.findIndex((s) => Boolean(s.is4k || (s.quality || '').includes('4K') || (s.providerName || '').includes('4K')));
+                    if (k4Idx >= 0) handleSelectServer(k4Idx);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/30 to-amber-600/30 hover:from-amber-500/45 hover:to-amber-600/45 text-amber-200 border border-amber-400/60 text-xs font-bold shadow-xl shadow-amber-500/20 cursor-pointer active:scale-95 transition-all animate-pulse"
+                  title="Assistir em 4K Ultra HD (Servidor mais estável)"
+                >
+                  <span>💎 Assistir em 4K</span>
+                </button>
+              )
+            )}
+          </div>
         </div>
       )}
 
@@ -3957,6 +4002,62 @@ export default function VideoPlayer({
                 <X size={16} />
               </button>
             </div>
+          </div>
+
+          {/* Seletor de Resolução do Servidor: 4K / 1080p / 720p */}
+          <div className="flex items-center gap-1 p-1 bg-slate-900/90 rounded-xl mb-2 border border-slate-800/80 overflow-x-auto no-scrollbar shrink-0">
+            <button
+              onClick={() => setServerQualityFilter('all')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                serverQualityFilter === 'all'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              ✨ Todos ({servers.length})
+            </button>
+
+            {count4kServers > 0 && (
+              <button
+                onClick={() => setServerQualityFilter('4k')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  serverQualityFilter === '4k'
+                    ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
+                    : 'text-slate-400 hover:text-amber-300 hover:bg-white/5'
+                }`}
+              >
+                <span>💎 4K UHD</span>
+                <span className="text-[10px] font-mono opacity-80">({count4kServers})</span>
+              </button>
+            )}
+
+            {count1080Servers > 0 && (
+              <button
+                onClick={() => setServerQualityFilter('1080')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  serverQualityFilter === '1080'
+                    ? 'bg-indigo-500/25 text-indigo-300 border border-indigo-500/50 shadow-sm'
+                    : 'text-slate-400 hover:text-indigo-300 hover:bg-white/5'
+                }`}
+              >
+                <span>⚡ 1080p</span>
+                <span className="text-[10px] font-mono opacity-80">({count1080Servers})</span>
+              </button>
+            )}
+
+            {count720Servers > 0 && (
+              <button
+                onClick={() => setServerQualityFilter('720')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  serverQualityFilter === '720'
+                    ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 shadow-sm'
+                    : 'text-slate-400 hover:text-emerald-300 hover:bg-white/5'
+                }`}
+              >
+                <span>📱 720p</span>
+                <span className="text-[10px] font-mono opacity-80">({count720Servers})</span>
+              </button>
+            )}
           </div>
 
           {/* Seletor de Idioma das Fontes: Dublado 🇧🇷 vs Original 🇺🇸 */}
@@ -4553,6 +4654,120 @@ export default function VideoPlayer({
               >
                 <X size={16} />
               </button>
+            </div>
+          </div>
+
+          {/* Seletor Rápido de Resolução do Servidor (4K / 1080p / 720p) */}
+          <div className="mb-3 p-2.5 bg-slate-900/90 rounded-2xl border border-slate-800">
+            <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase px-1 mb-2 select-none flex items-center justify-between">
+              <span>Resoluções de Servidor Disponíveis</span>
+              <span className="text-[9px] text-sky-400 font-normal">Mais Estável</span>
+            </div>
+            <div className="space-y-1.5">
+              {count4kServers > 0 && (
+                <button
+                  onClick={() => {
+                    const k4Idx = servers.findIndex(s => Boolean(s.is4k || (s.quality || '').includes('4K') || (s.providerName || '').includes('4K')));
+                    if (k4Idx >= 0) handleSelectServer(k4Idx);
+                    setQualityModalOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition-all border cursor-pointer ${
+                    Boolean(activeServer?.is4k || (activeServer?.quality || '').includes('4K') || (activeServer?.providerName || '').includes('4K'))
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold shadow-sm'
+                      : 'text-slate-300 bg-slate-800/60 border-slate-700/60 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">💎</span>
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span>4K Ultra HD</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/30 text-amber-300 border border-amber-500/40 uppercase">2160p</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">Servidor mais estável com máxima definição</div>
+                    </div>
+                  </div>
+                  {Boolean(activeServer?.is4k || (activeServer?.quality || '').includes('4K') || (activeServer?.providerName || '').includes('4K')) ? (
+                    <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                      <Check size={14} /> Ativo
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
+                      Mudar
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {count1080Servers > 0 && (
+                <button
+                  onClick={() => {
+                    const fhdIdx = servers.findIndex(s => !Boolean(s.is4k || (s.quality || '').includes('4K')) && Boolean((s.quality || '').includes('1080') || (s.providerName || '').includes('1080')));
+                    if (fhdIdx >= 0) handleSelectServer(fhdIdx);
+                    setQualityModalOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition-all border cursor-pointer ${
+                    !Boolean(activeServer?.is4k || (activeServer?.quality || '').includes('4K') || (activeServer?.providerName || '').includes('4K')) && !Boolean((activeServer?.quality || '').includes('720') || (activeServer?.providerName || '').includes('720'))
+                      ? 'bg-sky-500/20 text-sky-300 border-sky-400/50 font-bold shadow-sm'
+                      : 'text-slate-300 bg-slate-800/60 border-slate-700/60 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">⚡</span>
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span>1080p Full HD</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-sky-500/30 text-sky-300 border border-sky-400/40 uppercase">FHD</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">Carregamento instantâneo sem travamentos</div>
+                    </div>
+                  </div>
+                  {!Boolean(activeServer?.is4k || (activeServer?.quality || '').includes('4K') || (activeServer?.providerName || '').includes('4K')) && !Boolean((activeServer?.quality || '').includes('720') || (activeServer?.providerName || '').includes('720')) ? (
+                    <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                      <Check size={14} /> Ativo
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30 font-semibold">
+                      Mudar
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {count720Servers > 0 && (
+                <button
+                  onClick={() => {
+                    const hdIdx = servers.findIndex(s => Boolean((s.quality || '').includes('720') || (s.providerName || '').includes('720')));
+                    if (hdIdx >= 0) handleSelectServer(hdIdx);
+                    setQualityModalOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition-all border cursor-pointer ${
+                    Boolean((activeServer?.quality || '').includes('720') || (activeServer?.providerName || '').includes('720'))
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/50 font-bold shadow-sm'
+                      : 'text-slate-300 bg-slate-800/60 border-slate-700/60 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">📱</span>
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span>720p HD</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 uppercase">Econômico</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">Ideal para redes móveis e conexões lentas</div>
+                    </div>
+                  </div>
+                  {Boolean((activeServer?.quality || '').includes('720') || (activeServer?.providerName || '').includes('720')) ? (
+                    <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                      <Check size={14} /> Ativo
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+                      Mudar
+                    </span>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
