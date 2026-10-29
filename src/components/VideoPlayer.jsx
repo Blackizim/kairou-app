@@ -3217,7 +3217,7 @@ export default function VideoPlayer({
       onTouchStart={handleMouseMove}
       onTouchEnd={handleTouchEnd}
       onClick={handlePlayerTap}
-      className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center select-none overflow-hidden touch-manipulation"
+      className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center select-none overflow-hidden touch-manipulation"
     >
 
 

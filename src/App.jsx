@@ -366,6 +366,8 @@ export default function App() {
   };
 
   const handlePlayMedia = (media, episode = null, options = {}) => {
+    // Fecha imediatamente o popup/modal de detalhes para não sobrepor o player
+    setActiveMediaModal(null);
     // Exibe tela com escolha: assistir com anúncios, sem anúncios ou apoiar Pix
     setPendingPlayMedia({ media, episode, ...options });
     setSupportModalOpen(true);
@@ -374,6 +376,7 @@ export default function App() {
   const handleSelectAdConsent = (consented) => {
     setAdConsent(consented);
     setSupportModalOpen(false);
+    setActiveMediaModal(null);
 
     if (consented) {
       showToast('Muito obrigado por apoiar o Kairou! ❤️');
@@ -962,6 +965,7 @@ export default function App() {
         onSelectChoice={handleSelectAdConsent}
         onOpenDonation={() => {
           setSupportModalOpen(false);
+          setActiveMediaModal(null);
           setDonationModalOpen(true);
           if (pendingPlayMedia) {
             setActiveVideoPlayer(pendingPlayMedia);
