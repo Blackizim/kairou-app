@@ -1766,7 +1766,7 @@ export default function VideoPlayer({
 
     let hasStartedPlayback = false;
     // Watchdog de carregamento inteligente com tolerância e renovação a cada chunk recebido
-    const timeoutDuration = 25000;
+    const timeoutDuration = 5000;
 
     let watchdogTimer = null;
 
@@ -1792,7 +1792,7 @@ export default function VideoPlayer({
           }
           console.warn(`[VideoPlayer] Servidor ${activeServer?.providerName} demorou a responder. Alternando...`);
           handleAutoFallbackRef.current();
-        }, 25000);
+        }, 5000);
       }
     };
 

@@ -1319,10 +1319,61 @@ export default async function handler(req, res) {
     const curatedStreams = curateTopStreams(collected, extractedSubtitles);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ATRIBUIÇÃO DE LATÊNCIA BASE E DISPONIBILIDADE IMEDIATA (< 1ms, ZERO BLOCKING)
+    // TESTE REAL DE VIDA (< 900ms CONCORRENTE) - ELIMINA SERVIDORES MORTOS DO TOPO
     // ─────────────────────────────────────────────────────────────────────────
+    await Promise.allSettled(
+      curatedStreams.slice(0, 8).map(async (s) => {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 950);
+          const rawUrl = s.url.includes('?url=')
+            ? decodeURIComponent(s.url.split('?url=')[1].split('&')[0])
+            : s.url;
+          const res = await fetch(rawUrl, {
+            method: 'GET',
+            headers: { Range: 'bytes=0-100', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+            signal: ctrl.signal,
+          });
+          clearTimeout(timer);
+          s.alive = res.status < 400 || res.status === 206;
+          s.httpStatus = res.status;
+        } catch {
+          s.alive = false;
+        }
+      })
+    );
+
+    // Servidores vivos sempre vêm primeiro! Servidores que deram 502/401/timeout vão para o final da lista
+    curatedStreams.sort((a, b) => {
+      const aAlive = a.alive ? 1 : 0;
+      const bAlive = b.alive ? 1 : 0;
+      return bAlive - aAlive;
+    });
+
+    // Reatribuir títulos com base em quem REALMENTE está vivo e online
+    const aliveDubs = curatedStreams.filter(s => s.isDub);
+    aliveDubs.forEach((s, idx) => {
+      const q = s.quality || '1080p Full HD';
+      if (idx === 0 && s.alive) {
+        s.providerName = `⚡ ${q} [Dublado] · Mais Estável (Opção 1)`;
+        s.isFastest = true;
+      } else {
+        s.providerName = `⚡ ${q} [Dublado] (Opção ${idx + 1})`;
+        s.isFastest = false;
+      }
+    });
+
+    const aliveSubs = curatedStreams.filter(s => !s.isDub);
+    aliveSubs.forEach((s, idx) => {
+      const q = s.quality || '1080p Full HD';
+      if (idx === 0 && s.alive) {
+        s.providerName = `⚡ ${q} [Legendado PT-BR] · Mais Estável (Opção 1)`;
+      } else {
+        s.providerName = `⚡ ${q} [Legendado PT-BR] (Opção ${idx + 1})`;
+      }
+    });
+
     curatedStreams.forEach((s, idx) => {
-      s.alive = true;
       if (s.isKairouNative) {
         s.latency = 35 + idx * 8;
       } else if (s.server === 'BestCine' || (s.url && s.url.includes('bestcine'))) {
@@ -1335,13 +1386,6 @@ export default async function handler(req, res) {
     });
 
     const finalStreams = curatedStreams;
-
-    // Marcar o servidor 1080p dublado mais rápido com isFastest
-    const aliveDub1080 = finalStreams.filter(s => s.isDub && !s.is4k && s.alive && !s.isIframe && s.type !== 'iframe');
-    aliveDub1080.sort((a, b) => (a.latency || 9999) - (b.latency || 9999));
-    if (aliveDub1080.length > 0) {
-      aliveDub1080[0].isFastest = true;
-    }
 
     const payload = {
       ok: true,
