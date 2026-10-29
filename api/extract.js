@@ -57,12 +57,11 @@ function normalizeStreamUrl(url) {
 
   // Únicos hosts diretos com HTTPS válido, alta velocidade e CORS nativo que NÃO devem passar pelo proxy:
   // (Nota: bestcine.dpdns.org NUNCA deve passar pelo proxy da VPS pois a Cloudflare bloqueia IPs de datacenter)
+  // Apenas servidores com CORS comprovadamente aberto podem ser diretos.
+  // FrostStream e outros CDNs NÃO enviam CORS para kairou.space e DEVEM passar pelo proxy!
   const isDirectFastHost =
-    u.includes('froststream.cloutteam.com') ||
-    u.includes('wasabisys.com') ||
     u.includes('bestcine.dpdns.org') ||
     u.includes('cnvods.com') ||
-    u.includes('vodshuby.com') ||
     u.includes('duckdns.org');
 
   if (isDirectFastHost && u.startsWith('https://')) {

@@ -56,12 +56,11 @@ export function normalizeStreamUrl(url) {
 
   // Únicos hosts diretos com HTTPS válido, alta velocidade e CORS nativo que NÃO devem passar pelo proxy:
   // (Nota: bestcine.dpdns.org NUNCA deve passar pelo proxy da VPS pois a Cloudflare bloqueia IPs de datacenter)
+  // Apenas servidores com CORS comprovadamente aberto podem ser diretos.
+  // FrostStream e outros CDNs NÃO enviam CORS para kairou.space e DEVEM passar pelo proxy!
   const isDirectFastHost =
     u.includes('bestcine.dpdns.org') ||
-    u.includes('froststream.cloutteam.com') ||
     u.includes('cnvods.com') ||
-    u.includes('wasabisys.com') ||
-    u.includes('vodshuby.com') ||
     u.includes('duckdns.org');
 
   if (isDirectFastHost && u.startsWith('https://')) {
@@ -1031,6 +1030,8 @@ export function findPreferredDefaultServerIndex(serversList) {
 // Teste veloz de conectividade e velocidade no navegador do cliente (corrida paralela < 900ms)
 export async function testCandidateServersSpeed(serversList, maxToTest = 4) {
   if (!Array.isArray(serversList) || serversList.length <= 1) return serversList;
+  // Se os servidores já foram curados pelo backend, não dispara fetches paralelos no navegador (evita erros de CORS)
+  if (serversList.some(s => s && s.isCurated)) return serversList;
 
   const isServer4k = (s) => Boolean(s.is4k || (s.quality || '').includes('4K') || (s.providerName || '').includes('4K'));
   const hasDub = serversList.some((s) => s.isDub && !isServer4k(s));

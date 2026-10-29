@@ -2442,8 +2442,9 @@ export default function VideoPlayer({
         const currentSrc = video.src || currentUrl;
         const isWorkerUrl = currentUrl && currentUrl.includes('workers.dev');
 
-        // Se o Worker falhou no MP4 (cota 100k ou queda), comuta para VPS com cf=0
-        if (isWorkerUrl) {
+        // Se o Worker falhou no MP4 (cota 100k ou queda), comuta UMA VEZ para VPS com cf=0
+        if (isWorkerUrl && !hasTriedProxy) {
+          hasTriedProxy = true;
           console.warn('[VideoPlayer Failover MP4] Worker indisponível. Resgatando via VPS Turbo Proxy...');
           if (typeof sessionStorage !== 'undefined') {
             sessionStorage.setItem('kairou_cf_exhausted', 'true');
@@ -2456,6 +2457,12 @@ export default function VideoPlayer({
             return;
           }
         }
+
+        // Se a VPS também falhou ou o stream original está morto (ex: 502 upstream),
+        // avança imediatamente para o PRÓXIMO servidor sem travar o usuário!
+        console.warn('[VideoPlayer] Servidor atual inoperante. Alternando para o próximo servidor...');
+        handleAutoFallbackRef.current();
+        return;
         // Se a reprodução direta falhou (ex: net::ERR_CERT_AUTHORITY_INVALID, CORS, SSL autoassinado)
         // e ainda não tentamos o proxy local, tenta resgatar através de /api/proxy
         if (!hasTriedProxy && currentUrl && !currentUrl.includes('/api/proxy') && !currentUrl.includes('bestcine.dpdns.org') && (!currentSrc || !currentSrc.includes('/api/proxy'))) {
