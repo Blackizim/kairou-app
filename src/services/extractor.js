@@ -530,8 +530,8 @@ export async function extractVeyra({ tmdbId, imdbId, type, season = 1, episode =
 
           streams.push({
             id: `kairou-veyra-${isDub ? 'dub' : 'sub'}-${idx}`,
-            server: 'Veyra',
-            providerName: isDub ? `Veyra · Servidor (${qInfo.quality}) [Dublado]` : `Veyra · Servidor (${qInfo.quality}) [Legendado]`,
+            server: 'Kairou',
+            providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Servidor (${qInfo.quality}) [Legendado]`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
             quality: qInfo.quality,
@@ -595,8 +595,8 @@ export async function extractKingVod({ tmdbId, imdbId, type, season = 1, episode
 
           streams.push({
             id: `kairou-king-${isDub ? 'dub' : 'sub'}-${idx}`,
-            server: 'King VOD',
-            providerName: `King VOD · Servidor (${qInfo.quality}) [${isDub ? 'Dublado' : 'Original'}]`,
+            server: 'Kairou',
+            providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Servidor (${qInfo.quality}) [Legendado]`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
             quality: qInfo.quality,
@@ -655,8 +655,8 @@ export async function extractMagnetFlix({ tmdbId, imdbId, type, season = 1, epis
 
           streams.push({
             id: `kairou-mf-${isDub ? 'dub' : 'sub'}-${idx}`,
-            server: 'MagnetFlix',
-            providerName: `MagnetFlix · Servidor (${qInfo.quality}) [${isDub ? 'Dublado' : 'Legendado'}]`,
+            server: 'Kairou',
+            providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Servidor (${qInfo.quality}) [Legendado]`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
             quality: qInfo.quality,
@@ -716,8 +716,8 @@ export async function extractPleiadesAnime({ tmdbId, imdbId, type, season = 1, e
 
           streams.push({
             id: `kairou-pleiades-${idx}`,
-            server: 'PleiadesStream',
-            providerName: `Pleiades · Anime (${qInfo.quality}) [Dual/Legendado]`,
+            server: 'Kairou',
+            providerName: `Kairou · Anime (${qInfo.quality}) [Dual/Legendado]`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
             quality: qInfo.quality,

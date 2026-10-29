@@ -48,6 +48,7 @@ import {
 } from 'lucide-react';
 import { extractAllServers, clearStreamCache, testCandidateServersSpeed } from '../services/extractor';
 import { saveWatchProgress } from '../services/supabase';
+import KairouIcon from './KairouIcon';
 import { fetchSeasonEpisodes, fetchMediaDetails, fetchMediaExternalIds } from '../services/tmdb';
 import { resolveChannelStream } from '../services/channelsResolver';
 
@@ -1013,7 +1014,7 @@ export default function VideoPlayer({
         return best;
       }, null);
       if (fastest) {
-        triggerNotification(`⚡ Melhor servidor: ${fastest.providerName} (${fastest.latency}ms)`);
+        triggerNotification(`⚡ Servidor otimizado: Kairou Direct (${fastest.latency}ms)`);
       }
     } catch {}
     setIsSpeedTesting(false);
@@ -1174,7 +1175,7 @@ export default function VideoPlayer({
               setActiveServerIndex(defIdx);
               const sel = fastList[defIdx] || fastList[0];
               const pingText = sel?.latency && sel.latency < 9000 ? ` (${sel.latency}ms)` : '';
-              triggerNotification(`⚡ Servidor Mais Rápido: ${sel?.providerName || ''}${pingText}`);
+              triggerNotification(`⚡ Transmissão conectada (${sel?.quality || 'Full HD'})${pingText}`);
               setIsExtracting(false);
 
               // Teste de velocidade em background sem travar o início da reprodução
@@ -1209,7 +1210,7 @@ export default function VideoPlayer({
               setActiveServerIndex(defIdx);
               const sel = extractedList[defIdx] || extractedList[0];
               const pingText = sel?.latency && sel.latency < 9000 ? ` (${sel.latency}ms)` : '';
-              triggerNotification(`⚡ Servidor Mais Rápido: ${sel?.providerName || ''}${pingText}`);
+              triggerNotification(`⚡ Transmissão conectada (${sel?.quality || 'Full HD'})${pingText}`);
               setIsExtracting(false);
               return extractedList;
             }
@@ -1311,7 +1312,7 @@ export default function VideoPlayer({
             if (!prev || prev.length === 0) {
               const defIdx = findPreferredDefaultServerIndex(fastList);
               setActiveServerIndex(defIdx);
-              triggerNotification(`Conectado: ${fastList[defIdx]?.providerName || fastList[0].providerName}`);
+              triggerNotification(`Conectado à transmissão (${fastList[defIdx]?.quality || 'Full HD'})`);
               setIsExtracting(false);
               return fastList;
             }
@@ -1328,10 +1329,10 @@ export default function VideoPlayer({
             const newBestRank = extractedList[0]?.rank ?? 4;
             if (newBestRank < currentRank) {
               setActiveServerIndex(0);
-              triggerNotification(`Qualidade máxima disponível: ${extractedList[0].providerName}`);
+              triggerNotification(`Qualidade máxima: ${extractedList[0]?.quality || 'Full HD'}`);
             } else if (!currentActive) {
               setActiveServerIndex(0);
-              triggerNotification(`Conectado: ${extractedList[0].providerName}`);
+              triggerNotification('Conectado à transmissão');
             }
             return extractedList;
           });
@@ -1537,7 +1538,7 @@ export default function VideoPlayer({
     }
 
     const nextSrv = servers[nextIndex];
-    triggerNotification(`Servidor instável. Alternando para: ${nextSrv.providerName}`);
+    triggerNotification('Servidor instável. Alternando para transmissão reserva...');
     setActiveServerIndex(nextIndex);
   }, [servers, activeServerIndex, isSeries, triggerNotification]);
 
@@ -2803,7 +2804,7 @@ export default function VideoPlayer({
       srv?.quality?.includes('720') || srv?.providerName?.includes('720') ? '720p HD' :
       '1080p Full HD';
     setCurrentPlayingResolution(initialDeclaredRes);
-    triggerNotification(`Conectando a: ${servers[idx].providerName}`);
+    triggerNotification(`Conectando ao servidor ${idx + 1} (${initialDeclaredRes})...`);
   };
 
   // Troca de Faixa de Áudio (Normalizado para Português / Inglês Original com troca suave)
@@ -3438,7 +3439,7 @@ export default function VideoPlayer({
           <div className="mt-3 pt-2 border-t border-white/10">
             <span className="text-slate-500 block text-[9px] uppercase tracking-wider mb-0.5">Servidor Ativo</span>
             <span className="text-sky-300 font-semibold block text-[11px] truncate">
-              {activeServer?.providerName || 'Nenhum'}
+              {activeServer?.quality ? `Kairou · ${activeServer.quality}` : 'Kairou Stream'}
             </span>
           </div>
 
@@ -3475,21 +3476,18 @@ export default function VideoPlayer({
         </div>
       )}
 
-      {/* Spinner de Carregamento & Extração */}
+      {/* Carregando Transmissão Kairou Animado */}
       {(isExtracting || isVideoBuffering) && !streamError && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50 backdrop-blur-xs pointer-events-none transition-all">
-          <div className="relative flex items-center justify-center mb-4">
-            <div className="w-16 h-16 rounded-full border-4 border-sky-400/20 border-t-sky-400 animate-spin" />
-            <Radio size={24} className="absolute text-sky-400 animate-pulse" />
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-xs pointer-events-none transition-all select-none">
+          <div className="relative flex items-center justify-center mb-3">
+            <div className="absolute w-20 h-20 rounded-full bg-sky-500/20 blur-xl animate-pulse pointer-events-none" />
+            <div className="relative flex items-center justify-center w-16 h-16 animate-spin [animation-duration:2.8s]">
+              <KairouIcon size={46} glow={true} />
+            </div>
           </div>
-          <p className="text-sm font-semibold text-white tracking-wide drop-shadow">
-            {isExtracting ? extractionStatus : 'Carregando transmissão...'}
+          <p className="text-sm font-medium text-slate-200 tracking-wide drop-shadow-md">
+            Carregando transmissão...
           </p>
-          {activeServer && (
-            <p className="text-xs text-sky-400/80 mt-1">
-              {activeServer.providerName}
-            </p>
-          )}
         </div>
       )}
 
@@ -4222,40 +4220,22 @@ export default function VideoPlayer({
                 const isDub = Boolean(srv.isDub || (srv.providerName || '').includes('[Dublado]'));
                 const name = srv.providerName || '';
 
-                // Nomes humanizados e limpos, no padrão Kairou
+                // Nomes 100% Kairou - NUNCA expõe servidores reais
+                const optionNum = realIndex + 1;
                 let title = 'Kairou Stream';
-                let subtitle = 'Transmissão direta em alta fidelidade';
+                let subtitle = 'Transmissão direta em alta velocidade';
 
                 if (is4k) {
-                  if (name.includes('Opção 2')) {
-                    title = 'Kairou Ultra 4K (Opção 2)';
-                    subtitle = isDub ? 'Linha secundária 2160p UHD Dublado' : 'Linha secundária 2160p Legendado';
-                  } else if (!isDub) {
-                    title = 'Kairou Ultra 4K · Legendado';
-                    subtitle = 'Áudio Original com legendas em 2160p UHD';
-                  } else {
-                    title = 'Kairou Ultra 4K · Principal';
-                    subtitle = 'Mais estável · Resolução 2160p UHD nativa';
-                  }
-                } else if ((srv.quality || '').includes('1080') || name.includes('1080')) {
-                  if (srv.isFastest) {
-                    title = 'Kairou Express 1080p';
-                    subtitle = 'Mais rápido · Carregamento instantâneo';
-                  } else if (name.includes('Opção 2')) {
-                    title = 'Kairou Estável 1080p';
-                    subtitle = 'Linha alternativa Full HD de alta estabilidade';
-                  } else if (!isDub) {
-                    title = 'Kairou Original 1080p';
-                    subtitle = 'Áudio Original com legendas PT-BR';
-                  } else {
-                    title = 'Kairou Principal 1080p';
-                    subtitle = 'Transmissão Full HD de alta definição';
-                  }
-                } else if ((srv.quality || '').includes('720') || name.includes('720')) {
-                  title = 'Kairou Econômico 720p';
-                  subtitle = 'Otimizado para redes móveis e 4G/5G';
+                  title = isDub ? `Kairou Ultra 4K · Dublado (Opção ${optionNum})` : `Kairou Ultra 4K · Legendado (Opção ${optionNum})`;
+                  subtitle = 'Ultra HD 2160p · Qualidade máxima de cinema';
+                } else if ((srv.quality || '').includes('1080') || (srv.providerName || '').includes('1080')) {
+                  title = isDub ? `Kairou Full HD · Dublado (Opção ${optionNum})` : `Kairou Full HD · Legendado (Opção ${optionNum})`;
+                  subtitle = srv.isFastest ? 'Mais estável · Carregamento instantâneo' : 'Full HD 1080p · Alta estabilidade';
+                } else if ((srv.quality || '').includes('720') || (srv.providerName || '').includes('720')) {
+                  title = `Kairou HD 720p (Opção ${optionNum})`;
+                  subtitle = 'Otimizado para redes móveis e economia de dados';
                 } else {
-                  title = name.replace(/\[.*?\]/g, '').trim() || 'Kairou Direct';
+                  title = isDub ? `Kairou Dublado (Opção ${optionNum})` : `Kairou Original (Opção ${optionNum})`;
                   subtitle = isDub ? 'Áudio em Português' : 'Áudio Original';
                 }
 

@@ -849,8 +849,8 @@ async function extractKingVod({ tmdbId, imdbId, type, season = 1, episode = 1, c
 
           streams.push({
             id: `kairou-king-${isDub ? 'dub' : 'sub'}-${idx}`,
-            server: 'King VOD',
-            providerName: `King VOD · Servidor (${qInfo.quality}) [${isDub ? 'Dublado' : 'Original'}]`,
+            server: 'Kairou',
+            providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Servidor (${qInfo.quality}) [Legendado]`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
             quality: qInfo.quality,
@@ -917,8 +917,8 @@ async function extractMagnetFlix({ tmdbId, imdbId, type, season = 1, episode = 1
 
           streams.push({
             id: `kairou-mf-${isDub ? 'dub' : 'sub'}-${idx}`,
-            server: 'MagnetFlix',
-            providerName: `MagnetFlix · Servidor (${qInfo.quality}) [${isDub ? 'Dublado' : 'Legendado'}]`,
+            server: 'Kairou',
+            providerName: isDub ? `Kairou · Servidor (${qInfo.quality}) [Dublado]` : `Kairou · Servidor (${qInfo.quality}) [Legendado]`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
             quality: qInfo.quality,
@@ -976,8 +976,8 @@ async function extractPleiadesAnime({ tmdbId, imdbId, type, season = 1, episode 
 
           streams.push({
             id: `kairou-pleiades-${idx}`,
-            server: 'PleiadesStream',
-            providerName: `Pleiades · Anime (${qInfo.quality}) [Dual/Legendado]`,
+            server: 'Kairou',
+            providerName: `Kairou · Anime (${qInfo.quality}) [Dual/Legendado]`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
             quality: qInfo.quality,
@@ -1040,8 +1040,8 @@ async function extractSuperStream({ tmdbId, imdbId, type, season = 1, episode = 
 
           streams.push({
             id: `kairou-ss-${idx}`,
-            server: 'SuperStream',
-            providerName: `SuperStream · Servidor (${qInfo.quality})`,
+            server: 'Kairou',
+            providerName: `Kairou · Servidor (${qInfo.quality})`,
             url: streamUrl,
             type: isHls ? 'hls' : 'mp4',
             quality: qInfo.quality,
@@ -1380,39 +1380,34 @@ export default async function handler(req, res) {
       return (a.priority || 5) - (b.priority || 5);
     });
 
-    // Reatribuir títulos com base em quem REALMENTE está vivo e online
+    // Reatribuir títulos com base em quem REALMENTE está vivo e online (Nomes 100% Kairou)
     const aliveDubs = streamPool.filter(s => s.isDub);
     aliveDubs.forEach((s, idx) => {
+      s.server = 'Kairou';
       const q = s.quality || '1080p Full HD';
       if (idx === 0 && s.alive) {
-        s.providerName = `⚡ ${q} [Dublado] · Mais Estável (Opção 1)`;
+        s.providerName = `⚡ Kairou ${q} [Dublado] · Mais Estável (Opção 1)`;
         s.isFastest = true;
       } else {
-        s.providerName = `⚡ ${q} [Dublado] (Opção ${idx + 1})`;
+        s.providerName = `⚡ Kairou ${q} [Dublado] (Opção ${idx + 1})`;
         s.isFastest = false;
       }
     });
 
     const aliveSubs = streamPool.filter(s => !s.isDub);
     aliveSubs.forEach((s, idx) => {
+      s.server = 'Kairou';
       const q = s.quality || '1080p Full HD';
       if (idx === 0 && s.alive) {
-        s.providerName = `⚡ ${q} [Legendado PT-BR] · Mais Estável (Opção 1)`;
+        s.providerName = `⚡ Kairou ${q} [Legendado PT-BR] · Mais Estável (Opção 1)`;
       } else {
-        s.providerName = `⚡ ${q} [Legendado PT-BR] (Opção ${idx + 1})`;
+        s.providerName = `⚡ Kairou ${q} [Legendado PT-BR] (Opção ${idx + 1})`;
       }
     });
 
     streamPool.forEach((s, idx) => {
-      if (s.isKairouNative) {
-        s.latency = 35 + idx * 8;
-      } else if (s.server === 'BestCine' || (s.url && s.url.includes('bestcine'))) {
-        s.latency = 45 + idx * 10;
-      } else if (s.server === 'King VOD') {
-        s.latency = 80 + idx * 10;
-      } else {
-        s.latency = 110 + idx * 15;
-      }
+      s.server = 'Kairou';
+      s.latency = 40 + idx * 12;
     });
 
     const finalStreams = streamPool;
