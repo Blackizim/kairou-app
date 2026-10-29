@@ -1682,15 +1682,27 @@ export default function VideoPlayer({
     const video = videoRef.current;
     let currentUrl = activeServer.url;
 
-    // Proteção absoluta contra Mixed Content: Se o site carregar em HTTPS e a URL for HTTP puro,
-    // converte instantaneamente para o Cloudflare Worker Proxy seguro antes de passar ao elemento <video>
+    // Gerenciador de Alta Disponibilidade: Se o Cloudflare Worker atingiu o limite de 100k requisições/dia,
+    // comuta automaticamente para o Proxy VPS da Kairou (sem limite)
+    const isWorkerQuotaReached = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('kairou_cf_exhausted') === 'true';
+    if (isWorkerQuotaReached && currentUrl && currentUrl.includes('workers.dev/?url=')) {
+      const target = decodeURIComponent(currentUrl.split('?url=')[1].split('&')[0]);
+      currentUrl = `/api/proxy?cf=0&url=${encodeURIComponent(target)}`;
+    }
+
+    // Proteção de Mixed Content: Se o site carregar em HTTPS e a URL for HTTP puro,
+    // converte para proxy seguro antes de passar ao elemento <video>
     if (
       currentUrl &&
       currentUrl.startsWith('http://') &&
       typeof window !== 'undefined' &&
       window.location.protocol === 'https:'
     ) {
-      currentUrl = `https://kairou-proxy.sukiwooky-professional.workers.dev/?url=${encodeURIComponent(currentUrl)}`;
+      if (isWorkerQuotaReached) {
+        currentUrl = `/api/proxy?cf=0&url=${encodeURIComponent(currentUrl)}`;
+      } else {
+        currentUrl = `https://kairou-proxy.sukiwooky-professional.workers.dev/?url=${encodeURIComponent(currentUrl)}`;
+      }
     }
 
     // Se este mesmo stream já está carregando ou tocando, não reinicia tudo do zero!
@@ -2004,29 +2016,30 @@ export default function VideoPlayer({
     } else if (isHlsStream && Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
+        progressive: true, // Início imediato: decodifica bytes assim que chegam da rede sem esperar chunk inteiro!
         lowLatencyMode: false,
-        backBufferLength: 90,
-        maxBufferLength: 60,
-        maxMaxBufferLength: 120,
-        maxBufferSize: 250 * 1024 * 1024,
+        backBufferLength: 60,
+        maxBufferLength: 20, // 20s inicial: ágil e leve, não satura a conexão do usuário
+        maxMaxBufferLength: 45,
+        maxBufferSize: 100 * 1024 * 1024,
         maxBufferHole: 0.5,
         nudgeOffset: 0.1,
-        nudgeMaxRetry: 8,
-        startFragPrefetch: true,
+        nudgeMaxRetry: 5,
+        startFragPrefetch: true, // Pré-carrega o 1º fragmento em paralelo ao manifesto
         renderTextTracksNatively: true,
         capLevelToPlayerSize: false,
-        manifestLoadingTimeOut: 12000,
-        manifestLoadingMaxRetry: 3,
-        manifestLoadingRetryDelay: 1000,
-        levelLoadingTimeOut: 12000,
-        levelLoadingMaxRetry: 3,
-        levelLoadingRetryDelay: 1000,
-        fragLoadingTimeOut: 15000,
-        fragLoadingMaxRetry: 4,
-        fragLoadingRetryDelay: 1000,
-        abrEwmaDefaultEstimate: 5000000,
-        abrBandwidthFactor: 0.95,
-        abrBandwidthUpFactor: 0.9,
+        manifestLoadingTimeOut: 8000,
+        manifestLoadingMaxRetry: 2,
+        manifestLoadingRetryDelay: 800,
+        levelLoadingTimeOut: 8000,
+        levelLoadingMaxRetry: 2,
+        levelLoadingRetryDelay: 800,
+        fragLoadingTimeOut: 10000,
+        fragLoadingMaxRetry: 3,
+        fragLoadingRetryDelay: 800,
+        abrEwmaDefaultEstimate: 3000000, // 3 Mbps: início instantâneo e estável
+        abrBandwidthFactor: 0.9,
+        abrBandwidthUpFactor: 0.85,
       });
       hlsRef.current = hls;
 
@@ -2268,6 +2281,28 @@ export default function VideoPlayer({
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
+        // Detecção de limite de cota da Cloudflare (100k requisições diárias / erro 1015 / 429)
+        const errStatus = data.response ? data.response.status : 0;
+        const isWorkerUrl = currentUrl && currentUrl.includes('workers.dev');
+        if (isWorkerUrl && (errStatus === 429 || errStatus === 1015 || errStatus === 530 || errStatus === 502 || data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR)) {
+          console.warn('[VideoPlayer Failover] Cloudflare Worker atingiu limite ou falhou. Comutando automaticamente para VPS Turbo Proxy!');
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('kairou_cf_exhausted', 'true');
+          }
+          if (currentUrl.includes('?url=')) {
+            const rawTarget = decodeURIComponent(currentUrl.split('?url=')[1].split('&')[0]);
+            const vpsUrl = `/api/proxy?cf=0&url=${encodeURIComponent(rawTarget)}`;
+            try {
+              hls.destroy();
+              hlsRef.current = null;
+            } catch (_) {}
+            video.src = vpsUrl;
+            video.load();
+            video.play().catch(() => {});
+            return;
+          }
+        }
+
         if (data.fatal) {
           console.warn('[VideoPlayer] Erro fatal HLS:', data.type, data.details);
           switch (data.type) {
@@ -2405,6 +2440,22 @@ export default function VideoPlayer({
       let hasTriedProxy = false;
       const handleMp4Error = () => {
         const currentSrc = video.src || currentUrl;
+        const isWorkerUrl = currentUrl && currentUrl.includes('workers.dev');
+
+        // Se o Worker falhou no MP4 (cota 100k ou queda), comuta para VPS com cf=0
+        if (isWorkerUrl) {
+          console.warn('[VideoPlayer Failover MP4] Worker indisponível. Resgatando via VPS Turbo Proxy...');
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('kairou_cf_exhausted', 'true');
+          }
+          if (currentUrl.includes('?url=')) {
+            const rawTarget = decodeURIComponent(currentUrl.split('?url=')[1].split('&')[0]);
+            video.src = `/api/proxy?cf=0&url=${encodeURIComponent(rawTarget)}`;
+            video.load();
+            video.play().catch(() => {});
+            return;
+          }
+        }
         // Se a reprodução direta falhou (ex: net::ERR_CERT_AUTHORITY_INVALID, CORS, SSL autoassinado)
         // e ainda não tentamos o proxy local, tenta resgatar através de /api/proxy
         if (!hasTriedProxy && currentUrl && !currentUrl.includes('/api/proxy') && !currentUrl.includes('bestcine.dpdns.org') && (!currentSrc || !currentSrc.includes('/api/proxy'))) {
