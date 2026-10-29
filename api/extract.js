@@ -39,6 +39,7 @@ function normalizeStreamUrl(url) {
     u.includes('squareweb.app') ||
     u.includes('imagesskill.com') ||
     u.includes('v-net.work') ||
+    u.includes('shardweb.app') || // Veyra bloqueado com 401 Authentication failed
     u.includes('never_gonna_give_you_up')
   ) {
     return '';
@@ -57,8 +58,7 @@ function normalizeStreamUrl(url) {
 
   // Únicos hosts diretos com HTTPS válido, alta velocidade e CORS nativo que NÃO devem passar pelo proxy:
   // (Nota: bestcine.dpdns.org NUNCA deve passar pelo proxy da VPS pois a Cloudflare bloqueia IPs de datacenter)
-  // Apenas servidores com CORS comprovadamente aberto podem ser diretos.
-  // FrostStream e outros CDNs NÃO enviam CORS para kairou.space e DEVEM passar pelo proxy!
+  // BestCine é a fonte mais rápida e estável de streaming direto MP4 no Brasil!
   const isDirectFastHost =
     u.includes('bestcine.dpdns.org') ||
     u.includes('cnvods.com') ||
@@ -68,10 +68,16 @@ function normalizeStreamUrl(url) {
     return u;
   }
 
-  // QUALQUER OUTRA FONTE (IPTV dinâmico, vodis, pfsv, gmafast, oneplayfast, 2kbrfonte, tech-cdn,
-  // HTTP inseguro, IPs diretos ou domínios com SSL autoassinado/inválido/cipher antigo)
-  // DEVE ser encapsulada no Turbo Proxy local para garantir HTTPS, CORS, Range HTTP 206 e eliminar Mixed Content!
-  return `https://kairou-proxy.sukiwooky-professional.workers.dev/?url=${encodeURIComponent(u)}`;
+  // Para zunderflix.lat, o Referer correto é obrigatório para evitar HTTP 429
+  let extraParams = '';
+  if (u.includes('zunderflix.lat')) {
+    extraParams = `&referer=${encodeURIComponent('https://zunderflix.lat/')}`;
+  } else if (u.includes('froststream.cloutteam.com')) {
+    extraParams = `&referer=${encodeURIComponent('https://froststream.cloutteam.com/')}`;
+  }
+
+  // Encapsula no Turbo Proxy Cloudflare Worker para garantir HTTPS, CORS, Range HTTP 206 e zero Mixed Content
+  return `https://kairou-proxy.sukiwooky-professional.workers.dev/?url=${encodeURIComponent(u)}${extraParams}`;
 }
 
 function detectQuality(url = '', name = '', title = '', explicitQuality = null) {
@@ -1135,17 +1141,20 @@ function curateTopStreams(allStreams, extractedSubtitles = []) {
       if (aAlive !== bAlive) return bAlive - aAlive;
 
       const getCdnScore = (item) => {
-        if (item.isKairouNative) return 0; // Kairou Native Server é a fonte oficial prioritária!
         const u = item.url || '';
-        if (u.includes('zunderflix.lat')) return 0;
+        // 1º Lugar: BestCine (ultra-estável, MP4 nativo, 4K & 1080p, alta velocidade, sem proxy, sem bloqueios)
+        if (u.includes('bestcine.dpdns.org')) return 0;
         if (u.includes('cnvods.com')) return 1;
-        if (u.includes('bestcine.dpdns.org')) return 2;
-        if (u.includes('froststream.cloutteam.com')) return 3;
-        if (u.includes('shardweb.app')) return 4;
-        if (u.includes('baby-beamup.club')) return 5;
-        if (u.includes('wasabisys.com')) return 6;
-        if (u.includes('qzz.io')) return 7;
-        return 8;
+        if (u.includes('baby-beamup.club')) return 2; // King VOD / SuperStream
+        if (u.includes('flixbr.online')) return 3; // MagnetFlix
+        if (u.includes('thsolucoes.site')) return 4; // VeTela
+        if (u.includes('alwaysdata.net')) return 5; // BsCine
+        if (u.includes('froststream.cloutteam.com')) return 6;
+        if (item.isKairouNative || u.includes('zunderflix.lat')) return 7;
+        if (u.includes('wasabisys.com')) return 8;
+        if (u.includes('shardweb.app')) return 20; // 401 Unauthorized
+        if (u.includes('qzz.io')) return 21; // 410 Gone (tokens expirados)
+        return 10;
       };
       return getCdnScore(a) - getCdnScore(b);
     });
@@ -1319,39 +1328,60 @@ export default async function handler(req, res) {
     const curatedStreams = curateTopStreams(collected, extractedSubtitles);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // TESTE REAL DE VIDA (< 900ms CONCORRENTE) - ELIMINA SERVIDORES MORTOS DO TOPO
+    // TESTE REAL DE VIDA (CONCORRENTE) - ELIMINA SERVIDORES MORTOS DO TOPO
     // ─────────────────────────────────────────────────────────────────────────
     await Promise.allSettled(
-      curatedStreams.slice(0, 8).map(async (s) => {
+      curatedStreams.map(async (s) => {
         try {
           const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 950);
+          const timer = setTimeout(() => ctrl.abort(), 2200);
           const rawUrl = s.url.includes('?url=')
             ? decodeURIComponent(s.url.split('?url=')[1].split('&')[0])
             : s.url;
+
+          const headers = {
+            Range: 'bytes=0-100',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+          };
+          if (s.url.includes('referer=')) {
+            const match = s.url.match(/referer=([^&]+)/);
+            if (match) headers['Referer'] = decodeURIComponent(match[1]);
+          }
+
           const res = await fetch(rawUrl, {
             method: 'GET',
-            headers: { Range: 'bytes=0-100', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+            headers,
             signal: ctrl.signal,
           });
           clearTimeout(timer);
-          s.alive = res.status < 400 || res.status === 206;
+          const isAlive = (res.status >= 200 && res.status < 400) || res.status === 206;
+          s.alive = isAlive;
           s.httpStatus = res.status;
+          if (res.status >= 400) {
+            s.dead = true;
+          }
         } catch {
           s.alive = false;
         }
       })
     );
 
-    // Servidores vivos sempre vêm primeiro! Servidores que deram 502/401/timeout vão para o final da lista
-    curatedStreams.sort((a, b) => {
+    // Filtra servidores com erro HTTP fatal (410 Gone, 401 Unauthorized, 429 Too Many Requests, 500, 502)
+    // para NUNCA entregar streams sabidamente inoperantes ao usuário!
+    const healthyStreams = curatedStreams.filter(s => !s.dead && s.httpStatus !== 410 && s.httpStatus !== 401 && s.httpStatus !== 429 && s.httpStatus !== 500 && s.httpStatus !== 502);
+
+    const streamPool = healthyStreams.length > 0 ? healthyStreams : curatedStreams;
+
+    // Servidores vivos sempre vêm primeiro!
+    streamPool.sort((a, b) => {
       const aAlive = a.alive ? 1 : 0;
       const bAlive = b.alive ? 1 : 0;
-      return bAlive - aAlive;
+      if (aAlive !== bAlive) return bAlive - aAlive;
+      return (a.priority || 5) - (b.priority || 5);
     });
 
     // Reatribuir títulos com base em quem REALMENTE está vivo e online
-    const aliveDubs = curatedStreams.filter(s => s.isDub);
+    const aliveDubs = streamPool.filter(s => s.isDub);
     aliveDubs.forEach((s, idx) => {
       const q = s.quality || '1080p Full HD';
       if (idx === 0 && s.alive) {
@@ -1363,7 +1393,7 @@ export default async function handler(req, res) {
       }
     });
 
-    const aliveSubs = curatedStreams.filter(s => !s.isDub);
+    const aliveSubs = streamPool.filter(s => !s.isDub);
     aliveSubs.forEach((s, idx) => {
       const q = s.quality || '1080p Full HD';
       if (idx === 0 && s.alive) {
@@ -1373,11 +1403,11 @@ export default async function handler(req, res) {
       }
     });
 
-    curatedStreams.forEach((s, idx) => {
+    streamPool.forEach((s, idx) => {
       if (s.isKairouNative) {
         s.latency = 35 + idx * 8;
       } else if (s.server === 'BestCine' || (s.url && s.url.includes('bestcine'))) {
-        s.latency = 65 + idx * 10;
+        s.latency = 45 + idx * 10;
       } else if (s.server === 'King VOD') {
         s.latency = 80 + idx * 10;
       } else {
@@ -1385,7 +1415,7 @@ export default async function handler(req, res) {
       }
     });
 
-    const finalStreams = curatedStreams;
+    const finalStreams = streamPool;
 
     const payload = {
       ok: true,

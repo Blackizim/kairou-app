@@ -44,6 +44,7 @@ export function normalizeStreamUrl(url) {
     u.includes('squareweb.app') ||
     u.includes('imagesskill.com') ||
     u.includes('v-net.work') ||
+    u.includes('shardweb.app') ||
     u.includes('never_gonna_give_you_up')
   ) {
     return '';
@@ -70,7 +71,13 @@ export function normalizeStreamUrl(url) {
   // QUALQUER OUTRA FONTE (IPTV dinâmico, vodis, pfsv, gmafast, oneplayfast, 2kbrfonte, tech-cdn,
   // HTTP inseguro, IPs diretos ou domínios com SSL autoassinado/inválido/cipher antigo)
   // DEVE ser encapsulada no Turbo Proxy local para garantir HTTPS, CORS, Range HTTP 206 e eliminar Mixed Content!
-  return `https://kairou-proxy.sukiwooky-professional.workers.dev/?url=${encodeURIComponent(u)}`;
+    let extraParams = '';
+  if (u.includes('zunderflix.lat')) {
+    extraParams = `&referer=${encodeURIComponent('https://zunderflix.lat/')}`;
+  } else if (u.includes('froststream.cloutteam.com')) {
+    extraParams = `&referer=${encodeURIComponent('https://froststream.cloutteam.com/')}`;
+  }
+  return `https://kairou-proxy.sukiwooky-professional.workers.dev/?url=${encodeURIComponent(u)}${extraParams}`;
 }
 
 export function detectQuality(url = '', name = '', title = '', explicitQuality = null) {
@@ -893,14 +900,18 @@ export function formatKairouServers(streams) {
 
       const getCdnScore = (u) => {
         if (!u) return 10;
+        if (u.includes('bestcine.dpdns.org')) return 0;
         if (u.includes('cnvods.com')) return 1;
-        if (u.includes('bestcine.dpdns.org')) return 2;
-        if (u.includes('froststream.cloutteam.com')) return 3;
-        if (u.includes('shardweb.app')) return 4;
-        if (u.includes('baby-beamup.club')) return 5;
-        if (u.includes('wasabisys.com')) return 6;
-        if (u.includes('qzz.io')) return 7;
-        return 8;
+        if (u.includes('baby-beamup.club')) return 2;
+        if (u.includes('flixbr.online')) return 3;
+        if (u.includes('thsolucoes.site')) return 4;
+        if (u.includes('alwaysdata.net')) return 5;
+        if (u.includes('froststream.cloutteam.com')) return 6;
+        if (u.includes('zunderflix.lat')) return 7;
+        if (u.includes('wasabisys.com')) return 8;
+        if (u.includes('shardweb.app')) return 20;
+        if (u.includes('qzz.io')) return 21;
+        return 10;
       };
       return getCdnScore(a.url) - getCdnScore(b.url);
     });

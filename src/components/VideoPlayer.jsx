@@ -1445,22 +1445,7 @@ export default function VideoPlayer({
     }
 
     failedServersRef.current.add(activeServerIndex);
-
-    const now = Date.now();
-    if (now - lastFallbackTimeRef.current < 600) {
-      if (!fallbackTimeoutRef.current) {
-        fallbackTimeoutRef.current = setTimeout(() => {
-          fallbackTimeoutRef.current = null;
-          handleAutoFallback();
-        }, 700);
-      }
-      return;
-    }
-    if (fallbackTimeoutRef.current) {
-      clearTimeout(fallbackTimeoutRef.current);
-      fallbackTimeoutRef.current = null;
-    }
-    lastFallbackTimeRef.current = now;
+    lastFallbackTimeRef.current = Date.now();
 
     if (media?.type === 'live' || media?.isLive) {
       const slug = media.slug || media.channel?.slug;
@@ -2028,15 +2013,15 @@ export default function VideoPlayer({
         startFragPrefetch: true, // Pré-carrega o 1º fragmento em paralelo ao manifesto
         renderTextTracksNatively: true,
         capLevelToPlayerSize: false,
-        manifestLoadingTimeOut: 8000,
-        manifestLoadingMaxRetry: 2,
-        manifestLoadingRetryDelay: 800,
-        levelLoadingTimeOut: 8000,
-        levelLoadingMaxRetry: 2,
-        levelLoadingRetryDelay: 800,
-        fragLoadingTimeOut: 10000,
-        fragLoadingMaxRetry: 3,
-        fragLoadingRetryDelay: 800,
+        manifestLoadingTimeOut: 4500,
+        manifestLoadingMaxRetry: 1,
+        manifestLoadingRetryDelay: 200,
+        levelLoadingTimeOut: 4500,
+        levelLoadingMaxRetry: 1,
+        levelLoadingRetryDelay: 200,
+        fragLoadingTimeOut: 8000,
+        fragLoadingMaxRetry: 2,
+        fragLoadingRetryDelay: 400,
         abrEwmaDefaultEstimate: 3000000, // 3 Mbps: início instantâneo e estável
         abrBandwidthFactor: 0.9,
         abrBandwidthUpFactor: 0.85,
@@ -2281,74 +2266,45 @@ export default function VideoPlayer({
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
-        // Detecção de limite de cota da Cloudflare (100k requisições diárias / erro 1015 / 429)
         const errStatus = data.response ? data.response.status : 0;
-        const isWorkerUrl = currentUrl && currentUrl.includes('workers.dev');
-        if (isWorkerUrl && (errStatus === 429 || errStatus === 1015 || errStatus === 530 || errStatus === 502 || data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR)) {
-          console.warn('[VideoPlayer Failover] Cloudflare Worker atingiu limite ou falhou. Comutando automaticamente para VPS Turbo Proxy!');
-          if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.setItem('kairou_cf_exhausted', 'true');
-          }
-          if (currentUrl.includes('?url=')) {
-            const rawTarget = decodeURIComponent(currentUrl.split('?url=')[1].split('&')[0]);
-            const vpsUrl = `/api/proxy?cf=0&url=${encodeURIComponent(rawTarget)}`;
-            try {
-              hls.destroy();
-              hlsRef.current = null;
-            } catch (_) {}
-            video.src = vpsUrl;
-            video.load();
-            video.play().catch(() => {});
-            return;
-          }
+        const isFatalHttp = errStatus >= 400; // 401, 403, 404, 410, 429, 500, 502, 503
+
+        // Se for erro HTTP fatal no manifesto ou fragmento (ex: 410 Gone de token expirado, 500, 502, 401, 429)
+        // ou erro fatal de rede: interrompe imediatamente sem retentativas demoradas e avana na hora!
+        if (isFatalHttp || (data.fatal && data.type === Hls.ErrorTypes.NETWORK_ERROR)) {
+          console.warn(`[VideoPlayer] Falha fatal HLS (HTTP ${errStatus}, ${data.type}, ${data.details}). Alternando instantaneamente para o próximo servidor...`);
+          try {
+            hls.stopLoad();
+            hls.destroy();
+            hlsRef.current = null;
+          } catch (_) {}
+          failedServersRef.current.add(activeServerIndex);
+          handleAutoFallbackRef.current();
+          return;
         }
 
         if (data.fatal) {
-          console.warn('[VideoPlayer] Erro fatal HLS:', data.type, data.details);
           switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              // Se o manifesto for inválido ou inacessível (ex: SSL/CORS), tentar proxy antes de alternar
-              if (
-                data.details === Hls.ErrorDetails.MANIFEST_PARSING_ERROR ||
-                data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
-                data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT
-              ) {
-                if (currentUrl && !currentUrl.includes('/api/proxy') && !currentUrl.includes('bestcine.dpdns.org')) {
-                  console.warn('[VideoPlayer] Manifesto HLS inacessível diretamente (SSL/CORS). Resgatando via /api/proxy...');
-                  const proxiedUrl = `/api/proxy?url=${encodeURIComponent(currentUrl)}`;
-                  cancelWatchdog();
-                  watchdogTimer = setTimeout(() => {
-                    const v = videoRef.current;
-                    if (hasStartedPlayback || (v && (v.currentTime > 0 || v.readyState >= 2 || !v.paused || (v.buffered && v.buffered.length > 0 && v.buffered.end(0) > 0.5)))) {
-                      cancelWatchdog();
-                      return;
-                    }
-                    handleAutoFallbackRef.current();
-                  }, 25000);
-                  hls.loadSource(proxiedUrl);
-                  hls.startLoad();
-                  return;
-                }
-                console.warn('[VideoPlayer] Manifesto HLS inválido ou inacessível. Alternando para servidor reserva...');
-                handleAutoFallbackRef.current();
-              } else {
-                hls.startLoad();
-              }
-              break;
             case Hls.ErrorTypes.MEDIA_ERROR:
               hls.recoverMediaError();
               break;
             default:
+              try {
+                hls.stopLoad();
+                hls.destroy();
+                hlsRef.current = null;
+              } catch (_) {}
+              failedServersRef.current.add(activeServerIndex);
               handleAutoFallbackRef.current();
               break;
           }
         } else if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
-          // Se houver qualquer micro-stall de sincronia de buffer, avança sutilmente para destravar
           if (videoRef.current && !videoRef.current.paused) {
             videoRef.current.currentTime += 0.05;
           }
         }
       });
+    
     } else if (video.canPlayType('application/vnd.apple.mpegurl') && isHlsStream) {
       // Suporte Safari HLS nativo
       video.src = currentUrl;
@@ -2442,15 +2398,22 @@ export default function VideoPlayer({
         const currentSrc = video.src || currentUrl;
         const isWorkerUrl = currentUrl && currentUrl.includes('workers.dev');
 
-        // Se o Worker falhou no MP4 (cota 100k ou queda), comuta UMA VEZ para VPS com cf=0
+        // Se o Worker falhou no MP4 (cota 100k ou queda) E a URL original no for de um host sabidamente inoperante
         if (isWorkerUrl && !hasTriedProxy) {
           hasTriedProxy = true;
-          console.warn('[VideoPlayer Failover MP4] Worker indisponível. Resgatando via VPS Turbo Proxy...');
           if (typeof sessionStorage !== 'undefined') {
             sessionStorage.setItem('kairou_cf_exhausted', 'true');
           }
           if (currentUrl.includes('?url=')) {
             const rawTarget = decodeURIComponent(currentUrl.split('?url=')[1].split('&')[0]);
+            // Se o alvo bruto  de um servio upstream sabidamente inoperante, pula direto pro prximo servidor!
+            if (rawTarget.includes('shardweb.app') || rawTarget.includes('qzz.io')) {
+              console.warn('[VideoPlayer] Upstream indisponvel. Pulando direto para o prximo servidor...');
+              failedServersRef.current.add(activeServerIndex);
+              handleAutoFallbackRef.current();
+              return;
+            }
+            console.warn('[VideoPlayer Failover MP4] Worker indisponvel. Resgatando via VPS Turbo Proxy...');
             video.src = `/api/proxy?cf=0&url=${encodeURIComponent(rawTarget)}`;
             video.load();
             video.play().catch(() => {});
@@ -2458,33 +2421,11 @@ export default function VideoPlayer({
           }
         }
 
-        // Se a VPS também falhou ou o stream original está morto (ex: 502 upstream),
-        // avança imediatamente para o PRÓXIMO servidor sem travar o usuário!
-        console.warn('[VideoPlayer] Servidor atual inoperante. Alternando para o próximo servidor...');
-        handleAutoFallbackRef.current();
-        return;
-        // Se a reprodução direta falhou (ex: net::ERR_CERT_AUTHORITY_INVALID, CORS, SSL autoassinado)
-        // e ainda não tentamos o proxy local, tenta resgatar através de /api/proxy
-        if (!hasTriedProxy && currentUrl && !currentUrl.includes('/api/proxy') && !currentUrl.includes('bestcine.dpdns.org') && (!currentSrc || !currentSrc.includes('/api/proxy'))) {
-          hasTriedProxy = true;
-          console.warn('[VideoPlayer] Falha na reprodução direta (possível certificado SSL inválido ou CORS). Resgatando via /api/proxy:', currentUrl);
-          const proxiedUrl = `/api/proxy?url=${encodeURIComponent(currentUrl)}`;
-          cancelWatchdog();
-          watchdogTimer = setTimeout(() => {
-            const v = videoRef.current;
-            if (hasStartedPlayback || (v && (v.currentTime > 0 || v.readyState >= 2 || !v.paused || (v.buffered && v.buffered.length > 0 && v.buffered.end(0) > 0.5)))) {
-              cancelWatchdog();
-              return;
-            }
-            handleAutoFallbackRef.current();
-          }, 25000);
-          video.src = proxiedUrl;
-          video.load();
-          video.play().catch(() => {});
-          return;
-        }
+        console.warn('[VideoPlayer] Servidor atual inoperante. Alternando instantaneamente para o prximo servidor...');
+        failedServersRef.current.add(activeServerIndex);
         handleAutoFallbackRef.current();
       };
+
       video.addEventListener('loadeddata', handleData, { once: true });
       video.addEventListener('canplay', handleData, { once: true });
       video.addEventListener('resize', handleRealtimeResize);
