@@ -41,6 +41,16 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, service: 'Kairou Turbo Proxy Online' });
   }
 
+  // Turbo Offload: Se não for IP numérico direto (que Cloudflare bloqueia), redireciona 307
+  // para o Cloudflare Worker para garantir velocidade global máxima (0ms na borda da CDN)!
+  const isDirectIp = /^https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(targetUrl);
+  if (!isDirectIp && req.query?.cf !== '0') {
+    let cfWorkerUrl = `https://kairou-proxy.sukiwooky-professional.workers.dev/?url=${encodeURIComponent(targetUrl)}`;
+    if (req.query?.referer) cfWorkerUrl += `&referer=${encodeURIComponent(req.query.referer)}`;
+    if (req.query?.format) cfWorkerUrl += `&format=${encodeURIComponent(req.query.format)}`;
+    return res.redirect(307, cfWorkerUrl);
+  }
+
   try {
     const parsedTarget = new URL(targetUrl);
     const forwardHeaders = {
