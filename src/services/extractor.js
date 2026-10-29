@@ -50,7 +50,7 @@ export function normalizeStreamUrl(url) {
   }
 
   // Se já for rota do proxy local
-  if (u.startsWith('/api/proxy')) {
+  if (u.startsWith('/api/proxy') || u.includes('workers.dev')) {
     return u;
   }
 
@@ -71,7 +71,7 @@ export function normalizeStreamUrl(url) {
   // QUALQUER OUTRA FONTE (IPTV dinâmico, vodis, pfsv, gmafast, oneplayfast, 2kbrfonte, tech-cdn,
   // HTTP inseguro, IPs diretos ou domínios com SSL autoassinado/inválido/cipher antigo)
   // DEVE ser encapsulada no Turbo Proxy local para garantir HTTPS, CORS, Range HTTP 206 e eliminar Mixed Content!
-  return `/api/proxy?url=${encodeURIComponent(u)}`;
+  return `https://kairou-proxy.sukiwooky-professional.workers.dev/?url=${encodeURIComponent(u)}`;
 }
 
 export function detectQuality(url = '', name = '', title = '', explicitQuality = null) {
@@ -814,7 +814,7 @@ export function formatKairouServers(streams) {
 
   // Se já foi curado no backend, preserva sem alterar
   if (streams.some((s) => s && s.isCurated)) {
-    return streams;
+    return streams.map(s => (s && s.url && s.url.startsWith('http://') ? { ...s, url: normalizeStreamUrl(s.url) } : s));
   }
 
   const pools = {
@@ -839,7 +839,8 @@ export function formatKairouServers(streams) {
       continue;
     }
 
-    const urlClean = url.split('?')[0];
+    const rawTarget = url.includes('?url=') ? decodeURIComponent(url.split('?url=')[1].split('&')[0]) : url;
+    const urlClean = rawTarget.split('?')[0];
     if (seenUrls.has(urlClean)) continue;
     seenUrls.add(urlClean);
 

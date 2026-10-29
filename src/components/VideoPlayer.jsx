@@ -1680,7 +1680,18 @@ export default function VideoPlayer({
     if (!videoRef.current) return;
 
     const video = videoRef.current;
-    const currentUrl = activeServer.url;
+    let currentUrl = activeServer.url;
+
+    // Proteção absoluta contra Mixed Content: Se o site carregar em HTTPS e a URL for HTTP puro,
+    // converte instantaneamente para o Cloudflare Worker Proxy seguro antes de passar ao elemento <video>
+    if (
+      currentUrl &&
+      currentUrl.startsWith('http://') &&
+      typeof window !== 'undefined' &&
+      window.location.protocol === 'https:'
+    ) {
+      currentUrl = `https://kairou-proxy.sukiwooky-professional.workers.dev/?url=${encodeURIComponent(currentUrl)}`;
+    }
 
     // Se este mesmo stream já está carregando ou tocando, não reinicia tudo do zero!
     if (previousLoadedUrlRef.current === currentUrl && video.src) {
